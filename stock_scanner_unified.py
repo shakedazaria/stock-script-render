@@ -59,32 +59,27 @@ except Exception:
 # ============================================================
 
 # --- אבטחה: סיסמה + מפתחות API ----
-FROM_EMAIL = os.getenv("FROM_EMAIL", "sendemail920@gmail.com")
-APP_PASSWORD = "mxui buvu flcp uivc"
+FROM_EMAIL = os.getenv("FROM_EMAIL", "")
+APP_PASSWORD = os.getenv("APP_PASSWORD", "")
 if APP_PASSWORD == "YOUR_APP_PASSWORD_HERE" or not APP_PASSWORD:
     print(
         "Warning: APP_PASSWORD is still set to the default value or is empty. Email sending disabled."
     )
-    APP_PASSWORD = "mxui buvu flcp uivc"
+    APP_PASSWORD = os.getenv("APP_PASSWORD", "")
 TO_EMAILS = ["sendemail920@gmail.com","shakedstocks@gmail.com", "Lian.hadar77@gmail.com"]
 TO_EMAILS = list(dict.fromkeys(TO_EMAILS))
 CHARTS_DIR = os.getenv("CHARTS_DIR", "temp_images")
 os.makedirs(CHARTS_DIR, exist_ok=True)
-LOGFILE = os.getenv("LOGFILE", r"C:\Users\LENOVO\Desktop\stock_scanner_unified_log.txt")
+LOGFILE = os.getenv("LOGFILE", "stock_scanner_unified_log.txt")
 
-API_KEYS = [k.strip() for k in os.getenv("TWELVEDATA_API_KEYS", "").split(",") if k.strip()]
-# fallback לפיתוח — הסר בפרודקשן
+API_KEYS = [
+    key.strip()
+    for key in os.getenv("TWELVEDATA_API_KEYS", "").split(",")
+    if key.strip()
+]
+
 if not API_KEYS:
-    API_KEYS = [
-        "fc3e6d895e094c9ba26508301c9ca65c",
-        "21fbe50dff884944bd215f6614699025",
-        "dd8ad0e570d4417fa82124e3aaee58ed",
-        "04dbdccf2c4e4b4fa6b2afa3eb995181",
-        "54f4c054cc124cde94e3ccc571e82475",
-        "7838aab01eb7423db1a9135105d48b02",
-        "a6270ae8f1d74165adc7f9680a3f44e5",
-    ]
-
+    raise RuntimeError("TWELVEDATA_API_KEYS environment variable is missing")
 # --- TwelveData ---
 BASE_URL        = "https://api.twelvedata.com/time_series"
 TICKERS_PER_KEY = int(os.getenv("TICKERS_PER_KEY", "735"))
@@ -494,20 +489,11 @@ SECTOR_ETF_MAP = {
     "Communication Services": "XLC",
 }
 
-# LOGFILE עם fallback
-_default_log = r"C:\Users\LENOVO\Desktop\stock_scanner_unified_log.txt"
-LOGFILE = os.getenv("LOGFILE", _default_log)
-try:
-    _log_dir = os.path.dirname(LOGFILE)
-    if _log_dir and not os.path.exists(_log_dir):
-        os.makedirs(_log_dir, exist_ok=True)
-    open(LOGFILE, "a").close()  # בדיקת כתיבה
-except Exception:
-    LOGFILE = "stock_scanner_unified_log.txt"
+# LOGFILE
+LOGFILE = os.getenv("LOGFILE", "stock_scanner_unified_log.txt")
 
 # WATCHLIST LOG — מניות שעברו EMA28+MA150+דוחות אבל נפסלו בשלב אחרון
-_default_watchlist_log = r"C:\Users\LENOVO\Desktop\watchlist_log.txt"
-WATCHLIST_LOG = os.getenv("WATCHLIST_LOG", _default_watchlist_log)
+WATCHLIST_LOG = os.getenv("WATCHLIST_LOG", "watchlist_log.txt")
 try:
     open(WATCHLIST_LOG, "a").close()
 except Exception:
@@ -687,12 +673,16 @@ HTTP_SESSION.headers.update({"User-Agent": "Mozilla/5.0"})
 # ============================================================
 def log(msg: str) -> None:
     line = f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {msg}"
+
+    # מציג את ההודעה ב-Render Logs
+    print(line, flush=True)
+
+    # שומר גם לקובץ לוג
     try:
         with open(LOGFILE, "a", encoding="utf-8") as f:
             f.write(line + "\n")
     except Exception:
-        print(line)
-
+        pass
 
 def log_watchlist(symbol: str, reason: str, price: float,
                   pattern: str = "", breakout: float = 0.0,
