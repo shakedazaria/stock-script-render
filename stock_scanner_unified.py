@@ -66,8 +66,15 @@ if APP_PASSWORD == "YOUR_APP_PASSWORD_HERE" or not APP_PASSWORD:
         "Warning: APP_PASSWORD is still set to the default value or is empty. Email sending disabled."
     )
     APP_PASSWORD = os.getenv("APP_PASSWORD", "")
-TO_EMAILS = ["sendemail920@gmail.com","shakedstocks@gmail.com", "Lian.hadar77@gmail.com"]
+TO_EMAILS = [
+    email.strip()
+    for email in os.getenv("TO_EMAILS", "").split(",")
+    if email.strip()
+]
 TO_EMAILS = list(dict.fromkeys(TO_EMAILS))
+
+if not TO_EMAILS:
+    raise RuntimeError("TO_EMAILS environment variable is missing")
 CHARTS_DIR = os.getenv("CHARTS_DIR", "temp_images")
 os.makedirs(CHARTS_DIR, exist_ok=True)
 LOGFILE = os.getenv("LOGFILE", "stock_scanner_unified_log.txt")
