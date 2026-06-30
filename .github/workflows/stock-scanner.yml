@@ -15,6 +15,7 @@ jobs:
       FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
       APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
       TWELVEDATA_API_KEYS: ${{ secrets.TWELVEDATA_API_KEYS }}
+      TO_EMAILS: ${{ secrets.TO_EMAILS }}
 
     steps:
       - name: Checkout repository
