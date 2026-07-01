@@ -11,9 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
-    permissions:
-      contents: write
-
     env:
       FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
       APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
@@ -23,8 +20,19 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Restore scanner state
+        uses: actions/cache@v4
         with:
-          persist-credentials: true
+          path: |
+            performance_log.csv
+            progress.json
+            alerts_sent.json
+            signals_log.csv
+            twelvedata_blocklist.json
+          key: scanner-state-${{ github.run_id }}
+          restore-keys: |
+            scanner-state-
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -38,14 +46,3 @@ jobs:
 
       - name: Run stock scanner
         run: python stock_scanner_unified.py
-
-      - name: Save scanner files
-        if: always()
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add performance_log.csv alerts_sent.json open_positions.json watchlist_log.txt signals_log.csv progress.json twelvedata_blocklist.json universe_cache.json scanner_learned_params.json || true
-
-          git diff --cached --quiet || git commit -m "Update scanner tracking files"
-          git push
