@@ -2,10 +2,9 @@ name: Stock Scanner Daily
 
 on:
   schedule:
-    # 08:00 Israel time during summer = 05:00 UTC
-    - cron: "0 5 * * *"
+    - cron: "0 8 * * *"
+      timezone: "Asia/Jerusalem"
   workflow_dispatch:
-
 jobs:
   run-stock-scanner:
     runs-on: ubuntu-latest
