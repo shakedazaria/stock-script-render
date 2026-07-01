@@ -5,10 +5,14 @@ on:
     - cron: "0 8 * * *"
       timezone: "Asia/Jerusalem"
   workflow_dispatch:
+
 jobs:
   run-stock-scanner:
     runs-on: ubuntu-latest
     timeout-minutes: 360
+
+    permissions:
+      contents: write
 
     env:
       FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
@@ -19,6 +23,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -32,3 +38,14 @@ jobs:
 
       - name: Run stock scanner
         run: python stock_scanner_unified.py
+
+      - name: Save scanner files
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add performance_log.csv alerts_sent.json open_positions.json watchlist_log.txt signals_log.csv progress.json twelvedata_blocklist.json universe_cache.json scanner_learned_params.json || true
+
+          git diff --cached --quiet || git commit -m "Update scanner tracking files"
+          git push
