@@ -5384,9 +5384,25 @@ def prefilter_by_ema28(ticker_list: list[str]) -> tuple[list[str], list[str]]:
 
 
 def main() -> None:
+   global tickers
     log("=" * 60)
     log("Stock Scanner Unified — START")
     log("=" * 60)
+  try:
+    msg = MIMEText("GitHub Actions הצליח להתחבר ל-Gmail ולשלוח מייל בדיקה.", "plain", "utf-8")
+    msg["Subject"] = "✅ Stock Scanner Email Test"
+    msg["From"] = FROM_EMAIL
+    msg["To"] = FROM_EMAIL
+    msg["Bcc"] = ", ".join(TO_EMAILS)
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+        smtp.login(FROM_EMAIL, APP_PASSWORD)
+        smtp.send_message(msg)
+
+    log(f"✅ Test email sent successfully to {len(TO_EMAILS)} recipients")
+
+except Exception as e:
+    log(f"❌ Test email failed: {e}")
     # ── מנע Sleep במהלך הסריקה ──────────────────────────────
     try:
         import ctypes
@@ -5422,7 +5438,6 @@ def main() -> None:
         log("❌ FATAL: אין מפתחות TwelveData API. הגדר TWELVEDATA_API_KEYS.")
         return
     # ── בנה Universe — כל מניות NYSE + NASDAQ מעל $1B ──────
-    global tickers
     if not tickers:
         log("🌐 Loading universe (first run or no cache)...")
         tickers = build_universe()
