@@ -5384,25 +5384,31 @@ def prefilter_by_ema28(ticker_list: list[str]) -> tuple[list[str], list[str]]:
 
 
 def main() -> None:
-   global tickers
+    global tickers
+
     log("=" * 60)
     log("Stock Scanner Unified — START")
     log("=" * 60)
-  try:
-    msg = MIMEText("GitHub Actions הצליח להתחבר ל-Gmail ולשלוח מייל בדיקה.", "plain", "utf-8")
-    msg["Subject"] = "✅ Stock Scanner Email Test"
-    msg["From"] = FROM_EMAIL
-    msg["To"] = FROM_EMAIL
-    msg["Bcc"] = ", ".join(TO_EMAILS)
 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
-        smtp.login(FROM_EMAIL, APP_PASSWORD)
-        smtp.send_message(msg)
+    try:
+        msg = MIMEText(
+            "GitHub Actions הצליח להתחבר ל-Gmail ולשלוח מייל בדיקה.",
+            "plain",
+            "utf-8",
+        )
+        msg["Subject"] = "✅ Stock Scanner Email Test"
+        msg["From"] = FROM_EMAIL
+        msg["To"] = FROM_EMAIL
+        msg["Bcc"] = ", ".join(TO_EMAILS)
 
-    log(f"✅ Test email sent successfully to {len(TO_EMAILS)} recipients")
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+            smtp.login(FROM_EMAIL, APP_PASSWORD)
+            smtp.send_message(msg)
 
-except Exception as e:
-    log(f"❌ Test email failed: {e}")
+        log(f"✅ Test email sent successfully to {len(TO_EMAILS)} recipients")
+
+    except Exception as e:
+        log(f"❌ Test email failed: {e}")
     # ── מנע Sleep במהלך הסריקה ──────────────────────────────
     try:
         import ctypes
