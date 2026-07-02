@@ -530,11 +530,47 @@ UNIVERSE_MIN_PRICE  = float(os.getenv("UNIVERSE_MIN_PRICE", "5.0")) # לא פנ�
 UNIVERSE_MIN_VOL    = int(os.getenv("UNIVERSE_MIN_VOL", "100000"))  # volume מינימלי
 
 
-def _fetch_exchange_tickers(exchange: str) -> list[str]:
-    """מוריד רשימת טיקרים מ-yfinance לפי בורסה."""
+def _parse_market_number(value) -> float | None:
+    """
+    ממיר מספרים שמגיעים מ-NASDAQ/Yahoo למספר float.
+    תומך בפורמטים כמו: "$12.3B", "1,234,567,890", "N/A".
+    """
     try:
-        import urllib.request, csv, io
-        # NASDAQ + NYSE דרך קובץ NASDAQ FTP — זמין לציבור
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            if pd.isna(value):
+                return None
+            return float(value)
+
+        s = str(value).strip()
+        if not s or s.lower() in ("n/a", "na", "none", "null", "-", "--"):
+            return None
+
+        s = s.replace("$", "").replace(",", "").replace("%", "").strip()
+        mult = 1.0
+        if s[-1:].upper() == "T":
+            mult = 1_000_000_000_000.0
+            s = s[:-1]
+        elif s[-1:].upper() == "B":
+            mult = 1_000_000_000.0
+            s = s[:-1]
+        elif s[-1:].upper() == "M":
+            mult = 1_000_000.0
+            s = s[:-1]
+        elif s[-1:].upper() == "K":
+            mult = 1_000.0
+            s = s[:-1]
+
+        return float(s) * mult
+    except Exception:
+        return None
+
+
+def _fetch_exchange_rows(exchange: str) -> list[dict]:
+    """מוריד rows מלאים מ-NASDAQ screener כדי לא להעמיס על yfinance בשלב ה-Universe."""
+    try:
+        import urllib.request
         urls = {
             "NASDAQ": "https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit=10000&exchange=nasdaq",
             "NYSE":   "https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit=10000&exchange=nyse",
@@ -542,29 +578,48 @@ def _fetch_exchange_tickers(exchange: str) -> list[str]:
         url = urls.get(exchange.upper(), "")
         if not url:
             return []
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "Mozilla/5.0",
+                "Accept": "application/json,text/plain,*/*",
+                "Origin": "https://www.nasdaq.com",
+                "Referer": "https://www.nasdaq.com/market-activity/stocks/screener",
+            },
+        )
         with urllib.request.urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read().decode())
-        rows = data.get("data", {}).get("table", {}).get("rows", [])
-        symbols = []
-        for row in rows:
-            sym = (row.get("symbol") or "").strip()
-            # דלג על מניות עם תוים מיוחדים (preferred, warrants וכו')
+
+        rows = data.get("data", {}).get("table", {}).get("rows", []) or []
+        return rows if isinstance(rows, list) else []
+    except Exception as e:
+        log(f"_fetch_exchange_rows {exchange} error: {e}")
+        return []
+
+
+def _fetch_exchange_tickers(exchange: str) -> list[str]:
+    """מוריד רשימת טיקרים מ-NASDAQ screener לפי בורסה."""
+    rows = _fetch_exchange_rows(exchange)
+    symbols = []
+    for row in rows:
+        try:
+            sym = (row.get("symbol") or "").strip().upper()
+            # דלג על preferred/warrants וסימולים עם נקודה/מקף כדי להפחית שגיאות API
             if sym and sym.isalpha() and len(sym) <= 5:
                 symbols.append(sym)
-        return symbols
-    except Exception as e:
-        log(f"_fetch_exchange_tickers {exchange} error: {e}")
-        return []
+        except Exception:
+            continue
+    return symbols
 
 
 def build_universe(force_refresh: bool = False) -> list[str]:
     """
-    מוריד את כל מניות NASDAQ + NYSE, מסנן לפי market cap > $1B,
-    שומר cache ומחזיר רשימה נקייה.
+    מוריד את כל מניות NASDAQ + NYSE ומסנן לפי Market Cap/Price מתוך NASDAQ screener.
 
-    force_refresh=True מאלץ הורדה מחדש גם אם cache קיים.
-    Cache מתחדש אוטומטית פעם בשבוע.
+    שינוי חשוב:
+    לא משתמש יותר ב-yf.Ticker(sym).info על אלפי מניות, כי זה גורם לחסימות/חוסר נתונים.
+    אם Market Cap לא זמין — לא פוסלים את המניה; היא תעבור לשלבים הבאים.
     """
     # בדוק cache
     if not force_refresh and os.path.exists(UNIVERSE_CACHE_FILE):
@@ -580,66 +635,94 @@ def build_universe(force_refresh: bool = False) -> list[str]:
         except Exception:
             pass
 
-    log("🌐 Building universe — downloading NASDAQ + NYSE tickers...")
+    log("🌐 Building universe — downloading NASDAQ + NYSE rows...")
 
-    # שלב 1: הורד כל הטיקרים
-    nasdaq_tickers = _fetch_exchange_tickers("NASDAQ")
-    nyse_tickers   = _fetch_exchange_tickers("NYSE")
-    all_tickers    = list(dict.fromkeys(nasdaq_tickers + nyse_tickers))
-    log(f"   Raw: {len(nasdaq_tickers)} NASDAQ + {len(nyse_tickers)} NYSE = {len(all_tickers)} unique")
+    # שלב 1: הורד rows מלאים מה-NASDAQ screener
+    nasdaq_rows = _fetch_exchange_rows("NASDAQ")
+    nyse_rows   = _fetch_exchange_rows("NYSE")
+    all_rows    = nasdaq_rows + nyse_rows
+    log(f"   Raw rows: {len(nasdaq_rows)} NASDAQ + {len(nyse_rows)} NYSE = {len(all_rows)} total")
 
-    if not all_tickers:
-        log("⚠️ FALLBACK MODE — API נכשל, סורק רק 66 מניות! בדוק חיבור לאינטרנט.")
+    if not all_rows:
+        log("⚠️ FALLBACK MODE — NASDAQ API נכשל, סורק רק 66 מניות! בדוק חיבור לאינטרנט.")
         return _FALLBACK_TICKERS
 
-    # שלב 2: סינון מהיר לפי market cap דרך yfinance batch
-    log(f"   Filtering by market cap > ${UNIVERSE_MIN_CAP/1e9:.0f}B ...")
-    passed = []
+    log(f"   Filtering by NASDAQ row data: market cap > ${UNIVERSE_MIN_CAP/1e9:.0f}B, price > ${UNIVERSE_MIN_PRICE:.0f}")
+    passed: list[str] = []
+    seen: set[str] = set()
+
     failed = 0
+    filtered_market_cap = 0
+    filtered_price = 0
+    unknown_market_cap = 0
+    unknown_price = 0
 
-    for i, sym in enumerate(all_tickers):
+    for i, row in enumerate(all_rows):
         try:
-            info  = yf.Ticker(sym).info or {}
+            sym = (row.get("symbol") or "").strip().upper()
+            # דלג על preferred/warrants וסימולים עם נקודה/מקף כדי להפחית שגיאות API
+            if not sym or not sym.isalpha() or len(sym) > 5:
+                failed += 1
+                continue
+            if sym in seen:
+                continue
+            seen.add(sym)
 
-            # market cap — עקבי עם fetch_market_cap בscan_ticker
-            mc    = info.get("marketCap")
-            mc    = float(mc) if mc else None
+            # NASDAQ screener בדרך כלל מחזיר marketCap + lastsale.
+            mc = _parse_market_number(
+                row.get("marketCap")
+                or row.get("marketcap")
+                or row.get("market_cap")
+                or row.get("MarketCap")
+            )
+            price = _parse_market_number(
+                row.get("lastsale")
+                or row.get("lastSale")
+                or row.get("price")
+                or row.get("Price")
+                or row.get("previousClose")
+            )
 
-            # fallback: shares × price
-            if not mc:
-                shares = info.get("sharesOutstanding") or info.get("impliedSharesOutstanding")
-                price  = info.get("currentPrice") or info.get("previousClose")
-                if shares and price:
-                    mc = float(shares) * float(price)
+            # אם יש Market Cap והוא נמוך — פוסלים. אם אין נתון — לא פוסלים.
+            if mc is not None and mc < UNIVERSE_MIN_CAP:
+                filtered_market_cap += 1
+                failed += 1
+                continue
+            if price is not None and price < UNIVERSE_MIN_PRICE:
+                filtered_price += 1
+                failed += 1
+                continue
 
-            # מחיר
-            price = info.get("currentPrice") or info.get("previousClose") or info.get("regularMarketPrice")
-            price = float(price) if price else None
-
-            # חובה: market cap ידוע ומעל $1B
-            if not mc or mc < UNIVERSE_MIN_CAP:
-                failed += 1; continue
-            # חובה: מחיר ידוע ומעל $5
-            if not price or price < UNIVERSE_MIN_PRICE:
-                failed += 1; continue
+            if mc is None:
+                unknown_market_cap += 1
+            if price is None:
+                unknown_price += 1
 
             passed.append(sym)
 
         except Exception:
             failed += 1
 
-        # התקדמות
-        if (i + 1) % 500 == 0 or (i + 1) == len(all_tickers):
-            log(f"   Progress: {i+1}/{len(all_tickers)} — passed so far: {len(passed)}")
+        if (i + 1) % 500 == 0 or (i + 1) == len(all_rows):
+            log(f"   Progress: {i+1}/{len(all_rows)} rows — passed so far: {len(passed)}")
+
+    if not passed:
+        log("⚠️ Universe filter returned 0 tickers — using fallback list.")
+        return _FALLBACK_TICKERS
 
     # שמור cache
     try:
         cache_data = {
             "date":    datetime.now().isoformat(),
             "tickers": passed,
-            "total_scanned": len(all_tickers),
+            "total_rows": len(all_rows),
             "passed": len(passed),
             "failed": failed,
+            "filtered_market_cap": filtered_market_cap,
+            "filtered_price": filtered_price,
+            "unknown_market_cap_passed": unknown_market_cap,
+            "unknown_price_passed": unknown_price,
+            "source": "nasdaq_screener_no_yfinance_info",
         }
         with open(UNIVERSE_CACHE_FILE, "w") as f:
             json.dump(cache_data, f, indent=2)
@@ -647,7 +730,8 @@ def build_universe(force_refresh: bool = False) -> list[str]:
     except Exception as e:
         log(f"Universe cache save error: {e}")
 
-    log(f"✅ Universe built: {len(passed)} tickers passed out of {len(all_tickers)}")
+    log(f"✅ Universe built: {len(passed)} tickers passed out of {len(all_rows)} rows")
+    log(f"   Filtered: market_cap={filtered_market_cap}, price={filtered_price}, unknown_mc_passed={unknown_market_cap}, unknown_price_passed={unknown_price}")
     return passed
 
 
@@ -1046,7 +1130,8 @@ def fetch_data_yfinance(ticker: str, period: str = "500d", max_retries: int = 3)
     for attempt in range(max_retries):
         try:
             df = yf.download(ticker, period=period, interval="1d",
-                             progress=False, auto_adjust=False, threads=False)
+                             progress=False, auto_adjust=False, threads=False,
+                             timeout=20)
             if df is None or df.empty:
                 raise RuntimeError("empty")
             # תמיכה ב-MultiIndex columns של yfinance החדש (>= 0.2.x)
@@ -1554,8 +1639,12 @@ def compute_setup_score(df: pd.DataFrame, ticker: str,
 
     # B1) RS ציון vs S&P500 (מקס 8)
     try:
-        rs = compute_rs_score(ticker, df)
-        if rs >= 90:
+        rs_data = compute_rs_score(ticker, df)
+        rs = rs_data.get("rs_score") if isinstance(rs_data, dict) else rs_data
+
+        if rs is None:
+            pts = 3.0; reasons.append("B1 ⚠️ RS לא זמין (+3)")
+        elif rs >= 90:
             pts = 8.0; reasons.append(f"B1 ✅ RS={rs} — טופ 10% (+8)")
         elif rs >= 75:
             pts = 6.0; reasons.append(f"B1 ✅ RS={rs} — חזק (+6)")
@@ -2893,6 +2982,7 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
 
 
     if not candidates:
+        _fs("no_pattern")
         if DEBUG_SCAN_REASONS:
             log(f"NO ALERT {symbol} | close={price_now:.2f} | ma150={'NA' if np.isnan(ma150_val) else f'{ma150_val:.2f}'}")
         # ── Watchlist: עבר EMA28+MA150+דוחות אבל אין תבנית ──
@@ -5260,6 +5350,106 @@ def send_email_alerts(alerts: list[dict]) -> None:
         log(f"Email sent: {len(alerts)} alert(s) to {len(TO_EMAILS)} recipients.")
     except Exception as e:
         log(f"Email send error: {e}")
+def send_daily_summary_email(stats: dict, filter_stats: dict, regime: dict | None = None,
+                             prefilter_stats: dict | None = None, note: str = "") -> None:
+    """
+    שולח מייל יומי גם כשאין סטאפים.
+    המטרה: לדעת שהסריקה באמת רצה, כמה מניות נבדקו, ומה נפסל בדרך.
+    """
+    if not APP_PASSWORD:
+        log("APP_PASSWORD not set — daily summary email disabled.")
+        return
+
+    stats = stats or {}
+    filter_stats = filter_stats or {}
+    prefilter_stats = prefilter_stats or {}
+    regime = regime or {}
+
+    now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+    regime_summary = regime.get("summary", "מצב שוק לא ידוע")
+
+    def row(label: str, value, extra: str = "") -> str:
+        return (
+            f"<tr>"
+            f"<td style='padding:8px 10px;border-bottom:1px solid #e5e7eb;color:#374151;'>{label}</td>"
+            f"<td style='padding:8px 10px;border-bottom:1px solid #e5e7eb;font-weight:700;text-align:left;'>{value}</td>"
+            f"<td style='padding:8px 10px;border-bottom:1px solid #e5e7eb;color:#6b7280;font-size:12px;'>{extra}</td>"
+            f"</tr>"
+        )
+
+    note_html = ""
+    if note:
+        note_html = f"""
+        <div style="background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:12px;margin:14px 0;color:#9a3412;">
+          <b>הערה:</b> {note}
+        </div>
+        """
+
+    html = f"""
+    <html>
+    <body dir="rtl" style="font-family:Arial,sans-serif;background:#f3f4f6;padding:18px;">
+      <div style="max-width:720px;margin:auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">
+        <div style="background:#16a34a;padding:20px;text-align:center;">
+          <h2 style="color:white;margin:0;">✅ סורק המניות רץ בהצלחה</h2>
+          <p style="color:rgba(255,255,255,0.9);margin:6px 0 0;">{now_str}</p>
+        </div>
+
+        <div style="padding:18px;">
+          <p style="font-size:15px;color:#111827;margin-top:0;">
+            לא נמצאו סטאפים מתאימים לשליחה היום.
+          </p>
+          {note_html}
+
+          <h3 style="margin-bottom:8px;color:#111827;">📊 סיכום ריצה</h3>
+          <table style="width:100%;border-collapse:collapse;background:white;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+            {row("מניות אחרי Universe", prefilter_stats.get("total", "N/A"))}
+            {row("עברו Pre-filter והגיעו לסריקה מלאה", prefilter_stats.get("passed", "N/A"))}
+            {row("נדחו ב־Pre-filter EMA28", prefilter_stats.get("failed", "N/A"))}
+            {row("באטצ׳ים שנכשלו והועברו הלאה", prefilter_stats.get("download_failed_batches", 0), "לא נמחקים — עוברים לסריקה מלאה")}
+            {row("מניות בלי נתונים בבאטצ׳ והועברו הלאה", prefilter_stats.get("missing_tickers", 0), "לא פוסלים בגלל חוסר נתונים זמני")}
+            {row("מניות שנסרקו בפועל", stats.get("scanned", 0))}
+            {row("שגיאות קריטיות", stats.get("errors", 0))}
+            {row("התראות שנשלחו", stats.get("sent", 0))}
+          </table>
+
+          <h3 style="margin:18px 0 8px;color:#111827;">🔍 פירוט דחיות בסריקה מלאה</h3>
+          <table style="width:100%;border-collapse:collapse;background:white;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+            {row("Market Cap / No Data", filter_stats.get("market_cap",0) + filter_stats.get("no_data",0))}
+            {row("דוחות קרובים", filter_stats.get("earnings",0))}
+            {row("EMA28", filter_stats.get("ema28",0))}
+            {row("MA150 רחוק", filter_stats.get("ma150_dist",0))}
+            {row("MA לא קרוב ל־neckline", filter_stats.get("ma_neckline",0))}
+            {row("לא נמצאה תבנית", filter_stats.get("no_pattern",0))}
+            {row("Reverse Scanner", filter_stats.get("reverse_scan",0))}
+          </table>
+
+          <h3 style="margin:18px 0 8px;color:#111827;">🌍 מצב שוק</h3>
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px;color:#374151;">
+            {regime_summary}
+          </div>
+
+          <p style="font-size:11px;color:#6b7280;margin-top:20px;text-align:center;">
+            הודעה אוטומטית — אינה מהווה ייעוץ פיננסי.
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>
+    """
+
+    msg = MIMEMultipart("alternative")
+    msg["From"] = FROM_EMAIL
+    msg["To"] = ", ".join(TO_EMAILS)
+    msg["Subject"] = f"✅ סורק המניות רץ — אין סטאפים היום — {now_str}"
+    msg.attach(MIMEText(html, "html", "utf-8"))
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as srv:
+            srv.login(FROM_EMAIL, APP_PASSWORD)
+            srv.sendmail(FROM_EMAIL, TO_EMAILS, msg.as_string())
+        log(f"Daily summary email sent to {len(TO_EMAILS)} recipients.")
+    except Exception as e:
+        log(f"Daily summary email error: {e}")
 
 # ============================================================
 #  MAIN LOOP
@@ -5274,32 +5464,33 @@ def send_email_alerts(alerts: list[dict]) -> None:
 #  חיסכון: ~80% מהמניות נדחות לפני הורדת נתונים מלאים
 # ============================================================
 
-PREFILTER_BATCH_SIZE = int(os.getenv("PREFILTER_BATCH_SIZE", "200"))  # מניות לבקשה אחת
-PREFILTER_PERIOD     = "35d"   # מספיק ל-EMA28
+PREFILTER_BATCH_SIZE = int(os.getenv("PREFILTER_BATCH_SIZE", "50"))  # מניות לבקשה אחת — קטן יותר כדי להפחית חסימות Yahoo
+PREFILTER_PERIOD     = os.getenv("PREFILTER_PERIOD", "45d")          # מספיק ל-EMA28 + מרווח ביטחון
+PREFILTER_DOWNLOAD_RETRIES = int(os.getenv("PREFILTER_DOWNLOAD_RETRIES", "3"))
+PREFILTER_TIMEOUT_SECONDS  = int(os.getenv("PREFILTER_TIMEOUT_SECONDS", "20"))
+PREFILTER_RETRY_SLEEP_SECONDS = int(os.getenv("PREFILTER_RETRY_SLEEP_SECONDS", "10"))
+
+# סטטיסטיקה של ה-Pre-filter למייל היומי
+PREFILTER_STATS = {
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
+    "batches": 0,
+    "download_failed_batches": 0,
+    "missing_tickers": 0,
+    "ticker_errors": 0,
+    "passed_due_to_download_failure": 0,
+}
 
 
-def prefilter_by_ema28(ticker_list: list[str]) -> tuple[list[str], list[str]]:
-    """
-    מוריד 35 ימים לכל המניות ב-batch וסורן לפי EMA28.
-    מחזיר (passed, failed) — passed ממשיכות לסריקה מלאה.
-    
-    קריטריון מעבר:
-    - מחיר מעל EMA28
-    - EMA28 בשיפוע עולה
-    - מחיר לא יותר מ-EMA28_MAX_DIST_PCT מעל EMA28
-    """
-    passed = []
-    failed = []
-    total  = len(ticker_list)
-    
-    log(f"⚡ Pre-filter: בודק {total} מניות לפי EMA28...")
-    
-    # עבד ב-batches
-    for batch_start in range(0, total, PREFILTER_BATCH_SIZE):
-        batch = ticker_list[batch_start:batch_start + PREFILTER_BATCH_SIZE]
-        
+def _download_prefilter_batch(batch: list[str], batch_start: int, total: int) -> pd.DataFrame | None:
+    """מוריד batch מ-yfinance עם retry, timeout ו-threads=False כדי להפחית חסימות."""
+    for attempt in range(1, PREFILTER_DOWNLOAD_RETRIES + 1):
         try:
-            # הורד batch אחד
+            log(
+                f"   Downloading prefilter batch {batch_start + 1}-"
+                f"{batch_start + len(batch)} / {total} | attempt {attempt}"
+            )
             raw = yf.download(
                 batch,
                 period=PREFILTER_PERIOD,
@@ -5307,79 +5498,180 @@ def prefilter_by_ema28(ticker_list: list[str]) -> tuple[list[str], list[str]]:
                 progress=False,
                 auto_adjust=True,
                 group_by="ticker",
-                threads=True,
+                threads=False,
+                timeout=PREFILTER_TIMEOUT_SECONDS,
             )
-            
-            if raw is None or raw.empty:
-                # אם batch נכשל — תן ל-scan_ticker לטפל
-                passed.extend(batch)
-                continue
-            
-            for ticker in batch:
-                try:
-                    # שלוף נתוני הטיקר
-                    if isinstance(raw.columns, pd.MultiIndex):
-                        if ticker not in raw.columns.get_level_values(0):
-                            passed.append(ticker)  # לא ידוע — תן לעבור
-                            continue
-                        df_t = raw[ticker].copy()
-                    else:
-                        # batch של מניה אחת
-                        df_t = raw.copy()
-                    
-                    df_t = df_t.dropna(how="all")
-                    if len(df_t) < 10:
-                        passed.append(ticker)
-                        continue
-                    
-                    # נרמל עמודות
-                    df_t.columns = [str(c).lower() for c in df_t.columns]
-                    if "close" not in df_t.columns:
-                        passed.append(ticker)
-                        continue
-                    
-                    close = df_t["close"].squeeze()
-                    if hasattr(close, "columns"):  # עדיין DataFrame
-                        close = close.iloc[:, 0]
-                    
-                    # חשב EMA28
-                    ema28     = close.ewm(span=28, adjust=False).mean()
-                    price_now = float(close.iloc[-1])
-                    ema_now   = float(ema28.iloc[-1])
-                    ema_prev  = float(ema28.iloc[-2]) if len(ema28) >= 2 else ema_now
-                    
-                    if ema_now <= 0:
-                        passed.append(ticker)
-                        continue
-                    
-                    dist = (price_now - ema_now) / ema_now
-                    
-                    # סנן: מתחת ל-EMA28 או רחוק מדי מעליו
-                    if dist < 0:
-                        failed.append(ticker)
-                        continue
-                    if dist > EMA28_MAX_DIST_PCT:
-                        failed.append(ticker)
-                        continue
-                    # EMA28 חייב לעלות
-                    if EMA28_REQUIRE_RISING and ema_now <= ema_prev:
-                        failed.append(ticker)
-                        continue
-                    
-                    passed.append(ticker)
-                    
-                except Exception:
-                    passed.append(ticker)  # במקרה של שגיאה — תן לעבור
-                    
+
+            if raw is not None and not raw.empty:
+                return raw
+
+            log(f"   ⚠️ Empty prefilter batch {batch_start + 1}-{batch_start + len(batch)}")
         except Exception as e:
-            log(f"Pre-filter batch error: {e}")
-            passed.extend(batch)  # batch שנכשל — כולם עוברים
-        
+            log(f"   ⚠️ Pre-filter download failed attempt {attempt}: {e}")
+
+        if attempt < PREFILTER_DOWNLOAD_RETRIES:
+            time.sleep(PREFILTER_RETRY_SLEEP_SECONDS * attempt)
+
+    return None
+
+
+def _extract_prefilter_ticker_frame(raw: pd.DataFrame, ticker: str) -> pd.DataFrame | None:
+    """שולף DataFrame של טיקר מתוך תוצאת yf.download, גם אם MultiIndex הפוך."""
+    try:
+        if raw is None or raw.empty:
+            return None
+
+        ticker_up = ticker.upper()
+
+        if isinstance(raw.columns, pd.MultiIndex):
+            level0 = [str(x).upper() for x in raw.columns.get_level_values(0)]
+            level1 = [str(x).upper() for x in raw.columns.get_level_values(1)]
+
+            if ticker_up in level0:
+                actual = raw.columns.get_level_values(0)[level0.index(ticker_up)]
+                return raw[actual].copy()
+
+            if ticker_up in level1:
+                actual = raw.columns.get_level_values(1)[level1.index(ticker_up)]
+                return raw.xs(actual, axis=1, level=1).copy()
+
+            return None
+
+        return raw.copy()
+    except Exception:
+        return None
+
+
+def prefilter_by_ema28(ticker_list: list[str]) -> tuple[list[str], list[str]]:
+    """
+    מוריד 45 ימים לכל המניות ב-batch ומסנן לפי EMA28.
+    מחזיר (passed, failed) — passed ממשיכות לסריקה מלאה.
+
+    שינוי חשוב:
+    אם Yahoo לא מחזיר נתונים זמנית — לא פוסלים את המניה.
+    היא עוברת לסריקה המלאה כדי שלא נאבד מניות בגלל חסימה/תקלה.
+    """
+    global PREFILTER_STATS
+
+    passed: list[str] = []
+    failed: list[str] = []
+    total  = len(ticker_list)
+
+    PREFILTER_STATS = {
+        "total": total,
+        "passed": 0,
+        "failed": 0,
+        "batches": 0,
+        "download_failed_batches": 0,
+        "missing_tickers": 0,
+        "ticker_errors": 0,
+        "passed_due_to_download_failure": 0,
+    }
+
+    log(f"⚡ Pre-filter: בודק {total} מניות לפי EMA28...")
+    log(f"⚡ Pre-filter settings: batch={PREFILTER_BATCH_SIZE}, retries={PREFILTER_DOWNLOAD_RETRIES}, threads=False")
+
+    # עבד ב-batches
+    for batch_start in range(0, total, PREFILTER_BATCH_SIZE):
+        batch = ticker_list[batch_start:batch_start + PREFILTER_BATCH_SIZE]
+        PREFILTER_STATS["batches"] += 1
+
+        raw = _download_prefilter_batch(batch, batch_start, total)
+
+        if raw is None or raw.empty:
+            # אם batch נכשל — לא פוסלים. כולם ממשיכים לסריקה מלאה.
+            PREFILTER_STATS["download_failed_batches"] += 1
+            PREFILTER_STATS["passed_due_to_download_failure"] += len(batch)
+            passed.extend(batch)
+            done = batch_start + len(batch)
+            log(f"   ⚠️ Batch failed completely — passing all {len(batch)} tickers to full scan")
+            log(f"   Pre-filter: {done}/{total} — עברו: {len(passed)} | נכשלו: {len(failed)}")
+            continue
+
+        for ticker in batch:
+            try:
+                df_t = _extract_prefilter_ticker_frame(raw, ticker)
+                if df_t is None or df_t.empty:
+                    PREFILTER_STATS["missing_tickers"] += 1
+                    passed.append(ticker)  # לא ידוע — תן לעבור
+                    continue
+
+                df_t = df_t.dropna(how="all")
+                if len(df_t) < 10:
+                    PREFILTER_STATS["missing_tickers"] += 1
+                    passed.append(ticker)
+                    continue
+
+                # נרמל עמודות
+                df_t.columns = [str(c).lower() for c in df_t.columns]
+                if "close" not in df_t.columns:
+                    PREFILTER_STATS["missing_tickers"] += 1
+                    passed.append(ticker)
+                    continue
+
+                close = df_t["close"].squeeze()
+                if hasattr(close, "columns"):  # עדיין DataFrame
+                    close = close.iloc[:, 0]
+                close = pd.to_numeric(close, errors="coerce").dropna()
+
+                if len(close) < 10:
+                    PREFILTER_STATS["missing_tickers"] += 1
+                    passed.append(ticker)
+                    continue
+
+                # חשב EMA28
+                ema28     = close.ewm(span=28, adjust=False).mean()
+                price_now = float(close.iloc[-1])
+                ema_now   = float(ema28.iloc[-1])
+                ema_prev  = float(ema28.iloc[-2]) if len(ema28) >= 2 else ema_now
+
+                if ema_now <= 0:
+                    PREFILTER_STATS["missing_tickers"] += 1
+                    passed.append(ticker)
+                    continue
+
+                dist = (price_now - ema_now) / ema_now
+
+                # סנן: מתחת ל-EMA28 או רחוק מדי מעליו
+                if dist < 0:
+                    failed.append(ticker)
+                    continue
+                if dist > EMA28_MAX_DIST_PCT:
+                    failed.append(ticker)
+                    continue
+                # EMA28 חייב לעלות
+                if EMA28_REQUIRE_RISING and ema_now <= ema_prev:
+                    failed.append(ticker)
+                    continue
+
+                passed.append(ticker)
+
+            except Exception as e:
+                PREFILTER_STATS["ticker_errors"] += 1
+                # במקרה של שגיאה — לא פוסלים בגלל בעיית Data זמנית
+                passed.append(ticker)
+
         done = batch_start + len(batch)
         log(f"   Pre-filter: {done}/{total} — עברו: {len(passed)} | נכשלו: {len(failed)}")
-    
+
+    checked_total = len(passed) + len(failed)
+    if checked_total != total:
+        missing = total - checked_total
+        log(f"🚨 PREFILTER BUG: expected {total}, got {checked_total}. Missing {missing} tickers.")
+    else:
+        log(f"✅ PREFILTER OK: checked all {total} tickers.")
+
+    PREFILTER_STATS["passed"] = len(passed)
+    PREFILTER_STATS["failed"] = len(failed)
+
     pct_saved = len(failed) / max(total, 1) * 100
     log(f"⚡ Pre-filter סיים: {len(passed)} עוברות | {len(failed)} נדחו ({pct_saved:.0f}% חיסכון)")
+    log(
+        "⚡ Pre-filter data issues: "
+        f"failed_batches={PREFILTER_STATS['download_failed_batches']}, "
+        f"missing_tickers={PREFILTER_STATS['missing_tickers']}, "
+        f"ticker_errors={PREFILTER_STATS['ticker_errors']}"
+    )
     return passed, failed
 
 
@@ -5442,6 +5734,19 @@ def main() -> None:
     regime = get_market_regime()
     if not regime.get("allow_trading", True):
         log("⛔ BEAR Market detected — skipping scan. Set REGIME_ENABLED=False to override.")
+        try:
+            send_daily_summary_email(
+                {"scanned": 0, "skipped_bl": 0, "no_alert": 0, "found": 0, "errors": 0, "sent": 0},
+                {
+                    "market_cap": 0, "no_data": 0, "earnings": 0, "ema28": 0,
+                    "ma150_dist": 0, "ma_neckline": 0, "no_pattern": 0, "reverse_scan": 0,
+                },
+                regime,
+                PREFILTER_STATS,
+                note="הסריקה דולגה בגלל מצב שוק BEAR לפי ההגדרות שלך.",
+            )
+        except Exception as e:
+            log(f"Daily summary email error while skipping BEAR market: {e}")
         return
 
     # ── ציון מינימלי דינמי לפי מצב השוק ─────────────────────
@@ -5459,7 +5764,7 @@ def main() -> None:
     alert_history = load_alert_history()
 
     all_alerts: list[dict] = []
-    stats = {"scanned":0, "skipped_bl":0, "no_alert":0, "found":0, "errors":0}
+    stats = {"scanned":0, "skipped_bl":0, "no_alert":0, "found":0, "errors":0, "sent":0}
     filter_stats = {
         "market_cap":    0,
         "no_data":       0,
@@ -5526,14 +5831,17 @@ def main() -> None:
             stats["errors"] += 1
             log(f"Critical error {symbol}:\n{traceback.format_exc()}")
 
-    # נקה _df (DataFrames) לפני שמירה ל-JSON
-    for alerts_list in [all_alerts]:
-        for a in alerts_list:
-            a.pop("_df", None)
+    # שומר היסטוריית התראות. את _df מנקים רק אחרי שליחת המייל,
+    # כדי שהגרפים וה-RS במייל לא יצטרכו להוריד נתונים מחדש.
     save_alert_history(alert_history)
 
     if not all_alerts:
         log("No valid setups found today.")
+        try:
+            send_daily_summary_email(stats, filter_stats, regime, PREFILTER_STATS)
+        except Exception:
+            stats["errors"] += 1
+            log(f"Daily summary email error:\n{traceback.format_exc()}")
     else:
         all_alerts.sort(key=lambda a: float(a.get("score",0) or 0), reverse=True)
         # בחר את הסטאפ הכי טוב לכל טיקר, אחרי שכל הסריקה הסתיימה
@@ -5557,6 +5865,13 @@ def main() -> None:
         except Exception:
             stats["errors"] += 1
             log(f"Email error:\n{traceback.format_exc()}")
+
+    # נקה DataFrames מהזיכרון אחרי שסיימנו לשלוח מיילים וליצור גרפים
+    for a in all_alerts:
+        try:
+            a.pop("_df", None)
+        except Exception:
+            pass
 
     log(f"STATS: {stats}")
 
