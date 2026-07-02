@@ -2,8 +2,7 @@ name: Stock Scanner Daily
 
 on:
   schedule:
-    - cron: "0 8 * * *"
-      timezone: "Asia/Jerusalem"
+    - cron: "0 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -12,16 +11,34 @@ jobs:
     timeout-minutes: 360
 
     env:
+      TARGET_HOUR_ISRAEL: "10"
       FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
       APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
       TWELVEDATA_API_KEYS: ${{ secrets.TWELVEDATA_API_KEYS }}
       TO_EMAILS: ${{ secrets.TO_EMAILS }}
 
     steps:
+      - name: Check Israel time
+        id: timecheck
+        run: |
+          ISRAEL_HOUR=$(TZ="Asia/Jerusalem" date +%H)
+          echo "Israel hour now: $ISRAEL_HOUR"
+          echo "Target hour: $TARGET_HOUR_ISRAEL"
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          elif [ "$ISRAEL_HOUR" = "$TARGET_HOUR_ISRAEL" ]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Checkout repository
+        if: steps.timecheck.outputs.should_run == 'true'
         uses: actions/checkout@v4
 
       - name: Restore scanner state
+        if: steps.timecheck.outputs.should_run == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -35,14 +52,21 @@ jobs:
             scanner-state-
 
       - name: Set up Python
+        if: steps.timecheck.outputs.should_run == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Install dependencies
+        if: steps.timecheck.outputs.should_run == 'true'
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
       - name: Run stock scanner
+        if: steps.timecheck.outputs.should_run == 'true'
         run: python stock_scanner_unified.py
+
+      - name: Skip message
+        if: steps.timecheck.outputs.should_run == 'false'
+        run: echo "Not target hour in Israel. Skipping scanner."
