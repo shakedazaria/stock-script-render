@@ -15,11 +15,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
+    permissions:
+      contents: write
+
     env:
-      # שעה לבדיקה עכשיו: 12:40 שעון ישראל
-      TARGET_HOUR_ISRAEL: "12"
-      TARGET_MINUTE_ISRAEL: "40"
-      RUN_WINDOW_MINUTES: "15"
+      # חלון ריצה לפי שעון ישראל:
+      # מ-05:00 בבוקר עד 09:59
+      START_HOUR_ISRAEL: "05"
+      END_HOUR_ISRAEL: "10"
 
       FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
       APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
@@ -27,34 +30,47 @@ jobs:
       TO_EMAILS: ${{ secrets.TO_EMAILS }}
 
     steps:
-      - name: Check Israel time
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Check Israel time and daily run
         id: timecheck
         run: |
+          mkdir -p scanner_state
+
+          ISRAEL_DATE=$(TZ="Asia/Jerusalem" date +%F)
           ISRAEL_HOUR=$(TZ="Asia/Jerusalem" date +%H)
           ISRAEL_MINUTE=$(TZ="Asia/Jerusalem" date +%M)
 
-          echo "Israel time now: $ISRAEL_HOUR:$ISRAEL_MINUTE"
-          echo "Target time: $TARGET_HOUR_ISRAEL:$TARGET_MINUTE_ISRAEL"
-          echo "Run window minutes: $RUN_WINDOW_MINUTES"
+          echo "Israel time now: $ISRAEL_DATE $ISRAEL_HOUR:$ISRAEL_MINUTE"
+          echo "Allowed window: $START_HOUR_ISRAEL:00 - $END_HOUR_ISRAEL:00"
+
+          LAST_RUN=""
+          if [ -f scanner_state/last_run_date.txt ]; then
+            LAST_RUN=$(cat scanner_state/last_run_date.txt)
+          fi
+
+          echo "Last run date: $LAST_RUN"
 
           CURRENT_TOTAL=$((10#$ISRAEL_HOUR * 60 + 10#$ISRAEL_MINUTE))
-          TARGET_TOTAL=$((10#$TARGET_HOUR_ISRAEL * 60 + 10#$TARGET_MINUTE_ISRAEL))
-          WINDOW_END=$((TARGET_TOTAL + RUN_WINDOW_MINUTES))
+          START_TOTAL=$((10#$START_HOUR_ISRAEL * 60))
+          END_TOTAL=$((10#$END_HOUR_ISRAEL * 60))
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "Manual run — bypassing time check"
             echo "should_run=true" >> $GITHUB_OUTPUT
-          elif [ "$CURRENT_TOTAL" -ge "$TARGET_TOTAL" ] && [ "$CURRENT_TOTAL" -lt "$WINDOW_END" ]; then
-            echo "Inside target window — running scanner"
+          elif [ "$LAST_RUN" = "$ISRAEL_DATE" ]; then
+            echo "Already ran today — skipping"
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          elif [ "$CURRENT_TOTAL" -ge "$START_TOTAL" ] && [ "$CURRENT_TOTAL" -lt "$END_TOTAL" ]; then
+            echo "Inside morning window and not run today — running scanner"
             echo "should_run=true" >> $GITHUB_OUTPUT
           else
-            echo "Outside target window — skipping scanner"
+            echo "Outside morning window — skipping scanner"
             echo "should_run=false" >> $GITHUB_OUTPUT
           fi
-
-      - name: Checkout repository
-        if: steps.timecheck.outputs.should_run == 'true'
-        uses: actions/checkout@v4
 
       - name: Restore scanner state
         if: steps.timecheck.outputs.should_run == 'true'
@@ -86,6 +102,19 @@ jobs:
         if: steps.timecheck.outputs.should_run == 'true'
         run: python stock_scanner_unified.py
 
+      - name: Mark daily run completed
+        if: steps.timecheck.outputs.should_run == 'true' && success()
+        run: |
+          mkdir -p scanner_state
+          TZ="Asia/Jerusalem" date +%F > scanner_state/last_run_date.txt
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add scanner_state/last_run_date.txt
+          git commit -m "Update scanner last run date" || echo "No last run date changes"
+          git push
+
       - name: Skip message
         if: steps.timecheck.outputs.should_run == 'false'
-        run: echo "Not inside target time window in Israel. Skipping scanner."
+        run: echo "Not running scanner now."
