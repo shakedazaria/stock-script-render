@@ -1,0 +1,1340 @@
+Time,Ticker,Reasons
+2025-12-10 10:21:57,LYV,"EMA28_Breakout breakout:138.18077803562815 meta:{""type"": ""ema28_cross"", ""price_now"": 139.070007}"
+2025-12-10 10:29:44,NDAQ,"Bullish Triangle breakout:90.93 meta:{""breakout_score"": 6.21, ""adx14"": 18.836564975384878, ""atr14"": 1.5742856428571415, ""stop"": 88.5685715357143, ""position_size"": 423, ""neckline"": 90.93, ""near_peaks"": [90.84, 90.69, 91.26], ""near_positions"": [13, 19, 112]}"
+2025-12-10 10:34:27,NVST,"EMA28_Breakout breakout:20.162687216613374 meta:{""type"": ""ema28_cross"", ""price_now"": 20.62}"
+2025-12-10 10:38:00,OPK,"EMA28_Breakout breakout:1.3543241552137402 meta:{""type"": ""ema28_cross"", ""price_now"": 1.36}"
+2025-12-10 11:23:42,STT,ATH breakout:124.07 meta:{}
+2025-12-10 12:19:44,TRNO,"EMA28_Breakout breakout:61.11010133641914 meta:{""type"": ""ema28_cross"", ""price_now"": 61.24}"
+2025-12-10 13:03:56,VCTR,"EMA28_Breakout breakout:62.975558714878424 meta:{""type"": ""ema28_cross"", ""price_now"": 63.09}"
+2025-12-10 14:01:29,WSBC,"Bullish Triangle breakout:33.14333233333333 meta:{""breakout_score"": 6.25, ""adx14"": 25.83157670205555, ""atr14"": 0.7999997142857131, ""stop"": 31.943332761904763, ""position_size"": 833, ""neckline"": 33.14333233333333, ""near_peaks"": [33.28, 33.099998, 33.049999], ""near_positions"": [20, 49, 53]}"
+2025-12-10 14:13:21,XHR,"EMA28_Breakout breakout:13.59237119306153 meta:{""type"": ""ema28_cross"", ""price_now"": 13.79}"
+2025-12-10 14:37:08,BK,ATH breakout:114.44 meta:{}
+2025-12-14 08:06:39,AJG,"EMA28_Breakout breakout:252.0010580611367 meta:{""type"": ""ema28_cross"", ""price_now"": 255.38}"
+2025-12-14 08:59:31,GE,"EMA28_Breakout breakout:294.3205675257895 meta:{""type"": ""ema28_cross"", ""price_now"": 299.81}"
+2025-12-14 09:18:37,LIN,"EMA28_Breakout breakout:412.9024146859029 meta:{""type"": ""ema28_cross""שש, ""price_now"": 416.23999}"
+2025-12-14 10:50:49,TFC,ATH breakout:49.7 meta:{}
+2025-12-14 11:02:35,TJX,ATH breakout:155.67 meta:{}
+2025-12-14 11:05:28,TLRY,"EMA28_Breakout breakout:9.899478895720385 meta:{""type"": ""ema28_cross"", ""price_now"": 12.15}"
+2025-12-14 11:49:02,UNP,"Bullish Triangle breakout:238.125 meta:{""breakout_score"": 6.1, ""adx14"": 30.902333351658466, ""atr14"": 3.656427857142861, ""stop"": 232.6403582142857, ""position_size"": 182, ""neckline"": 238.125, ""near_peaks"": [239.19, 237.36, 238.23, 237.72], ""near_positions"": [6, 66, 71, 113]}"
+2025-12-14 13:04:56,WTM,ATH breakout:2044.87 meta:{}
+2025-12-15 08:06:28,AJG,"EMA28_Breakout breakout:252.0010580611367 meta:{""type"": ""ema28_cross"", ""price_now"": 255.38}"
+2025-12-15 08:58:28,GE,"EMA28_Breakout breakout:294.3205675257895 meta:{""type"": ""ema28_cross"", ""price_now"": 299.81}"
+2025-12-15 09:17:00,LIN,"EMA28_Breakout breakout:412.9024146859029 meta:{""type"": ""ema28_cross"", ""price_now"": 416.23999}"
+2025-12-15 10:47:58,TFC,ATH breakout:49.7 meta:{}
+2025-12-15 10:59:11,TJX,ATH breakout:155.67 meta:{}
+2025-12-15 11:01:40,TLRY,"EMA28_Breakout breakout:9.899478895720385 meta:{""type"": ""ema28_cross"", ""price_now"": 12.15}"
+2025-12-15 11:43:31,UNP,"Bullish Triangle breakout:238.125 meta:{""breakout_score"": 6.1, ""adx14"": 30.902333351658466, ""atr14"": 3.656427857142861, ""stop"": 232.6403582142857, ""position_size"": 182, ""neckline"": 238.125, ""near_peaks"": [239.19, 237.36, 238.23, 237.72], ""near_positions"": [6, 66, 71, 113]}"
+2025-12-15 12:58:43,WTM,ATH breakout:2044.87 meta:{}
+2025-12-16 08:06:41,AIZ,ATH breakout:229.3 meta:{}
+2025-12-16 08:10:07,AMGN,"EMA28_Breakout breakout:324.94820306475555 meta:{""type"": ""ema28_cross"", ""price_now"": 325.31}"
+2025-12-16 08:23:50,CB,ATH breakout:308.47 meta:{}
+2025-12-16 08:28:43,CMCSA,"Bullish Triangle breakout:28.139999666666668 meta:{""breakout_score"": 6.36, ""adx14"": 28.361249478376003, ""atr14"": 0.6528570714285716, ""stop"": 27.160714059523812, ""position_size"": 1021, ""neckline"": 28.139999666666668, ""near_peaks"": [28.059999, 28.28, 28.08], ""near_positions"": [93, 98, 113]}"
+2025-12-16 08:28:43,CMCSA,"EMA28_Breakout breakout:27.5329840872416 meta:{""type"": ""ema28_cross"", ""price_now"": 28.21}"
+2025-12-16 08:30:28,COF,ATH breakout:239.28999 meta:{}
+2025-12-16 08:31:36,COR,"EMA28_Breakout breakout:348.0096986607643 meta:{""type"": ""ema28_cross"", ""price_now"": 350.32001}"
+2025-12-16 09:05:41,HLT,ATH breakout:285.76999 meta:{}
+2025-12-16 09:14:32,JCI,"EMA28_Breakout breakout:115.3116160872598 meta:{""type"": ""ema28_cross"", ""price_now"": 116.88}"
+2025-12-16 09:16:36,KIM,"EMA28_Breakout breakout:20.437726113331607 meta:{""type"": ""ema28_cross"", ""price_now"": 20.5}"
+2025-12-16 09:19:45,LEVI,"EMA28_Breakout breakout:21.54567719654111 meta:{""type"": ""ema28_cross"", ""price_now"": 21.94}"
+2025-12-16 09:26:54,MO,"Bullish Triangle breakout:59.39333333333334 meta:{""breakout_score"": 6.39, ""adx14"": 22.57533328254977, ""atr14"": 0.719999735714285, ""stop"": 58.31333372976191, ""position_size"": 925, ""neckline"": 59.39333333333334, ""near_peaks"": [59.56, 59.27, 59.35], ""near_positions"": [14, 101, 110]}"
+2025-12-16 09:26:54,MO,"EMA28_Breakout breakout:59.02671295361282 meta:{""type"": ""ema28_cross"", ""price_now"": 59.09}"
+2025-12-16 09:35:34,NXPI,"Bullish Triangle breakout:233.13333 meta:{""breakout_score"": 6.52, ""adx14"": 39.46409907281708, ""atr14"": 6.851428285714287, ""stop"": 222.85618757142856, ""position_size"": 97, ""neckline"": 233.13333, ""near_peaks"": [232.28999, 233.11, 234.0, 234.92999], ""near_positions"": [16, 22, 70, 118]}"
+2025-12-16 09:39:43,PAA,"Bullish Triangle breakout:17.9425 meta:{""breakout_score"": 6.63, ""adx14"": 35.44444314613693, ""atr14"": 0.2721428571428573, ""stop"": 17.534285714285712, ""position_size"": 2449, ""neckline"": 17.9425, ""near_peaks"": [17.89, 18.02, 17.88, 17.98], ""near_positions"": [40, 45, 64, 113]}"
+2025-12-16 10:32:25,SWX,"EMA28_Breakout breakout:80.34816070537512 meta:{""type"": ""ema28_cross"", ""price_now"": 81.73}"
+2025-12-16 10:36:27,SYY,"EMA28_Breakout breakout:74.92350099716235 meta:{""type"": ""ema28_cross"", ""price_now"": 75.43}"
+2025-12-16 10:56:06,THG,ATH breakout:185.91 meta:{}
+2025-12-16 11:03:00,TJX,ATH breakout:156.14 meta:{}
+2025-12-16 11:52:34,USB,ATH breakout:53.66 meta:{}
+2025-12-16 12:31:15,VTOL,"EMA28_Breakout breakout:37.36438583394602 meta:{""type"": ""ema28_cross"", ""price_now"": 37.61}"
+2025-12-16 13:02:23,WTM,ATH breakout:2054.51001 meta:{}
+2025-12-16 13:06:53,WWW,"EMA28_Breakout breakout:18.14228999566729 meta:{""type"": ""ema28_cross"", ""price_now"": 18.35}"
+2025-12-16 13:07:39,WYNN,"EMA28_Breakout breakout:124.98634955086968 meta:{""type"": ""ema28_cross"", ""price_now"": 126.25}"
+2025-12-17 08:31:55,AIZ,ATH breakout:233.25999 meta:{}
+2025-12-17 08:55:50,CEG,"EMA28_Breakout breakout:359.5562916324909 meta:{""type"": ""ema28_cross"", ""price_now"": 365.625}"
+2025-12-17 09:02:55,COF,ATH breakout:239.81 meta:{}
+2025-12-18 08:34:10,AIZ,ATH breakout:233.32001 meta:{}
+2025-12-18 08:53:15,CB,ATH breakout:312.60999 meta:{}
+2025-12-18 09:02:13,CORT,"EMA28_Breakout breakout:81.24925817974487 meta:{""type"": ""ema28_cross"", ""price_now"": 82.28}"
+2025-12-18 09:14:30,DVN,"EMA28_Breakout breakout:36.19514511566493 meta:{""type"": ""ema28_cross"", ""price_now"": 36.95}"
+2025-12-18 09:23:37,FANG,"Bullish Triangle breakout:149.619998625 meta:{""breakout_score"": 5.85, ""adx14"": 35.692481309973026, ""atr14"": 4.690712214285715, ""stop"": 142.58393030357144, ""position_size"": 142, ""neckline"": 149.619998625, ""near_peaks"": [149.0099945, 150.12, 149.38, 149.97], ""near_positions"": [26, 43, 81, 94]}"
+2025-12-18 09:23:37,FANG,"EMA28_Breakout breakout:152.0741175697278 meta:{""type"": ""ema28_cross"", ""price_now"": 154.070007}"
+2025-12-18 09:48:55,IOVA,"EMA28_Breakout breakout:2.2794662987234906 meta:{""type"": ""ema28_cross"", ""price_now"": 2.52}"
+2025-12-18 10:08:21,MUR,"EMA28_Breakout breakout:31.35888000784024 meta:{""type"": ""ema28_cross"", ""price_now"": 32.26}"
+2025-12-18 10:16:17,OKE,"EMA28_Breakout breakout:72.19491256629831 meta:{""type"": ""ema28_cross"", ""price_now"": 73.050003}"
+2025-12-18 11:39:13,TFC,ATH breakout:49.89 meta:{}
+2025-12-18 12:09:42,TRP,"EMA28_Breakout breakout:53.811629612203085 meta:{""type"": ""ema28_cross"", ""price_now"": 54.02}"
+2025-12-18 12:13:06,TS,"EMA28_Breakout breakout:39.971608022569 meta:{""type"": ""ema28_cross"", ""price_now"": 40.02}"
+2025-12-18 12:17:09,TTC,"Bullish Triangle breakout:76.22666666666667 meta:{""breakout_score"": 6.92, ""adx14"": 21.199601179143094, ""atr14"": 2.0528572142857127, ""stop"": 73.1473808452381, ""position_size"": 324, ""neckline"": 76.22666666666667, ""near_peaks"": [76.07, 76.32, 76.29], ""near_positions"": [16, 79, 86]}"
+2025-12-18 12:44:26,USB,ATH breakout:53.71 meta:{}
+2025-12-18 13:17:45,VOD,ATH breakout:12.7 meta:{}
+2025-12-18 14:11:32,XOM,"EMA28_Breakout breakout:116.81580686113756 meta:{""type"": ""ema28_cross"", ""price_now"": 117.41}"
+2025-12-19 08:07:21,AIZ,ATH breakout:237.039993 meta:{}
+2025-12-19 08:31:42,COF,ATH breakout:241.61 meta:{}
+2025-12-19 08:35:40,CSCO,"EMA28_Breakout breakout:76.5282589113171 meta:{""type"": ""ema28_cross"", ""price_now"": 76.95}"
+2025-12-19 09:21:02,LRCX,"EMA28_Breakout breakout:157.6015831890909 meta:{""type"": ""ema28_cross"", ""price_now"": 164.7}"
+2025-12-19 09:24:43,META,"EMA28_Breakout breakout:650.7666646348551 meta:{""type"": ""ema28_cross"", ""price_now"": 664.45001}"
+2025-12-19 11:18:21,TRN,"Bullish Triangle breakout:28.757499999999997 meta:{""breakout_score"": 6.72, ""adx14"": 39.18803921374559, ""atr14"": 0.5878571428571432, ""stop"": 27.87571428571428, ""position_size"": 1134, ""neckline"": 28.757499999999997, ""near_peaks"": [28.92, 28.83, 28.79, 28.74, 28.67], ""near_positions"": [46, 50, 58, 85, 114]}"
+2025-12-19 11:29:54,TTWO,"EMA28_Breakout breakout:244.81502768238337 meta:{""type"": ""ema28_cross"", ""price_now"": 246.64999}"
+2025-12-19 11:52:08,USB,ATH breakout:53.74 meta:{}
+2025-12-19 11:52:08,USB,"Cup & Handle breakout:53.87 meta:{""breakout_score"": 6.4, ""adx14"": 39.984785928612965, ""adx_ok"": true, ""atr14"": 0.8499999499999988, ""stop"": 52.595000075, ""position_size"": 784, ""retest_status"": ""unknown"", ""neckline"": 53.87, ""price_now"": 53.87}"
+2025-12-19 12:35:53,WABC,"Bullish Triangle breakout:50.027500249999996 meta:{""breakout_score"": 6.78, ""adx14"": 27.663239208093295, ""atr14"": 1.0678570714285718, ""stop"": 48.42571464285714, ""position_size"": 624, ""neckline"": 50.027500249999996, ""near_peaks"": [49.81, 50.31, 50.11, 50.15, 50.040001], ""near_positions"": [19, 31, 55, 61, 104]}"
+2025-12-19 12:54:55,WMG,"EMA28_Breakout breakout:28.986242286932473 meta:{""type"": ""ema28_cross"", ""price_now"": 29.34}"
+2025-12-19 13:06:06,WTFC,"Cup & Handle breakout:142.0099945 meta:{""breakout_score"": 6.53, ""adx14"": 30.47286328771656, ""adx_ok"": true, ""atr14"": 2.659287214285716, ""stop"": 138.02106367857144, ""position_size"": 250, ""retest_status"": ""unknown"", ""neckline"": 142.0099945, ""price_now"": 141.81}"
+2025-12-20 09:38:57,ABBV,"EMA28_Breakout breakout:225.99384290145306 meta:{""type"": ""ema28_cross"", ""price_now"": 226.82001}"
+2025-12-20 09:44:41,AIZ,ATH breakout:238.029999 meta:{}
+2025-12-28 09:44:33,HLT,ATH breakout:293.29999 meta:{}
+2025-12-28 10:08:50,NDAQ,ATH breakout:98.64 meta:{}
+2025-12-28 10:56:54,SCHW,ATH breakout:101.85 meta:{}
+2025-12-28 11:17:03,TAK,ATH breakout:15.58 meta:{}
+2025-12-28 12:59:29,VOD,ATH breakout:13.1 meta:{}
+2025-12-28 13:53:07,XPEV,"EMA28_Breakout breakout:20.28895423507304 meta:{""type"": ""ema28_cross"", ""price_now"": 20.78}"
+2025-12-30 08:01:06,ACGL,"Cup & Handle breakout:97.12 meta:{""breakout_score"": 5.83, ""adx14"": 27.269374712177786, ""adx_ok"": true, ""atr14"": 1.3700003571428587, ""stop"": 95.06499946428572, ""position_size"": 486, ""retest_status"": ""unknown"", ""neckline"": 97.12, ""price_now"": 96.39}"
+2025-12-30 08:02:50,ACGL,"Cup & Handle breakout:97.12 meta:{""breakout_score"": 5.83, ""adx14"": 27.269374712177786, ""adx_ok"": true, ""atr14"": 1.3700003571428587, ""stop"": 95.06499946428572, ""position_size"": 486, ""retest_status"": ""unknown"", ""neckline"": 97.12, ""price_now"": 96.39}"
+2025-12-30 08:22:16,CB,ATH breakout:313.47 meta:{}
+2025-12-30 08:22:16,CB,"Cup & Handle breakout:314.45001 meta:{""breakout_score"": 5.87, ""adx14"": 26.450832545307136, ""adx_ok"": true, ""atr14"": 4.414280642857132, ""stop"": 307.82858903571434, ""position_size"": 151, ""retest_status"": ""unknown"", ""neckline"": 314.45001, ""price_now"": 314.45001}"
+2025-12-30 08:24:09,CB,ATH breakout:313.47 meta:{}
+2025-12-30 08:24:09,CB,"Cup & Handle breakout:314.45001 meta:{""breakout_score"": 5.87, ""adx14"": 26.450832545307136, ""adx_ok"": true, ""atr14"": 4.414280642857132, ""stop"": 307.82858903571434, ""position_size"": 151, ""retest_status"": ""unknown"", ""neckline"": 314.45001, ""price_now"": 314.45001}"
+2025-12-30 09:28:44,NTES,"EMA28_Breakout breakout:138.4575742731453 meta:{""type"": ""ema28_cross"", ""price_now"": 139.34}"
+2025-12-30 09:30:36,NVS,ATH breakout:139.17999 meta:{}
+2025-12-30 09:30:52,NTES,"EMA28_Breakout breakout:138.4575742731453 meta:{""type"": ""ema28_cross"", ""price_now"": 139.34}"
+2025-12-30 09:32:51,NVS,ATH breakout:139.17999 meta:{}
+2025-12-30 12:13:58,VOD,ATH breakout:13.12 meta:{}
+2025-12-30 12:17:40,VOD,ATH breakout:13.12 meta:{}
+2025-12-31 09:25:17,ACGL,"Cup & Handle breakout:97.12 meta:{""breakout_score"": 5.93, ""adx14"": 27.25638533750855, ""adx_ok"": true, ""atr14"": 1.324286071428573, ""stop"": 95.13357089285715, ""position_size"": 503, ""retest_status"": ""unknown"", ""neckline"": 97.12, ""price_now"": 96.66}"
+2025-12-31 09:29:36,AIZ,ATH breakout:241.89 meta:{}
+2025-12-31 09:29:36,AIZ,"Cup & Handle breakout:242.13 meta:{""breakout_score"": 6.27, ""adx14"": 41.438926513689424, ""adx_ok"": true, ""atr14"": 3.8050002142857244, ""stop"": 236.4224996785714, ""position_size"": 175, ""retest_status"": ""unknown"", ""neckline"": 242.13, ""price_now"": 242.13}"
+2025-12-31 12:18:31,TIGR,"EMA28_Breakout breakout:9.148941793977322 meta:{""type"": ""ema28_cross"", ""price_now"": 9.52}"
+2025-12-31 12:39:16,TRP,ATH breakout:55.85 meta:{}
+2025-12-31 13:40:13,VOD,ATH breakout:13.15 meta:{}
+2026-01-01 11:43:26,PAA,"Bullish Triangle breakout:17.95 meta:{""breakout_score"": 5.45, ""adx14"": 23.736776970499324, ""atr14"": 0.2664285714285707, ""stop"": 17.550357142857145, ""position_size"": 2502, ""neckline"": 17.95, ""near_peaks"": [17.89, 18.02, 17.88, 17.98, 17.98], ""near_positions"": [29, 34, 53, 102, 108]}"
+2026-01-01 15:36:17,BMRN,"Bullish Triangle breakout:59.126666666666665 meta:{""breakout_score"": 6.07, ""adx14"": 30.938351144810873, ""atr14"": 2.1678571428571423, ""stop"": 55.87488095238095, ""position_size"": 307, ""neckline"": 59.126666666666665, ""near_peaks"": [59.35, 59.09, 58.94], ""near_positions"": [3, 24, 30]}"
+2026-01-02 10:13:24,PAA,"Bullish Triangle breakout:17.95 meta:{""breakout_score"": 5.45, ""adx14"": 23.736776970499324, ""atr14"": 0.2664285714285707, ""stop"": 17.550357142857145, ""position_size"": 2502, ""neckline"": 17.95, ""near_peaks"": [17.89, 18.02, 17.88, 17.98, 17.98], ""near_positions"": [29, 34, 53, 102, 108]}"
+2026-01-02 14:05:42,BMRN,"Bullish Triangle breakout:59.126666666666665 meta:{""breakout_score"": 6.07, ""adx14"": 30.938351144810873, ""atr14"": 2.1678571428571423, ""stop"": 55.87488095238095, ""position_size"": 307, ""neckline"": 59.126666666666665, ""near_peaks"": [59.35, 59.09, 58.94], ""near_positions"": [3, 24, 30]}"
+2026-01-03 12:49:23,APH,"EMA28_Breakout breakout:135.6511785600188 meta:{""type"": ""ema28_cross"", ""price_now"": 139.71001}"
+2026-01-03 13:27:14,FE,"EMA28_Breakout breakout:45.08919681552211 meta:{""type"": ""ema28_cross"", ""price_now"": 45.26}"
+2026-01-03 13:46:53,INCY,"EMA28_Breakout breakout:99.49229844268524 meta:{""type"": ""ema28_cross"", ""price_now"": 101.42}"
+2026-01-03 13:52:50,KLAC,"EMA28_Breakout breakout:1221.5695241592018 meta:{""type"": ""ema28_cross"", ""price_now"": 1274.46997}"
+2026-01-03 14:01:39,MLM,"EMA28_Breakout breakout:626.8090700635287 meta:{""type"": ""ema28_cross"", ""price_now"": 634.44}"
+2026-01-03 14:08:52,NTES,"EMA28_Breakout breakout:139.15065703465984 meta:{""type"": ""ema28_cross"", ""price_now"": 147.56}"
+2026-01-03 14:10:41,NVS,"Cup & Handle breakout:139.2 meta:{""breakout_score"": 5.94, ""adx14"": 27.767572182131747, ""adx_ok"": true, ""atr14"": 1.585710749999998, ""stop"": 136.821433875, ""position_size"": 420, ""retest_status"": ""unknown"", ""neckline"": 139.2, ""price_now"": 138.53999}"
+2026-01-03 15:00:55,SU,ATH breakout:45.2 meta:{}
+2026-01-03 15:14:35,TAL,"EMA28_Breakout breakout:11.162505832344822 meta:{""type"": ""ema28_cross"", ""price_now"": 11.49}"
+2026-01-03 15:56:20,TRP,"Bullish Triangle breakout:55.15 meta:{""breakout_score"": 6.14, ""adx14"": 21.706012043802467, ""atr14"": 0.8278572142857133, ""stop"": 53.90821417857143, ""position_size"": 805, ""neckline"": 55.15, ""near_peaks"": [55.37, 55.34, 55.060001, 55.029999, 54.95], ""near_positions"": [58, 88, 97, 103, 107]}"
+2026-01-03 16:30:44,UTHR,"EMA28_Breakout breakout:491.269271733919 meta:{""type"": ""ema28_cross"", ""price_now"": 496.72}"
+2026-01-03 16:32:39,UUUU,"EMA28_Breakout breakout:15.150874922787736 meta:{""type"": ""ema28_cross"", ""price_now"": 16.68}"
+2026-01-03 17:13:38,WB,"EMA28_Breakout breakout:10.250726736521846 meta:{""type"": ""ema28_cross"", ""price_now"": 10.54}"
+2026-01-04 08:12:36,APH,"EMA28_Breakout breakout:135.6511785600188 meta:{""type"": ""ema28_cross"", ""price_now"": 139.71001}"
+2026-01-04 08:50:05,FE,"EMA28_Breakout breakout:45.08919681552211 meta:{""type"": ""ema28_cross"", ""price_now"": 45.26}"
+2026-01-04 09:09:38,INCY,"EMA28_Breakout breakout:99.49229844268524 meta:{""type"": ""ema28_cross"", ""price_now"": 101.42}"
+2026-01-04 09:15:46,KLAC,"EMA28_Breakout breakout:1221.5695241592018 meta:{""type"": ""ema28_cross"", ""price_now"": 1274.46997}"
+2026-01-04 09:25:07,MLM,"EMA28_Breakout breakout:626.8090700635287 meta:{""type"": ""ema28_cross"", ""price_now"": 634.44}"
+2026-01-04 09:33:08,NTES,"EMA28_Breakout breakout:139.15065703465984 meta:{""type"": ""ema28_cross"", ""price_now"": 147.56}"
+2026-01-04 09:35:01,NVS,"Cup & Handle breakout:139.2 meta:{""breakout_score"": 5.94, ""adx14"": 27.767572182131747, ""adx_ok"": true, ""atr14"": 1.585710749999998, ""stop"": 136.821433875, ""position_size"": 420, ""retest_status"": ""unknown"", ""neckline"": 139.2, ""price_now"": 138.53999}"
+2026-01-04 10:25:33,SU,ATH breakout:45.2 meta:{}
+2026-01-04 10:39:32,TAL,"EMA28_Breakout breakout:11.162505832344822 meta:{""type"": ""ema28_cross"", ""price_now"": 11.49}"
+2026-01-04 11:21:25,TRP,"Bullish Triangle breakout:55.15 meta:{""breakout_score"": 6.14, ""adx14"": 21.706012043802467, ""atr14"": 0.8278572142857133, ""stop"": 53.90821417857143, ""position_size"": 805, ""neckline"": 55.15, ""near_peaks"": [55.37, 55.34, 55.060001, 55.029999, 54.95], ""near_positions"": [58, 88, 97, 103, 107]}"
+2026-01-04 11:56:18,UTHR,"EMA28_Breakout breakout:491.269271733919 meta:{""type"": ""ema28_cross"", ""price_now"": 496.72}"
+2026-01-04 11:58:00,UUUU,"EMA28_Breakout breakout:15.150874922787736 meta:{""type"": ""ema28_cross"", ""price_now"": 16.68}"
+2026-01-04 12:39:20,WB,"EMA28_Breakout breakout:10.250726736521846 meta:{""type"": ""ema28_cross"", ""price_now"": 10.54}"
+2026-01-05 15:39:37,APH,"EMA28_Breakout breakout:135.6511785600188 meta:{""type"": ""ema28_cross"", ""price_now"": 139.71001}"
+2026-01-05 16:17:38,FE,"EMA28_Breakout breakout:45.08919681552211 meta:{""type"": ""ema28_cross"", ""price_now"": 45.26}"
+2026-01-05 16:52:03,META,"EMA28_Breakout breakout:655.7600283632074 meta:{""type"": ""ema28_cross"", ""price_now"": 658.66}"
+2026-01-05 17:11:18,PNC,ATH breakout:215.0 meta:{}
+2026-01-05 17:30:58,J,"EMA28_Breakout breakout:137.46090610464438 meta:{""type"": ""ema28_cross"", ""price_now"": 138.36}"
+2026-01-05 17:46:19,SCHW,ATH breakout:101.89 meta:{}
+2026-01-06 07:17:00,TAK,"Cup & Handle breakout:15.76 meta:{""breakout_score"": 6.19, ""adx14"": 33.97035803262392, ""adx_ok"": true, ""atr14"": 0.21785714285714253, ""stop"": 15.433214285714286, ""position_size"": 3060, ""retest_status"": ""unknown"", ""neckline"": 15.76, ""price_now"": 15.69}"
+2026-01-06 07:20:50,TBBK,"EMA28_Breakout breakout:67.97297183448974 meta:{""type"": ""ema28_cross"", ""price_now"": 69.49}"
+2026-01-06 07:28:32,TECH,"EMA28_Breakout breakout:59.89691033148277 meta:{""type"": ""ema28_cross"", ""price_now"": 63.029999}"
+2026-01-06 07:35:11,THC,"EMA28_Breakout breakout:201.21277657334986 meta:{""type"": ""ema28_cross"", ""price_now"": 207.0099945}"
+2026-01-06 07:39:55,TILE,"Bullish Triangle breakout:29.03 meta:{""breakout_score"": 5.53, ""adx14"": 37.070219676175725, ""atr14"": 0.6757144285714288, ""stop"": 28.016428357142857, ""position_size"": 986, ""neckline"": 29.03, ""near_peaks"": [29.0, 29.0, 29.09], ""near_positions"": [53, 105, 111]}"
+2026-01-06 07:46:40,TMC,"EMA28_Breakout breakout:6.822323965942276 meta:{""type"": ""ema28_cross"", ""price_now"": 7.15}"
+2026-01-06 07:47:33,TME,"EMA28_Breakout breakout:18.33483770839338 meta:{""type"": ""ema28_cross"", ""price_now"": 18.48}"
+2026-01-06 07:59:19,TRMK,"Bullish Triangle breakout:39.69 meta:{""breakout_score"": 5.69, ""adx14"": 26.30927487778333, ""atr14"": 0.6821428357142858, ""stop"": 38.666785746428566, ""position_size"": 977, ""neckline"": 39.69, ""near_peaks"": [39.66, 39.77, 39.63, 39.56, 39.83], ""near_positions"": [6, 63, 84, 93, 99]}"
+2026-01-06 07:59:19,TRMK,"EMA28_Breakout breakout:39.69196997570842 meta:{""type"": ""ema28_cross"", ""price_now"": 40.080002}"
+2026-01-06 08:02:49,TRU,"EMA28_Breakout breakout:84.98791667507757 meta:{""type"": ""ema28_cross"", ""price_now"": 86.95}"
+2026-01-06 08:04:30,TS,"EMA28_Breakout breakout:39.29201821150117 meta:{""type"": ""ema28_cross"", ""price_now"": 40.59}"
+2026-01-06 08:08:37,TTD,"EMA28_Breakout breakout:39.15868586038397 meta:{""type"": ""ema28_cross"", ""price_now"": 40.11}"
+2026-01-06 08:10:39,AMZN,"EMA28_Breakout breakout:229.74982552042997 meta:{""type"": ""ema28_cross"", ""price_now"": 233.059998}"
+2026-01-06 08:18:55,BAC,ATH breakout:56.25 meta:{}
+2026-01-06 08:20:04,UAN,ATH breakout:102.5 meta:{}
+2026-01-06 08:22:18,BURL,ATH breakout:301.35001 meta:{}
+2026-01-06 08:24:19,UFPT,"EMA28_Breakout breakout:225.12833551545094 meta:{""type"": ""ema28_cross"", ""price_now"": 237.31}"
+2026-01-06 08:30:19,COF,ATH breakout:249.32001 meta:{}
+2026-01-06 08:32:19,UPST,"EMA28_Breakout breakout:46.31120722159119 meta:{""type"": ""ema28_cross"", ""price_now"": 50.7}"
+2026-01-06 08:33:01,URBN,"EMA28_Breakout breakout:75.86121214288939 meta:{""type"": ""ema28_cross"", ""price_now"": 76.72}"
+2026-01-06 08:38:30,DHR,"Bullish Triangle breakout:231.57666666666668 meta:{""breakout_score"": 6.47, ""adx14"": 22.8130193468473, ""atr14"": 3.8278577857142864, ""stop"": 225.83487998809525, ""position_size"": 174, ""neckline"": 231.57666666666668, ""near_peaks"": [232.35001, 230.64999, 232.82001, 231.73], ""near_positions"": [93, 98, 105, 113]}"
+2026-01-06 08:41:09,V,"Bullish Triangle breakout:349.7074975 meta:{""breakout_score"": 6.21, ""adx14"": 26.66300017782534, ""atr14"": 4.610717999999996, ""stop"": 342.7914205, ""position_size"": 144, ""neckline"": 349.7074975, ""near_peaks"": [348.35999, 349.64999, 350.98001, 349.84], ""near_positions"": [22, 68, 74, 105]}"
+2026-01-06 08:55:51,VIS,ATH breakout:305.47 meta:{}
+2026-01-06 08:58:51,VLO,"EMA28_Breakout breakout:168.87555171125567 meta:{""type"": ""ema28_cross"", ""price_now"": 180.57001}"
+2026-01-06 09:00:27,GE,ATH breakout:320.75 meta:{}
+2026-01-06 09:04:01,HAS,ATH breakout:83.96 meta:{}
+2026-01-06 09:04:28,HBAN,"Bullish Triangle breakout:17.9740004 meta:{""breakout_score"": 5.47, ""adx14"": 32.70610907232228, ""atr14"": 0.2892857857142858, ""stop"": 17.54007172142857, ""position_size"": 2304, ""neckline"": 17.9740004, ""near_peaks"": [17.92, 18.030001, 17.93, 18.040001, 17.95], ""near_positions"": [32, 36, 46, 106, 111]}"
+2026-01-06 09:13:54,J,"EMA28_Breakout breakout:137.49538886326508 meta:{""type"": ""ema28_cross"", ""price_now"": 138.86}"
+2026-01-06 09:15:03,JPM,ATH breakout:329.17001 meta:{}
+2026-01-06 09:18:57,LDOS,"EMA28_Breakout breakout:186.76767890214344 meta:{""type"": ""ema28_cross"", ""price_now"": 195.49001}"
+2026-01-06 09:19:28,WABC,"EMA28_Breakout breakout:48.66052446675217 meta:{""type"": ""ema28_cross"", ""price_now"": 49.25}"
+2026-01-06 09:20:22,LIVN,"EMA28_Breakout breakout:61.4532131188687 meta:{""type"": ""ema28_cross"", ""price_now"": 63.23}"
+2026-01-06 09:21:58,WCC,"EMA28_Breakout breakout:255.53525533564058 meta:{""type"": ""ema28_cross"", ""price_now"": 266.85999}"
+2026-01-06 09:24:03,MCK,"EMA28_Breakout breakout:823.7392119462778 meta:{""type"": ""ema28_cross"", ""price_now"": 824.91998}"
+2026-01-06 09:25:42,META,"EMA28_Breakout breakout:655.7689925011384 meta:{""type"": ""ema28_cross"", ""price_now"": 658.78998}"
+2026-01-06 09:44:25,PNC,ATH breakout:215.0 meta:{}
+2026-01-06 09:45:42,WTFC,ATH breakout:144.34 meta:{}
+2026-01-06 10:08:45,ZBH,"EMA28_Breakout breakout:91.77710554020373 meta:{""type"": ""ema28_cross"", ""price_now"": 92.65}"
+2026-01-06 10:13:44,ZM,"EMA28_Breakout breakout:86.43062249199303 meta:{""type"": ""ema28_cross"", ""price_now"": 86.53}"
+2026-01-06 10:17:42,SBUX,"EMA28_Breakout breakout:85.1628057230218 meta:{""type"": ""ema28_cross"", ""price_now"": 86.56}"
+2026-01-06 10:18:10,SCHW,ATH breakout:101.89 meta:{}
+2026-01-06 10:23:52,STE,"Bullish Triangle breakout:252.40666666666667 meta:{""breakout_score"": 5.48, ""adx14"": 23.767843176992802, ""atr14"": 4.225711999999992, ""stop"": 246.06809866666669, ""position_size"": 157, ""neckline"": 252.40666666666667, ""near_peaks"": [252.46001, 253.0, 251.75999], ""near_positions"": [27, 41, 48]}"
+2026-01-06 10:23:52,STE,"EMA28_Breakout breakout:255.23808197141665 meta:{""type"": ""ema28_cross"", ""price_now"": 256.75}"
+2026-01-06 11:21:56,TRU,"EMA28_Breakout breakout:84.98791667507757 meta:{""type"": ""ema28_cross"", ""price_now"": 86.95}"
+2026-01-06 11:23:28,TS,"EMA28_Breakout breakout:39.29201821150117 meta:{""type"": ""ema28_cross"", ""price_now"": 40.59}"
+2026-01-06 11:27:40,TTD,"EMA28_Breakout breakout:39.15868586038397 meta:{""type"": ""ema28_cross"", ""price_now"": 40.11}"
+2026-01-06 11:38:49,UAN,ATH breakout:102.5 meta:{}
+2026-01-07 09:06:01,ACAD,"EMA28_Breakout breakout:26.302783706070002 meta:{""type"": ""ema28_cross"", ""price_now"": 26.94}"
+2026-01-07 09:07:00,ACN,"EMA28_Breakout breakout:265.5366917897273 meta:{""type"": ""ema28_cross"", ""price_now"": 275.92999}"
+2026-01-07 09:37:59,CRSP,"EMA28_Breakout breakout:55.68162208817988 meta:{""type"": ""ema28_cross"", ""price_now"": 58.19}"
+2026-01-07 09:40:51,CYTK,"EMA28_Breakout breakout:62.91402264485776 meta:{""type"": ""ema28_cross"", ""price_now"": 64.6}"
+2026-01-07 09:46:57,ECL,"EMA28_Breakout breakout:264.33714685152614 meta:{""type"": ""ema28_cross"", ""price_now"": 271.53}"
+2026-01-07 09:51:33,ETN,"EMA28_Breakout breakout:331.8944508120916 meta:{""type"": ""ema28_cross"", ""price_now"": 332.97}"
+2026-01-07 09:52:50,EW,"EMA28_Breakout breakout:85.01747560308654 meta:{""type"": ""ema28_cross"", ""price_now"": 85.85}"
+2026-01-07 10:08:57,HAS,ATH breakout:85.58 meta:{}
+2026-01-07 10:09:27,HBAN,ATH breakout:18.2 meta:{}
+2026-01-07 10:09:27,HBAN,"Bullish Triangle breakout:17.9740004 meta:{""breakout_score"": 5.83, ""adx14"": 32.796764858392606, ""atr14"": 0.29714285714285715, ""stop"": 17.528286114285716, ""position_size"": 2243, ""neckline"": 17.9740004, ""near_peaks"": [17.92, 18.030001, 17.93, 18.040001, 17.95], ""near_positions"": [31, 35, 45, 105, 110]}"
+2026-01-07 10:13:35,ICUI,"Bullish Triangle breakout:149.21999666666667 meta:{""breakout_score"": 5.49, ""adx14"": 18.41496545338923, ""atr14"": 4.505714928571426, ""stop"": 142.46142427380954, ""position_size"": 147, ""neckline"": 149.21999666666667, ""near_peaks"": [149.48, 149.17999, 149.0], ""near_positions"": [80, 110, 114]}"
+2026-01-07 10:14:06,IDXX,"EMA28_Breakout breakout:693.9577446603515 meta:{""type"": ""ema28_cross"", ""price_now"": 706.83002}"
+2026-01-07 10:17:31,IONS,"EMA28_Breakout breakout:78.87685588076432 meta:{""type"": ""ema28_cross"", ""price_now"": 81.49}"
+2026-01-07 10:18:58,ISRG,"Bullish Triangle breakout:581.7074875000001 meta:{""breakout_score"": 6.41, ""adx14"": 21.665029282481644, ""atr14"": 9.981437000000003, ""stop"": 566.7353320000001, ""position_size"": 66, ""neckline"": 581.7074875000001, ""near_peaks"": [580.46997, 582.40997, 583.45001, 580.5], ""near_positions"": [83, 93, 110, 114]}"
+2026-01-07 10:26:11,LLY,"EMA28_Breakout breakout:1043.112415916578 meta:{""type"": ""ema28_cross"", ""price_now"": 1064.040039}"
+2026-01-07 10:30:20,MDT,"EMA28_Breakout breakout:98.15776450938591 meta:{""type"": ""ema28_cross"", ""price_now"": 100.31}"
+2026-01-07 10:35:49,NDAQ,ATH breakout:99.35 meta:{}
+2026-01-07 10:41:09,NVS,ATH breakout:139.2 meta:{}
+2026-01-07 10:41:53,NXPI,"Bullish Triangle breakout:232.44999666666664 meta:{""breakout_score"": 6.84, ""adx14"": 25.596765021547917, ""atr14"": 6.789285142857139, ""stop"": 222.26606895238092, ""position_size"": 98, ""neckline"": 232.44999666666664, ""near_peaks"": [232.28999, 233.11, 234.0, 231.95], ""near_positions"": [2, 8, 56, 110]}"
+2026-01-07 10:50:25,PNC,ATH breakout:215.8 meta:{}
+2026-01-07 11:27:59,SNOW,"EMA28_Breakout breakout:229.31916969689954 meta:{""type"": ""ema28_cross"", ""price_now"": 234.53}"
+2026-01-07 11:45:23,TAK,ATH breakout:15.76 meta:{}
+2026-01-07 11:45:23,TAK,"Cup & Handle breakout:15.79 meta:{""breakout_score"": 6.27, ""adx14"": 35.032949951775954, ""adx_ok"": true, ""atr14"": 0.21928571428571406, ""stop"": 15.461071428571428, ""position_size"": 3040, ""retest_status"": ""unknown"", ""neckline"": 15.79, ""price_now"": 15.79}"
+2026-01-07 11:55:23,TDOC,"EMA28_Breakout breakout:7.368116558495644 meta:{""type"": ""ema28_cross"", ""price_now"": 8.0}"
+2026-01-07 11:59:23,TFC,ATH breakout:50.74 meta:{}
+2026-01-07 12:08:00,TILE,"Bullish Triangle breakout:29.03 meta:{""breakout_score"": 6.31, ""adx14"": 37.17835349034879, ""atr14"": 0.7135715714285714, ""stop"": 27.959642642857144, ""position_size"": 934, ""neckline"": 29.03, ""near_peaks"": [29.0, 29.0, 29.09], ""near_positions"": [52, 104, 110]}"
+2026-01-07 12:15:09,TMDX,"EMA28_Breakout breakout:127.43609640747097 meta:{""type"": ""ema28_cross"", ""price_now"": 132.67}"
+2026-01-07 12:26:39,TRMD,"EMA28_Breakout breakout:20.35395147925105 meta:{""type"": ""ema28_cross"", ""price_now"": 20.47}"
+2026-01-07 12:27:26,TRN,"Bullish Triangle breakout:28.784 meta:{""breakout_score"": 5.78, ""adx14"": 28.18712284047709, ""atr14"": 0.7142857142857147, ""stop"": 27.712571428571426, ""position_size"": 933, ""neckline"": 28.784, ""near_peaks"": [29.01, 28.92, 28.83, 28.79, 28.74, 28.67, 28.89], ""near_positions"": [30, 35, 39, 47, 74, 103, 108]}"
+2026-01-07 12:27:26,TRN,"EMA28_Breakout breakout:27.445673215203716 meta:{""type"": ""ema28_cross"", ""price_now"": 29.18}"
+2026-01-07 12:48:18,UBER,"EMA28_Breakout breakout:84.25689199394385 meta:{""type"": ""ema28_cross"", ""price_now"": 85.54}"
+2026-01-07 12:55:46,UMC,"EMA28_Breakout breakout:7.848603236331047 meta:{""type"": ""ema28_cross"", ""price_now"": 8.12}"
+2026-01-07 13:04:59,UTHR,"EMA28_Breakout breakout:491.95688289420565 meta:{""type"": ""ema28_cross"", ""price_now"": 502.70999}"
+2026-01-07 13:11:38,VC,"EMA28_Breakout breakout:100.2967399460272 meta:{""type"": ""ema28_cross"", ""price_now"": 103.62}"
+2026-01-07 13:14:05,VEEV,"EMA28_Breakout breakout:233.9021222255363 meta:{""type"": ""ema28_cross"", ""price_now"": 237.87}"
+2026-01-07 13:22:51,VIS,ATH breakout:309.17001 meta:{}
+2026-01-07 13:27:55,VLYPP,"EMA28_Breakout breakout:25.279907642146423 meta:{""type"": ""ema28_cross"", ""price_now"": 25.29}"
+2026-01-07 13:39:15,VST,"EMA28_Breakout breakout:168.16243598694405 meta:{""type"": ""ema28_cross"", ""price_now"": 169.53}"
+2026-01-07 13:40:46,VTI,ATH breakout:339.88 meta:{}
+2026-01-07 14:13:26,WTFC,ATH breakout:145.39999 meta:{}
+2026-01-08 14:29:57,ABBV,"EMA28_Breakout breakout:227.2227013218995 meta:{""type"": ""ema28_cross"", ""price_now"": 233.42}"
+2026-01-08 14:41:13,ANAB,"EMA28_Breakout breakout:44.95071981330995 meta:{""type"": ""ema28_cross"", ""price_now"": 45.21}"
+2026-01-08 14:45:33,APLS,"EMA28_Breakout breakout:24.305196128218743 meta:{""type"": ""ema28_cross"", ""price_now"": 26.49}"
+2026-01-08 14:57:07,CBOE,"EMA28_Breakout breakout:252.2419381394209 meta:{""type"": ""ema28_cross"", ""price_now"": 255.16}"
+2026-01-08 15:06:03,CRNX,"EMA28_Breakout breakout:47.25891974194782 meta:{""type"": ""ema28_cross"", ""price_now"": 53.34}"
+2026-01-08 15:38:03,HLT,ATH breakout:293.48001 meta:{}
+2026-01-08 16:02:43,NET,"EMA28_Breakout breakout:201.7337383251239 meta:{""type"": ""ema28_cross"", ""price_now"": 202.81}"
+2026-01-08 16:04:58,NRIX,"EMA28_Breakout breakout:17.83345705685944 meta:{""type"": ""ema28_cross"", ""price_now"": 18.49}"
+2026-01-08 16:12:36,PANW,"EMA28_Breakout breakout:189.79647865353056 meta:{""type"": ""ema28_cross"", ""price_now"": 193.89999}"
+2026-01-08 17:34:43,TILE,"Bullish Triangle breakout:29.03 meta:{""breakout_score"": 5.95, ""adx14"": 37.41583469813758, ""atr14"": 0.7232144285714283, ""stop"": 27.945178357142858, ""position_size"": 921, ""neckline"": 29.03, ""near_peaks"": [29.0, 29.0, 29.09], ""near_positions"": [50, 102, 108]}"
+2026-01-08 19:13:14,WAB,ATH breakout:221.71001 meta:{}
+2026-01-08 19:34:50,WPC,"Bullish Triangle breakout:66.46666666666665 meta:{""breakout_score"": 5.83, ""adx14"": 27.44973896873624, ""atr14"": 1.0271430000000008, ""stop"": 64.92595216666665, ""position_size"": 649, ""neckline"": 66.46666666666665, ""near_peaks"": [66.64, 66.26, 66.5], ""near_positions"": [7, 12, 101]}"
+2026-01-08 19:40:18,WTFC,ATH breakout:147.63 meta:{}
+2026-01-09 08:27:06,AOS,"EMA28_Breakout breakout:67.79636902950193 meta:{""type"": ""ema28_cross"", ""price_now"": 70.4}"
+2026-01-09 08:39:50,BX,"EMA28_Breakout breakout:154.06770322784382 meta:{""type"": ""ema28_cross"", ""price_now"": 155.3}"
+2026-01-09 08:53:51,CVX,"Bullish Triangle breakout:158.5749975 meta:{""breakout_score"": 6.16, ""adx14"": 19.586182893374524, ""atr14"": 3.3307148571428575, ""stop"": 153.5789252142857, ""position_size"": 200, ""neckline"": 158.5749975, ""near_peaks"": [158.53999, 158.59, 159.17999, 157.99001], ""near_positions"": [19, 67, 73, 80]}"
+2026-01-09 09:04:27,ES,"Bullish Triangle breakout:66.98749899999999 meta:{""breakout_score"": 6.21, ""adx14"": 22.964761298860427, ""atr14"": 1.310714499999998, ""stop"": 65.02142724999999, ""position_size"": 508, ""neckline"": 66.98749899999999, ""near_peaks"": [66.88, 66.83, 67.089996, 67.15, 67.43], ""near_positions"": [2, 7, 11, 22, 93]}"
+2026-01-09 09:04:27,ES,"EMA28_Breakout breakout:67.60078587636009 meta:{""type"": ""ema28_cross"", ""price_now"": 67.62}"
+2026-01-09 09:22:37,HBAN,ATH breakout:18.3 meta:{}
+2026-01-09 09:23:44,HLT,ATH breakout:293.5 meta:{}
+2026-01-09 09:31:49,ITW,"EMA28_Breakout breakout:250.54711466597536 meta:{""type"": ""ema28_cross"", ""price_now"": 253.73}"
+2026-01-09 09:40:26,LVMUY,"EMA28_Breakout breakout:147.68391767314583 meta:{""type"": ""ema28_cross"", ""price_now"": 148.5}"
+2026-01-09 09:47:22,MUR,"EMA28_Breakout breakout:31.360391817618073 meta:{""type"": ""ema28_cross"", ""price_now"": 32.74}"
+2026-01-09 09:57:48,OXY,"EMA28_Breakout breakout:41.24752047548059 meta:{""type"": ""ema28_cross"", ""price_now"": 43.23}"
+2026-01-09 10:01:47,PLD,"EMA28_Breakout breakout:127.75628935114904 meta:{""type"": ""ema28_cross"", ""price_now"": 128.39}"
+2026-01-09 10:02:57,PNC,ATH breakout:218.039993 meta:{}
+2026-01-09 10:35:32,RSI,"EMA28_Breakout breakout:19.09162561518791 meta:{""type"": ""ema28_cross"", ""price_now"": 19.17}"
+2026-01-09 10:37:33,SCL,"Bullish Triangle breakout:50.93 meta:{""breakout_score"": 6.55, ""adx14"": 29.927669999511085, ""atr14"": 1.1521430000000008, ""stop"": 49.2017855, ""position_size"": 578, ""neckline"": 50.93, ""near_peaks"": [51.13, 50.89, 50.77], ""near_positions"": [17, 33, 41]}"
+2026-01-09 10:44:33,SU,ATH breakout:45.59 meta:{}
+2026-01-09 10:58:20,TAL,"EMA28_Breakout breakout:11.187855353172449 meta:{""type"": ""ema28_cross"", ""price_now"": 11.27}"
+2026-01-09 11:08:17,TDW,"EMA28_Breakout breakout:53.18082476514412 meta:{""type"": ""ema28_cross"", ""price_now"": 56.7}"
+2026-01-09 11:20:25,TILE,"Bullish Triangle breakout:29.03 meta:{""breakout_score"": 6.37, ""adx14"": 37.59112408971614, ""atr14"": 0.7692858571428568, ""stop"": 27.876071214285716, ""position_size"": 866, ""neckline"": 29.03, ""near_peaks"": [29.0, 29.0, 29.09], ""near_positions"": [50, 102, 108]}"
+2026-01-09 11:23:05,TJX,ATH breakout:157.28999 meta:{}
+2026-01-09 11:41:34,TRS,"EMA28_Breakout breakout:34.933373282764585 meta:{""type"": ""ema28_cross"", ""price_now"": 34.94}"
+2026-01-09 11:49:11,TTEK,"EMA28_Breakout breakout:34.28698486877832 meta:{""type"": ""ema28_cross"", ""price_now"": 35.5}"
+2026-01-09 12:56:43,WAB,ATH breakout:221.71001 meta:{}
+2026-01-09 13:18:13,WPC,"Bullish Triangle breakout:66.46666666666665 meta:{""breakout_score"": 6.26, ""adx14"": 27.576634077149674, ""atr14"": 1.037857285714286, ""stop"": 64.90988073809523, ""position_size"": 642, ""neckline"": 66.46666666666665, ""near_peaks"": [66.64, 66.26, 66.5], ""near_positions"": [7, 12, 101]}"
+2026-01-09 13:23:43,WTFC,ATH breakout:147.63 meta:{}
+2026-01-09 13:25:26,WTS,ATH breakout:285.85999 meta:{}
+2026-01-09 13:29:07,WY,"EMA28_Breakout breakout:23.37191892294596 meta:{""type"": ""ema28_cross"", ""price_now"": 23.99}"
+2026-01-09 13:32:18,XERS,"EMA28_Breakout breakout:7.3292628276976455 meta:{""type"": ""ema28_cross"", ""price_now"": 8.13}"
+2026-01-09 13:35:28,XOM,"EMA28_Breakout breakout:119.18256775945342 meta:{""type"": ""ema28_cross"", ""price_now"": 122.91}"
+2026-01-09 13:41:21,XYL,"EMA28_Breakout breakout:139.5345815177308 meta:{""type"": ""ema28_cross"", ""price_now"": 140.89}"
+2026-01-10 08:04:52,AEP,"EMA28_Breakout breakout:116.14994799929474 meta:{""type"": ""ema28_cross"", ""price_now"": 116.899}"
+2026-01-10 08:47:33,EXAS,"Bullish Triangle breakout:101.87000075 meta:{""breakout_score"": 5.61, ""adx14"": 73.35327608780804, ""atr14"": 0.4092859285714283, ""stop"": 101.25607185714286, ""position_size"": 1628, ""neckline"": 101.87000075, ""near_peaks"": [101.87, 101.61, 101.95, 102.66, 102.050003], ""near_positions"": [86, 90, 99, 106, 114]}"
+2026-01-10 09:04:35,HLT,ATH breakout:298.32999 meta:{}
+2026-01-10 09:15:46,KO,"EMA28_Breakout breakout:69.7795792853715 meta:{""type"": ""ema28_cross"", ""price_now"": 70.53}"
+2026-01-10 10:16:00,SCL,"Bullish Triangle breakout:50.93 meta:{""breakout_score"": 6.93, ""adx14"": 32.00917961868154, ""atr14"": 1.1935715714285717, ""stop"": 49.13964264285714, ""position_size"": 558, ""neckline"": 50.93, ""near_peaks"": [51.13, 50.89, 50.77], ""near_positions"": [16, 32, 40]}"
+2026-01-10 11:05:03,TMHC,"Bullish Triangle breakout:63.53666666666667 meta:{""breakout_score"": 6.53, ""adx14"": 20.20833133609515, ""atr14"": 1.671428642857144, ""stop"": 61.029523702380956, ""position_size"": 398, ""neckline"": 63.53666666666667, ""near_peaks"": [63.8, 63.39, 63.42], ""near_positions"": [60, 64, 100]}"
+2026-01-10 11:09:36,TOL,"EMA28_Breakout breakout:137.51029851367534 meta:{""type"": ""ema28_cross"", ""price_now"": 145.38}"
+2026-01-10 11:11:06,TPB,"EMA28_Breakout breakout:104.98959039462962 meta:{""type"": ""ema28_cross"", ""price_now"": 109.97}"
+2026-01-10 11:19:43,TRU,"EMA28_Breakout breakout:84.9188668799528 meta:{""type"": ""ema28_cross"", ""price_now"": 87.71}"
+2026-01-10 11:26:41,TTMI,"EMA28_Breakout breakout:69.72216924564708 meta:{""type"": ""ema28_cross"", ""price_now"": 73.88}"
+2026-01-10 11:56:06,UWMC,"EMA28_Breakout breakout:4.928313672407617 meta:{""type"": ""ema28_cross"", ""price_now"": 5.36}"
+2026-01-10 12:11:11,VIS,ATH breakout:313.34 meta:{}
+2026-01-10 12:22:10,VRDN,"EMA28_Breakout breakout:30.8965973954538 meta:{""type"": ""ema28_cross"", ""price_now"": 31.75}"
+2026-01-10 12:28:46,VTI,ATH breakout:341.20999 meta:{}
+2026-01-10 12:34:33,WAB,ATH breakout:222.44 meta:{}
+2026-01-10 12:37:42,WD,"EMA28_Breakout breakout:62.70272775307821 meta:{""type"": ""ema28_cross"", ""price_now"": 65.0}"
+2026-01-11 08:04:47,AEP,"EMA28_Breakout breakout:116.15070661998439 meta:{""type"": ""ema28_cross"", ""price_now"": 116.91}"
+2026-01-11 08:23:49,CBOE,ATH breakout:260.88 meta:{}
+2026-01-11 08:46:22,ETR,"EMA28_Breakout breakout:93.09121291985682 meta:{""type"": ""ema28_cross"", ""price_now"": 93.52}"
+2026-01-11 08:47:52,EXAS,"Bullish Triangle breakout:101.87000075 meta:{""breakout_score"": 5.53, ""adx14"": 73.35327608780804, ""atr14"": 0.4092859285714283, ""stop"": 101.25607185714286, ""position_size"": 1628, ""neckline"": 101.87000075, ""near_peaks"": [101.87, 101.61, 101.95, 102.66, 102.050003], ""near_positions"": [86, 90, 99, 106, 114]}"
+2026-01-11 09:04:11,HLT,ATH breakout:298.32999 meta:{}
+2026-01-11 09:15:34,KO,"EMA28_Breakout breakout:69.77819997502668 meta:{""type"": ""ema28_cross"", ""price_now"": 70.51}"
+2026-01-11 09:33:50,OLMA,"EMA28_Breakout breakout:25.848742755033854 meta:{""type"": ""ema28_cross"", ""price_now"": 28.08}"
+2026-01-11 10:15:34,SCL,"Bullish Triangle breakout:50.93 meta:{""breakout_score"": 6.93, ""adx14"": 32.00917961868154, ""atr14"": 1.1935715714285717, ""stop"": 49.13964264285714, ""position_size"": 558, ""neckline"": 50.93, ""near_peaks"": [51.13, 50.89, 50.77], ""near_positions"": [16, 32, 40]}"
+2026-01-11 11:05:06,TMHC,"Bullish Triangle breakout:63.53666666666667 meta:{""breakout_score"": 6.53, ""adx14"": 20.20833133609515, ""atr14"": 1.671428642857144, ""stop"": 61.029523702380956, ""position_size"": 398, ""neckline"": 63.53666666666667, ""near_peaks"": [63.8, 63.39, 63.42], ""near_positions"": [60, 64, 100]}"
+2026-01-11 11:09:57,TOL,"EMA28_Breakout breakout:137.51029851367534 meta:{""type"": ""ema28_cross"", ""price_now"": 145.38}"
+2026-01-11 11:11:31,TPB,"EMA28_Breakout breakout:104.98959039462962 meta:{""type"": ""ema28_cross"", ""price_now"": 109.97}"
+2026-01-11 11:20:11,TRU,"EMA28_Breakout breakout:84.9188668799528 meta:{""type"": ""ema28_cross"", ""price_now"": 87.71}"
+2026-01-11 11:27:13,TTMI,"EMA28_Breakout breakout:69.72216924564708 meta:{""type"": ""ema28_cross"", ""price_now"": 73.88}"
+2026-01-11 11:55:53,UWMC,"EMA28_Breakout breakout:4.928313672407617 meta:{""type"": ""ema28_cross"", ""price_now"": 5.36}"
+2026-01-11 12:11:12,VIS,ATH breakout:313.34 meta:{}
+2026-01-11 12:22:19,VRDN,"EMA28_Breakout breakout:30.8965973954538 meta:{""type"": ""ema28_cross"", ""price_now"": 31.75}"
+2026-01-11 12:28:43,VTI,ATH breakout:341.20999 meta:{}
+2026-01-11 12:34:15,WAB,ATH breakout:222.44 meta:{}
+2026-01-11 12:37:35,WD,"EMA28_Breakout breakout:62.70272775307821 meta:{""type"": ""ema28_cross"", ""price_now"": 65.0}"
+2026-01-12 10:55:16,AEP,"EMA28_Breakout breakout:116.15070661998439 meta:{""type"": ""ema28_cross"", ""price_now"": 116.91}"
+2026-01-12 11:20:22,CBOE,ATH breakout:260.88 meta:{}
+2026-01-12 11:45:46,ETR,"EMA28_Breakout breakout:93.09121291985682 meta:{""type"": ""ema28_cross"", ""price_now"": 93.52}"
+2026-01-12 11:47:03,EXAS,"Bullish Triangle breakout:101.87000075 meta:{""breakout_score"": 5.53, ""adx14"": 73.35327608780804, ""atr14"": 0.4092859285714283, ""stop"": 101.25607185714286, ""position_size"": 1628, ""neckline"": 101.87000075, ""near_peaks"": [101.87, 101.61, 101.95, 102.66, 102.050003], ""near_positions"": [86, 90, 99, 106, 114]}"
+2026-01-12 12:07:01,HLT,ATH breakout:298.32999 meta:{}
+2026-01-12 12:21:22,KO,"EMA28_Breakout breakout:69.77819997502668 meta:{""type"": ""ema28_cross"", ""price_now"": 70.51}"
+2026-01-12 12:45:57,OLMA,"EMA28_Breakout breakout:25.848742755033854 meta:{""type"": ""ema28_cross"", ""price_now"": 28.08}"
+2026-01-12 13:33:51,SCL,"Bullish Triangle breakout:50.93 meta:{""breakout_score"": 6.93, ""adx14"": 32.00917961868154, ""atr14"": 1.1935715714285717, ""stop"": 49.13964264285714, ""position_size"": 558, ""neckline"": 50.93, ""near_peaks"": [51.13, 50.89, 50.77], ""near_positions"": [16, 32, 40]}"
+2026-01-12 14:24:16,TMHC,"Bullish Triangle breakout:63.53666666666667 meta:{""breakout_score"": 6.53, ""adx14"": 20.20833133609515, ""atr14"": 1.671428642857144, ""stop"": 61.029523702380956, ""position_size"": 398, ""neckline"": 63.53666666666667, ""near_peaks"": [63.8, 63.39, 63.42], ""near_positions"": [60, 64, 100]}"
+2026-01-12 14:29:13,TOL,"EMA28_Breakout breakout:137.51029851367534 meta:{""type"": ""ema28_cross"", ""price_now"": 145.38}"
+2026-01-12 14:30:45,TPB,"EMA28_Breakout breakout:104.98959039462962 meta:{""type"": ""ema28_cross"", ""price_now"": 109.97}"
+2026-01-12 14:39:27,TRU,"EMA28_Breakout breakout:84.9188668799528 meta:{""type"": ""ema28_cross"", ""price_now"": 87.71}"
+2026-01-12 14:47:07,TTMI,"EMA28_Breakout breakout:69.72216924564708 meta:{""type"": ""ema28_cross"", ""price_now"": 73.88}"
+2026-01-12 15:17:52,UWMC,"EMA28_Breakout breakout:4.928313672407617 meta:{""type"": ""ema28_cross"", ""price_now"": 5.36}"
+2026-01-12 15:34:02,VIS,ATH breakout:313.34 meta:{}
+2026-01-12 15:45:27,VRDN,"EMA28_Breakout breakout:30.8965973954538 meta:{""type"": ""ema28_cross"", ""price_now"": 31.75}"
+2026-01-12 15:52:22,VTI,ATH breakout:341.20999 meta:{}
+2026-01-12 15:57:57,WAB,ATH breakout:222.44 meta:{}
+2026-01-12 16:01:24,WD,"EMA28_Breakout breakout:62.70272775307821 meta:{""type"": ""ema28_cross"", ""price_now"": 65.0}"
+2026-01-13 17:26:58,BA,ATH breakout:239.81 meta:{}
+2026-01-13 17:56:33,ETN,"EMA28_Breakout breakout:330.1962042142688 meta:{""type"": ""ema28_cross"", ""price_now"": 332.335}"
+2026-01-13 17:57:50,EVRG,"Bullish Triangle breakout:73.62333333333333 meta:{""breakout_score"": 5.69, ""adx14"": 26.082924531496626, ""atr14"": 0.9535719285714259, ""stop"": 72.19297544047619, ""position_size"": 699, ""neckline"": 73.62333333333333, ""near_peaks"": [73.97, 73.4, 73.5], ""near_positions"": [10, 19, 112]}"
+2026-01-13 17:57:50,EVRG,"EMA28_Breakout breakout:73.5264247268275 meta:{""type"": ""ema28_cross"", ""price_now"": 73.765}"
+2026-01-14 08:18:36,BA,ATH breakout:239.81 meta:{}
+2026-01-14 08:24:24,CBOE,ATH breakout:263.97 meta:{}
+2026-01-14 08:29:41,CNP,"EMA28_Breakout breakout:38.30822576141603 meta:{""type"": ""ema28_cross"", ""price_now"": 38.6}"
+2026-01-14 08:31:27,COR,"EMA28_Breakout breakout:342.52249455687326 meta:{""type"": ""ema28_cross"", ""price_now"": 345.88}"
+2026-01-14 08:41:25,DVN,"EMA28_Breakout breakout:36.172892046924886 meta:{""type"": ""ema28_cross"", ""price_now"": 36.84}"
+2026-01-14 08:47:22,ETN,"EMA28_Breakout breakout:330.19930766254464 meta:{""type"": ""ema28_cross"", ""price_now"": 332.38}"
+2026-01-14 08:48:34,EVRG,"Bullish Triangle breakout:73.62333333333333 meta:{""breakout_score"": 6.26, ""adx14"": 26.082924531496626, ""atr14"": 0.9707147857142827, ""stop"": 72.16726115476192, ""position_size"": 686, ""neckline"": 73.62333333333333, ""near_peaks"": [73.97, 73.4, 73.5], ""near_positions"": [10, 19, 112]}"
+2026-01-14 08:48:34,EVRG,"EMA28_Breakout breakout:73.53780403717234 meta:{""type"": ""ema28_cross"", ""price_now"": 73.93}"
+2026-01-14 09:05:43,HLT,ATH breakout:300.39999 meta:{}
+2026-01-14 09:07:26,HUBB,ATH breakout:477.45999 meta:{}
+2026-01-14 09:26:22,MO,"Bullish Triangle breakout:59.02 meta:{""breakout_score"": 6.25, ""adx14"": 22.19761400800792, ""atr14"": 1.0264286428571425, ""stop"": 57.48035703571429, ""position_size"": 649, ""neckline"": 59.02, ""near_peaks"": [58.8, 59.27, 59.35, 58.99], ""near_positions"": [78, 82, 91, 107]}"
+2026-01-14 09:34:14,NVDA,"EMA28_Breakout breakout:185.07221791516145 meta:{""type"": ""ema28_cross"", ""price_now"": 185.81}"
+2026-01-14 10:38:14,TALO,"EMA28_Breakout breakout:10.984836429220831 meta:{""type"": ""ema28_cross"", ""price_now"": 11.46}"
+2026-01-14 11:26:45,TTE,"EMA28_Breakout breakout:64.90442754313581 meta:{""type"": ""ema28_cross"", ""price_now"": 65.8}"
+2026-01-14 12:34:29,WAB,ATH breakout:226.48 meta:{}
+2026-01-14 12:46:31,WINA,"EMA28_Breakout breakout:420.98349098169683 meta:{""type"": ""ema28_cross"", ""price_now"": 421.82999}"
+2026-01-14 13:11:30,XOM,ATH breakout:125.37 meta:{}
+2026-01-14 13:17:25,XYL,"EMA28_Breakout breakout:139.5543684097542 meta:{""type"": ""ema28_cross"", ""price_now"": 140.11}"
+2026-01-15 15:30:34,CCI,"EMA28_Breakout breakout:87.89714123203466 meta:{""type"": ""ema28_cross"", ""price_now"": 88.67}"
+2026-01-15 15:35:08,CMS,"EMA28_Breakout breakout:70.63253078981631 meta:{""type"": ""ema28_cross"", ""price_now"": 70.92}"
+2026-01-15 15:35:37,CNP,"Bullish Triangle breakout:38.712500000000006 meta:{""breakout_score"": 6.12, ""adx14"": 22.28824858264447, ""atr14"": 0.545714357142857, ""stop"": 37.89392846428572, ""position_size"": 1221, ""neckline"": 38.712500000000006, ""near_peaks"": [38.77, 38.63, 38.61, 38.84], ""near_positions"": [18, 34, 102, 111]}"
+2026-01-15 15:47:02,DUK,"EMA28_Breakout breakout:117.80607422809304 meta:{""type"": ""ema28_cross"", ""price_now"": 118.68}"
+2026-01-15 16:10:29,HBAN,"EMA28_Breakout breakout:17.541345837175164 meta:{""type"": ""ema28_cross"", ""price_now"": 17.68}"
+2026-01-15 16:22:59,KR,"EMA28_Breakout breakout:62.43206863206993 meta:{""type"": ""ema28_cross"", ""price_now"": 62.46}"
+2026-01-15 16:25:03,LH,"EMA28_Breakout breakout:256.69741158846205 meta:{""type"": ""ema28_cross"", ""price_now"": 262.0}"
+2026-01-15 16:29:58,MDT,"EMA28_Breakout breakout:98.08456052054007 meta:{""type"": ""ema28_cross"", ""price_now"": 98.74}"
+2026-01-15 17:01:37,HLT,ATH breakout:300.62 meta:{}
+2026-01-15 17:03:27,HUBB,ATH breakout:481.67999 meta:{}
+2026-01-15 18:08:04,TIGO,"EMA28_Breakout breakout:53.14149178971998 meta:{""type"": ""ema28_cross"", ""price_now"": 56.19}"
+2026-01-15 19:22:03,VIS,ATH breakout:318.87 meta:{}
+2026-01-15 19:26:37,VLY,"EMA28_Breakout breakout:11.769343799673914 meta:{""type"": ""ema28_cross"", ""price_now"": 12.005}"
+2026-01-15 19:45:14,WAB,ATH breakout:227.48 meta:{}
+2026-01-15 19:45:49,WABC,"Bullish Triangle breakout:50.052000199999995 meta:{""breakout_score"": 6.01, ""adx14"": 30.70196707748889, ""atr14"": 1.454285642857143, ""stop"": 47.87057173571428, ""position_size"": 458, ""neckline"": 50.052000199999995, ""near_peaks"": [49.81, 50.31, 50.11, 50.15, 50.040001, 50.15], ""near_positions"": [1, 13, 37, 43, 86, 107]}"
+2026-01-15 19:45:49,WABC,"EMA28_Breakout breakout:48.736805181549606 meta:{""type"": ""ema28_cross"", ""price_now"": 50.46}"
+2026-01-18 07:32:59,CBOE,ATH breakout:270.82999 meta:{}
+2026-01-18 07:33:26,CBRE,ATH breakout:170.83 meta:{}
+2026-01-18 08:09:24,GILD,"EMA28_Breakout breakout:122.58157749141404 meta:{""type"": ""ema28_cross"", ""price_now"": 124.91}"
+2026-01-18 08:12:47,HBAN,"Bullish Triangle breakout:17.9740004 meta:{""breakout_score"": 5.58, ""adx14"": 26.385244622433397, ""atr14"": 0.4078571428571432, ""stop"": 17.362214685714285, ""position_size"": 1634, ""neckline"": 17.9740004, ""near_peaks"": [17.92, 18.030001, 17.93, 18.040001, 17.95], ""near_positions"": [23, 27, 37, 97, 102]}"
+2026-01-18 08:15:13,HUBB,ATH breakout:484.10999 meta:{}
+2026-01-18 08:16:06,IBM,"EMA28_Breakout breakout:302.8777226627016 meta:{""type"": ""ema28_cross"", ""price_now"": 305.67001}"
+2026-01-18 08:37:35,NDAQ,ATH breakout:100.69 meta:{}
+2026-01-18 08:51:35,PNC,ATH breakout:218.64 meta:{}
+2026-01-18 08:59:09,GILD,"EMA28_Breakout breakout:122.58157749141404 meta:{""type"": ""ema28_cross"", ""price_now"": 124.91}"
+2026-01-18 09:02:20,HBAN,"Bullish Triangle breakout:17.9740004 meta:{""breakout_score"": 5.58, ""adx14"": 26.385244622433397, ""atr14"": 0.4078571428571432, ""stop"": 17.362214685714285, ""position_size"": 1634, ""neckline"": 17.9740004, ""near_peaks"": [17.92, 18.030001, 17.93, 18.040001, 17.95], ""near_positions"": [23, 27, 37, 97, 102]}"
+2026-01-18 09:04:53,HUBB,ATH breakout:484.10999 meta:{}
+2026-01-18 09:05:48,IBM,"EMA28_Breakout breakout:302.8777226627016 meta:{""type"": ""ema28_cross"", ""price_now"": 305.67001}"
+2026-01-18 09:25:24,SCHW,ATH breakout:103.74 meta:{}
+2026-01-18 09:26:37,NDAQ,ATH breakout:100.69 meta:{}
+2026-01-18 09:31:11,STE,ATH breakout:268.26001 meta:{}
+2026-01-18 09:40:20,SWX,ATH breakout:85.9 meta:{}
+2026-01-18 10:25:08,TRMK,ATH breakout:41.17 meta:{}
+2026-01-18 11:12:53,TRMK,ATH breakout:41.17 meta:{}
+2026-01-18 11:19:04,VIS,ATH breakout:322.51001 meta:{}
+2026-01-18 11:41:48,WAB,ATH breakout:228.52 meta:{}
+2026-01-18 11:47:46,WELL,"Bullish Triangle breakout:190.12333333333333 meta:{""breakout_score"": 6.09, ""adx14"": 19.404759386642585, ""atr14"": 3.6014292499999994, ""stop"": 184.72118945833333, ""position_size"": 185, ""neckline"": 190.12333333333333, ""near_peaks"": [189.53, 190.84, 190.0], ""near_positions"": [64, 107, 114]}"
+2026-01-18 11:47:46,WELL,"EMA28_Breakout breakout:188.83745485130368 meta:{""type"": ""ema28_cross"", ""price_now"": 191.38}"
+2026-01-18 12:03:04,WPC,ATH breakout:69.2 meta:{}
+2026-01-18 12:06:34,VIS,ATH breakout:322.51001 meta:{}
+2026-01-18 12:29:30,WAB,ATH breakout:228.52 meta:{}
+2026-01-18 12:35:21,WELL,"Bullish Triangle breakout:190.12333333333333 meta:{""breakout_score"": 6.09, ""adx14"": 19.404759386642585, ""atr14"": 3.6014292499999994, ""stop"": 184.72118945833333, ""position_size"": 185, ""neckline"": 190.12333333333333, ""near_peaks"": [189.53, 190.84, 190.0], ""near_positions"": [64, 107, 114]}"
+2026-01-18 12:35:21,WELL,"EMA28_Breakout breakout:188.83745485130368 meta:{""type"": ""ema28_cross"", ""price_now"": 191.38}"
+2026-01-18 12:51:14,WPC,ATH breakout:69.2 meta:{}
+2026-01-21 08:09:52,ASND,"EMA28_Breakout breakout:210.0934150541118 meta:{""type"": ""ema28_cross"", ""price_now"": 215.58}"
+2026-01-21 08:15:00,ASND,"EMA28_Breakout breakout:210.0934150541118 meta:{""type"": ""ema28_cross"", ""price_now"": 215.58}"
+2026-01-21 08:29:37,CVS,"EMA28_Breakout breakout:79.51688781748605 meta:{""type"": ""ema28_cross"", ""price_now"": 80.089996}"
+2026-01-21 08:34:19,CVS,"EMA28_Breakout breakout:79.51688781748605 meta:{""type"": ""ema28_cross"", ""price_now"": 80.089996}"
+2026-01-21 09:17:09,KO,"Bullish Triangle breakout:71.63499999999999 meta:{""breakout_score"": 6.26, ""adx14"": 20.699830159188934, ""atr14"": 1.0271427857142814, ""stop"": 70.09428582142857, ""position_size"": 649, ""neckline"": 71.63499999999999, ""near_peaks"": [71.71, 71.62, 71.89, 71.32], ""near_positions"": [15, 59, 74, 96]}"
+2026-01-21 09:19:27,LH,"Bullish Triangle breakout:272.16000333333335 meta:{""breakout_score"": 6.58, ""adx14"": 20.534685814039367, ""atr14"": 6.33714621428572, ""stop"": 262.6542840119048, ""position_size"": 105, ""neckline"": 272.16000333333335, ""near_peaks"": [272.66, 271.0, 272.82001], ""near_positions"": [10, 73, 86]}"
+2026-01-21 09:20:09,LIVN,"EMA28_Breakout breakout:62.20471302202202 meta:{""type"": ""ema28_cross"", ""price_now"": 62.92}"
+2026-01-21 09:22:00,KO,"Bullish Triangle breakout:71.63499999999999 meta:{""breakout_score"": 6.26, ""adx14"": 20.699830159188934, ""atr14"": 1.0271427857142814, ""stop"": 70.09428582142857, ""position_size"": 649, ""neckline"": 71.63499999999999, ""near_peaks"": [71.71, 71.62, 71.89, 71.32], ""near_positions"": [15, 59, 74, 96]}"
+2026-01-21 09:24:36,MDT,"EMA28_Breakout breakout:98.08978493278896 meta:{""type"": ""ema28_cross"", ""price_now"": 98.6}"
+2026-01-21 09:24:44,LIVN,"EMA28_Breakout breakout:62.20471302202202 meta:{""type"": ""ema28_cross"", ""price_now"": 62.92}"
+2026-01-21 09:29:07,MDT,"EMA28_Breakout breakout:98.08978493278896 meta:{""type"": ""ema28_cross"", ""price_now"": 98.6}"
+2026-01-21 09:33:42,NTRA,"EMA28_Breakout breakout:233.69980803462417 meta:{""type"": ""ema28_cross"", ""price_now"": 234.85001}"
+2026-01-21 09:38:14,NTRA,"EMA28_Breakout breakout:233.69980803462417 meta:{""type"": ""ema28_cross"", ""price_now"": 234.85001}"
+2026-01-21 11:46:33,UNH,"EMA28_Breakout breakout:335.4366382664445 meta:{""type"": ""ema28_cross"", ""price_now"": 338.42999}"
+2026-01-21 11:50:42,UNH,"EMA28_Breakout breakout:335.4366382664445 meta:{""type"": ""ema28_cross"", ""price_now"": 338.42999}"
+2026-01-21 12:12:52,VIV,"EMA28_Breakout breakout:12.234227671807298 meta:{""type"": ""ema28_cross"", ""price_now"": 12.68}"
+2026-01-21 12:17:45,VIV,"EMA28_Breakout breakout:12.234227671807298 meta:{""type"": ""ema28_cross"", ""price_now"": 12.68}"
+2026-01-21 12:35:36,WABC,"Bullish Triangle breakout:50.1520002 meta:{""breakout_score"": 6.46, ""adx14"": 33.809106487584735, ""atr14"": 1.5442855714285717, ""stop"": 47.83557184285715, ""position_size"": 431, ""neckline"": 50.1520002, ""near_peaks"": [50.31, 50.11, 50.15, 50.040001, 50.15], ""near_positions"": [11, 35, 41, 84, 105]}"
+2026-01-21 12:40:15,WABC,"Bullish Triangle breakout:50.1520002 meta:{""breakout_score"": 6.46, ""adx14"": 33.809106487584735, ""atr14"": 1.5442855714285717, ""stop"": 47.83557184285715, ""position_size"": 431, ""neckline"": 50.1520002, ""near_peaks"": [50.31, 50.11, 50.15, 50.040001, 50.15], ""near_positions"": [11, 35, 41, 84, 105]}"
+2026-01-25 13:17:10,DLTR,"EMA28_Breakout breakout:128.76627409946462 meta:{""type"": ""ema28_cross"", ""price_now"": 128.92}"
+2026-01-25 14:26:09,QURE,"EMA28_Breakout breakout:23.939216080481128 meta:{""type"": ""ema28_cross"", ""price_now"": 25.08}"
+2026-01-25 15:26:15,TDW,"Bullish Triangle breakout:59.696666666666665 meta:{""breakout_score"": 6.5, ""adx14"": 31.05926761756013, ""atr14"": 2.4085713571428573, ""stop"": 56.08380963095238, ""position_size"": 276, ""neckline"": 59.696666666666665, ""near_peaks"": [59.65, 59.6, 59.84], ""near_positions"": [38, 74, 113]}"
+2026-01-25 15:38:40,TIP,"EMA28_Breakout breakout:110.19857404337297 meta:{""type"": ""ema28_cross"", ""price_now"": 110.23}"
+2026-01-25 19:56:07,VDE,ATH breakout:137.98 meta:{}
+2026-01-25 20:06:01,VIV,ATH breakout:13.61 meta:{}
+2026-01-25 20:36:48,WF,ATH breakout:60.49 meta:{}
+2026-01-25 20:46:57,WMB,ATH breakout:64.48 meta:{}
+2026-01-26 13:45:53,ZM,"EMA28_Breakout breakout:84.7796719986078 meta:{""type"": ""ema28_cross"", ""price_now"": 85.78}"
+2026-01-26 14:01:27,DLTR,"EMA28_Breakout breakout:128.76627409946462 meta:{""type"": ""ema28_cross"", ""price_now"": 128.92}"
+2026-01-26 15:09:30,QURE,"EMA28_Breakout breakout:23.939216080481128 meta:{""type"": ""ema28_cross"", ""price_now"": 25.08}"
+2026-01-26 16:09:05,TDW,"Bullish Triangle breakout:59.696666666666665 meta:{""breakout_score"": 6.5, ""adx14"": 31.05926761756013, ""atr14"": 2.4085713571428573, ""stop"": 56.08380963095238, ""position_size"": 276, ""neckline"": 59.696666666666665, ""near_peaks"": [59.65, 59.6, 59.84], ""near_positions"": [38, 74, 113]}"
+2026-01-26 16:21:34,TIP,"EMA28_Breakout breakout:110.19857404337297 meta:{""type"": ""ema28_cross"", ""price_now"": 110.23}"
+2026-01-27 14:43:09,AEP,"EMA28_Breakout breakout:117.13360252474558 meta:{""type"": ""ema28_cross"", ""price_now"": 118.019997}"
+2026-01-27 14:48:35,AMGN,ATH breakout:347.070007 meta:{}
+2026-01-27 14:55:58,ATO,"Bullish Triangle breakout:166.9399975 meta:{""breakout_score"": 6.51, ""adx14"": 22.737391848990853, ""atr14"": 2.688570357142857, ""stop"": 162.90714196428573, ""position_size"": 247, ""neckline"": 166.9399975, ""near_peaks"": [166.42999, 167.44, 166.75, 167.14], ""near_positions"": [2, 7, 19, 27]}"
+2026-01-27 14:55:58,ATO,"EMA28_Breakout breakout:168.4131801534392 meta:{""type"": ""ema28_cross"", ""price_now"": 168.5}"
+2026-01-27 15:07:59,CLDX,"EMA28_Breakout breakout:26.385336721357298 meta:{""type"": ""ema28_cross"", ""price_now"": 26.57}"
+2026-01-27 15:14:07,CSCO,"EMA28_Breakout breakout:75.52346463170225 meta:{""type"": ""ema28_cross"", ""price_now"": 77.010002}"
+2026-01-27 15:15:40,CVS,ATH breakout:83.040001 meta:{}
+2026-01-27 15:18:05,DDOG,"EMA28_Breakout breakout:134.0797364164639 meta:{""type"": ""ema28_cross"", ""price_now"": 136.64}"
+2026-01-27 15:22:01,DUK,"EMA28_Breakout breakout:118.13811956231625 meta:{""type"": ""ema28_cross"", ""price_now"": 118.78}"
+2026-01-27 15:23:10,EBAY,"Bullish Triangle breakout:94.41000000000001 meta:{""breakout_score"": 6.12, ""adx14"": 29.636900840695244, ""atr14"": 2.3571426428571414, ""stop"": 90.8742860357143, ""position_size"": 282, ""neckline"": 94.41000000000001, ""near_peaks"": [94.2, 94.38, 94.65], ""near_positions"": [22, 36, 44]}"
+2026-01-27 15:28:34,ETR,"EMA28_Breakout breakout:93.91476786061509 meta:{""type"": ""ema28_cross"", ""price_now"": 94.97}"
+2026-01-27 15:29:56,EXAS,"Bullish Triangle breakout:102.29166716666667 meta:{""breakout_score"": 5.54, ""adx14"": 70.49073014984414, ""atr14"": 0.32285714285714256, ""stop"": 101.80738145238095, ""position_size"": 2064, ""neckline"": 102.29166716666667, ""near_peaks"": [101.87, 101.61, 101.95, 102.66, 102.050003, 102.56, 102.66], ""near_positions"": [76, 80, 89, 96, 104, 112, 117]}"
+2026-01-27 15:30:28,EXC,"EMA28_Breakout breakout:44.13886285318571 meta:{""type"": ""ema28_cross"", ""price_now"": 44.55}"
+2026-01-27 15:46:00,HAS,ATH breakout:89.14 meta:{}
+2026-01-27 16:04:37,MCK,"EMA28_Breakout breakout:824.9592404550023 meta:{""type"": ""ema28_cross"", ""price_now"": 826.62}"
+2026-01-27 17:20:25,TAK,ATH breakout:16.61 meta:{}
+2026-01-27 18:01:27,TRMD,"Bullish Triangle breakout:23.580000000000002 meta:{""breakout_score"": 5.64, ""adx14"": 30.791525452614284, ""atr14"": 0.7914284285714286, ""stop"": 22.39285735714286, ""position_size"": 842, ""neckline"": 23.580000000000002, ""near_peaks"": [23.65, 23.51, 23.67, 23.49, 23.755], ""near_positions"": [22, 30, 68, 74, 111]}"
+2026-01-27 18:35:48,USB,ATH breakout:56.18 meta:{}
+2026-01-27 18:47:47,VDE,ATH breakout:138.69 meta:{}
+2026-01-28 08:06:16,AIZ,"EMA28_Breakout breakout:235.2092852607048 meta:{""type"": ""ema28_cross"", ""price_now"": 237.050003}"
+2026-01-28 08:09:51,AMGN,ATH breakout:349.69 meta:{}
+2026-01-28 08:35:47,CVX,ATH breakout:168.50999 meta:{}
+2026-01-28 08:47:16,ETN,"EMA28_Breakout breakout:332.90606894989486 meta:{""type"": ""ema28_cross"", ""price_now"": 341.19}"
+2026-01-28 08:49:48,F,"EMA28_Breakout breakout:13.589954245283199 meta:{""type"": ""ema28_cross"", ""price_now"": 13.93}"
+2026-01-28 09:01:26,GEF,ATH breakout:72.2 meta:{}
+2026-01-28 09:04:56,HAS,ATH breakout:89.41 meta:{}
+2026-01-28 09:05:37,HCA,"EMA28_Breakout breakout:475.8996668702537 meta:{""type"": ""ema28_cross"", ""price_now"": 505.84}"
+2026-01-28 09:29:00,MUR,"EMA28_Breakout breakout:31.787918077964406 meta:{""type"": ""ema28_cross"", ""price_now"": 31.81}"
+2026-01-28 09:30:06,NEE,ATH breakout:86.29 meta:{}
+2026-01-28 09:30:06,NEE,"Bullish Triangle breakout:86.54 meta:{""breakout_score"": 6.6, ""adx14"": 24.705512562598194, ""atr14"": 1.8357147142857155, ""stop"": 83.78642792857143, ""position_size"": 363, ""neckline"": 86.54, ""near_peaks"": [86.74, 86.26, 86.69, 86.47], ""near_positions"": [50, 69, 73, 80]}"
+2026-01-28 09:31:29,NI,ATH breakout:44.17 meta:{}
+2026-01-28 09:31:29,NI,"Bullish Triangle breakout:44.133334 meta:{""breakout_score"": 6.1, ""adx14"": 24.082385818325992, ""atr14"": 0.7821430714285711, ""stop"": 42.96011939285714, ""position_size"": 852, ""neckline"": 44.133334, ""near_peaks"": [44.45, 44.080002, 44.2, 44.12], ""near_positions"": [55, 69, 80, 113]}"
+2026-01-28 09:41:48,PFE,"Bullish Triangle breakout:26.03 meta:{""breakout_score"": 6.8, ""adx14"": 23.687756845833263, ""atr14"": 0.5421428571428571, ""stop"": 25.216785714285717, ""position_size"": 1229, ""neckline"": 26.03, ""near_peaks"": [26.11, 25.97, 26.19, 26.01], ""near_positions"": [12, 78, 86, 105]}"
+2026-01-28 10:37:08,SYY,ATH breakout:83.27 meta:{}
+2026-01-28 10:37:08,SYY,"Bullish Triangle breakout:83.01666666666667 meta:{""breakout_score"": 6.84, ""adx14"": 22.813256170952958, ""atr14"": 2.0971429999999995, ""stop"": 79.87095216666667, ""position_size"": 317, ""neckline"": 83.01666666666667, ""near_peaks"": [82.64, 83.17, 83.24, 83.47], ""near_positions"": [5, 21, 31, 40]}"
+2026-01-28 10:39:20,TAK,ATH breakout:16.61 meta:{}
+2026-01-28 11:20:05,TRIN,ATH breakout:16.72 meta:{}
+2026-01-28 11:20:54,TRMD,"Bullish Triangle breakout:23.580000000000002 meta:{""breakout_score"": 6.05, ""adx14"": 30.818459640319187, ""atr14"": 0.7935712857142858, ""stop"": 22.389643071428573, ""position_size"": 840, ""neckline"": 23.580000000000002, ""near_peaks"": [23.65, 23.51, 23.67, 23.49, 23.755], ""near_positions"": [22, 30, 68, 74, 111]}"
+2026-01-28 11:45:23,UGI,ATH breakout:39.79 meta:{}
+2026-01-28 12:07:29,VDE,ATH breakout:138.69 meta:{}
+2026-01-28 12:40:40,WABC,"Bullish Triangle breakout:50.1520002 meta:{""breakout_score"": 6.19, ""adx14"": 36.66720871495403, ""atr14"": 1.4735711428571416, ""stop"": 47.941643485714295, ""position_size"": 452, ""neckline"": 50.1520002, ""near_peaks"": [50.31, 50.11, 50.15, 50.040001, 50.15], ""near_positions"": [6, 30, 36, 79, 100]}"
+2026-01-28 12:58:19,WMB,ATH breakout:64.96 meta:{}
+2026-01-28 13:05:58,WSFS,ATH breakout:61.09 meta:{}
+2026-01-28 13:19:45,XP,"Bullish Triangle breakout:20.255 meta:{""breakout_score"": 6.78, ""adx14"": 27.22764782577644, ""atr14"": 0.6349999285714281, ""stop"": 19.30250010714286, ""position_size"": 1049, ""neckline"": 20.255, ""near_peaks"": [20.35, 20.195, 20.22], ""near_positions"": [28, 67, 81]}"
+2026-01-28 13:30:15,YUM,"EMA28_Breakout breakout:153.47661369200318 meta:{""type"": ""ema28_cross"", ""price_now"": 154.0099945}"
+2026-01-29 18:48:45,HAS,ATH breakout:89.88 meta:{}
+2026-01-29 19:26:15,PFE,"Bullish Triangle breakout:26.03 meta:{""breakout_score"": 5.54, ""adx14"": 26.04643689823034, ""atr14"": 0.5346428571428573, ""stop"": 25.228035714285717, ""position_size"": 1246, ""neckline"": 26.03, ""near_peaks"": [26.11, 25.97, 26.19, 26.01], ""near_positions"": [10, 76, 84, 103]}"
+2026-01-29 19:40:27,HON,ATH breakout:226.5787 meta:{}
+2026-01-31 16:58:14,MCK,"EMA28_Breakout breakout:825.8320725912426 meta:{""type"": ""ema28_cross"", ""price_now"": 831.21002}"
+2026-01-31 17:16:54,BDX,"EMA28_Breakout breakout:201.2817545309931 meta:{""type"": ""ema28_cross"", ""price_now"": 203.48}"
+2026-01-31 17:26:18,CMS,"EMA28_Breakout breakout:71.05387585764963 meta:{""type"": ""ema28_cross"", ""price_now"": 71.49}"
+2026-01-31 17:34:13,TDS,ATH breakout:44.85 meta:{}
+2026-01-31 17:34:59,DECK,"EMA28_Breakout breakout:102.0155390698255 meta:{""type"": ""ema28_cross"", ""price_now"": 119.34}"
+2026-01-31 17:38:08,TFC,ATH breakout:51.32 meta:{}
+2026-01-31 17:41:01,TGNA,"EMA28_Breakout breakout:19.108207669684173 meta:{""type"": ""ema28_cross"", ""price_now"": 19.16}"
+2026-01-31 17:43:07,ES,"EMA28_Breakout breakout:69.03891110291914 meta:{""type"": ""ema28_cross"", ""price_now"": 69.13}"
+2026-01-31 18:02:15,HON,ATH breakout:227.24001 meta:{}
+2026-01-31 18:02:56,TR,"EMA28_Breakout breakout:37.38320339180854 meta:{""type"": ""ema28_cross"", ""price_now"": 37.88}"
+2026-01-31 18:06:49,INBX,"EMA28_Breakout breakout:75.74829385154894 meta:{""type"": ""ema28_cross"", ""price_now"": 76.27}"
+2026-01-31 18:12:52,KIM,"Bullish Triangle breakout:20.796666666666667 meta:{""breakout_score"": 6.5, ""adx14"": 18.75182880625867, ""atr14"": 0.40999999999999964, ""stop"": 20.18166666666667, ""position_size"": 1626, ""neckline"": 20.796666666666667, ""near_peaks"": [20.8, 20.83, 20.76], ""near_positions"": [66, 76, 105]}"
+2026-01-31 18:14:02,KO,ATH breakout:73.9 meta:{}
+2026-01-31 18:16:49,LH,"Bullish Triangle breakout:272.16000333333335 meta:{""breakout_score"": 6.09, ""adx14"": 25.74621409456242, ""atr14"": 5.826430500000001, ""stop"": 263.4203575833333, ""position_size"": 114, ""neckline"": 272.16000333333335, ""near_peaks"": [272.66, 271.0, 272.82001], ""near_positions"": [2, 65, 78]}"
+2026-01-31 18:20:58,MCK,"EMA28_Breakout breakout:825.8320725912426 meta:{""type"": ""ema28_cross"", ""price_now"": 831.21002}"
+2026-01-31 18:24:09,MO,"EMA28_Breakout breakout:60.194183160197085 meta:{""type"": ""ema28_cross"", ""price_now"": 61.99}"
+2026-01-31 18:26:41,UBSI,"Flying Wedge breakout:40.85 meta:{""breakout_score"": 6.66, ""adx14"": 26.75237492835442, ""adx_ok"": true, ""atr14"": 0.9542859071428573, ""stop"": 39.41857113928572, ""position_size"": 698, ""retest_status"": ""confirmed"", ""high_slope"": 3.259999999999999, ""low_slope"": 3.2399999999999958}"
+2026-01-31 18:33:13,ULTA,"EMA28_Breakout breakout:639.5590012906139 meta:{""type"": ""ema28_cross"", ""price_now"": 647.35999}"
+2026-01-31 18:51:33,VDE,ATH breakout:142.64 meta:{}
+2026-01-31 19:23:15,VZ,"EMA28_Breakout breakout:40.173637690274994 meta:{""type"": ""ema28_cross"", ""price_now"": 44.52}"
+2026-01-31 19:41:36,WMB,ATH breakout:67.24 meta:{}
+2026-01-31 19:43:40,TDS,ATH breakout:44.85 meta:{}
+2026-01-31 19:47:48,TFC,ATH breakout:51.32 meta:{}
+2026-01-31 19:50:37,TGNA,"EMA28_Breakout breakout:19.108207669684173 meta:{""type"": ""ema28_cross"", ""price_now"": 19.16}"
+2026-01-31 20:12:04,TR,"EMA28_Breakout breakout:37.38320339180854 meta:{""type"": ""ema28_cross"", ""price_now"": 37.88}"
+2026-01-31 20:34:35,UBSI,"Flying Wedge breakout:40.85 meta:{""breakout_score"": 6.66, ""adx14"": 26.75237492835442, ""adx_ok"": true, ""atr14"": 0.9542859071428573, ""stop"": 39.41857113928572, ""position_size"": 698, ""retest_status"": ""confirmed"", ""high_slope"": 3.259999999999999, ""low_slope"": 3.2399999999999958}"
+2026-01-31 20:41:34,ULTA,"EMA28_Breakout breakout:639.5590012906139 meta:{""type"": ""ema28_cross"", ""price_now"": 647.35999}"
+2026-02-01 15:35:18,VDE,ATH breakout:142.64 meta:{}
+2026-02-01 15:41:58,BDX,"EMA28_Breakout breakout:201.2817545309931 meta:{""type"": ""ema28_cross"", ""price_now"": 203.48}"
+2026-02-01 15:51:28,CMS,"EMA28_Breakout breakout:71.05387585764963 meta:{""type"": ""ema28_cross"", ""price_now"": 71.49}"
+2026-02-01 15:59:54,DECK,"EMA28_Breakout breakout:102.0155390698255 meta:{""type"": ""ema28_cross"", ""price_now"": 119.34}"
+2026-02-01 16:07:09,VZ,"EMA28_Breakout breakout:40.173637690274994 meta:{""type"": ""ema28_cross"", ""price_now"": 44.52}"
+2026-02-01 16:08:23,ES,"EMA28_Breakout breakout:69.03891110291914 meta:{""type"": ""ema28_cross"", ""price_now"": 69.13}"
+2026-02-01 16:25:21,WMB,ATH breakout:67.24 meta:{}
+2026-02-01 16:27:50,HON,ATH breakout:227.24001 meta:{}
+2026-02-01 16:32:25,INBX,"EMA28_Breakout breakout:75.74829385154894 meta:{""type"": ""ema28_cross"", ""price_now"": 76.27}"
+2026-02-01 16:38:25,KIM,"Bullish Triangle breakout:20.796666666666667 meta:{""breakout_score"": 6.5, ""adx14"": 18.75182880625867, ""atr14"": 0.40999999999999964, ""stop"": 20.18166666666667, ""position_size"": 1626, ""neckline"": 20.796666666666667, ""near_peaks"": [20.8, 20.83, 20.76], ""near_positions"": [66, 76, 105]}"
+2026-02-01 16:39:30,KO,ATH breakout:73.9 meta:{}
+2026-02-01 16:41:40,LH,"Bullish Triangle breakout:272.16000333333335 meta:{""breakout_score"": 6.09, ""adx14"": 25.74621409456242, ""atr14"": 5.826430500000001, ""stop"": 263.4203575833333, ""position_size"": 114, ""neckline"": 272.16000333333335, ""near_peaks"": [272.66, 271.0, 272.82001], ""near_positions"": [2, 65, 78]}"
+2026-02-01 16:45:48,MCK,"EMA28_Breakout breakout:825.8320725912426 meta:{""type"": ""ema28_cross"", ""price_now"": 831.21002}"
+2026-02-01 16:48:56,MO,"EMA28_Breakout breakout:60.194183160197085 meta:{""type"": ""ema28_cross"", ""price_now"": 61.99}"
+2026-02-01 18:09:07,TDS,ATH breakout:44.85 meta:{}
+2026-02-01 18:13:05,TFC,ATH breakout:51.32 meta:{}
+2026-02-01 18:15:46,TGNA,"EMA28_Breakout breakout:19.108207669684173 meta:{""type"": ""ema28_cross"", ""price_now"": 19.16}"
+2026-02-01 18:37:43,TR,"EMA28_Breakout breakout:37.38320339180854 meta:{""type"": ""ema28_cross"", ""price_now"": 37.88}"
+2026-02-01 19:01:24,UBSI,"Flying Wedge breakout:40.85 meta:{""breakout_score"": 6.66, ""adx14"": 26.75237492835442, ""adx_ok"": true, ""atr14"": 0.9542859071428573, ""stop"": 39.41857113928572, ""position_size"": 698, ""retest_status"": ""confirmed"", ""high_slope"": 3.259999999999999, ""low_slope"": 3.2399999999999958}"
+2026-02-01 19:08:34,ULTA,"EMA28_Breakout breakout:639.5590012906139 meta:{""type"": ""ema28_cross"", ""price_now"": 647.35999}"
+2026-02-01 19:27:04,VDE,ATH breakout:142.64 meta:{}
+2026-02-01 19:58:01,VZ,"EMA28_Breakout breakout:40.173637690274994 meta:{""type"": ""ema28_cross"", ""price_now"": 44.52}"
+2026-02-01 20:16:17,WMB,ATH breakout:67.24 meta:{}
+2026-02-03 07:12:50,AAPL,"EMA28_Breakout breakout:261.2232065838698 meta:{""type"": ""ema28_cross"", ""price_now"": 270.01001}"
+2026-02-03 07:44:39,CSCO,ATH breakout:80.25 meta:{}
+2026-02-03 07:48:25,DE,ATH breakout:531.47998 meta:{}
+2026-02-03 07:55:20,EMN,"Bullish Triangle breakout:70.435 meta:{""breakout_score"": 6.31, ""adx14"": 32.284370369418355, ""atr14"": 2.2514285714285722, ""stop"": 67.05785714285715, ""position_size"": 296, ""neckline"": 70.435, ""near_peaks"": [70.63, 70.4, 70.31, 70.4], ""near_positions"": [13, 17, 103, 108]}"
+2026-02-03 08:14:42,HALO,"Bullish Triangle breakout:74.27000066666666 meta:{""breakout_score"": 6.22, ""adx14"": 26.800875239962853, ""atr14"": 2.3596432857142844, ""stop"": 70.73053573809523, ""position_size"": 282, ""neckline"": 74.27000066666666, ""near_peaks"": [74.25, 74.080002, 74.48], ""near_positions"": [75, 107, 118]}"
+2026-02-03 08:16:14,HLT,ATH breakout:301.85999 meta:{}
+2026-02-03 08:16:44,HON,ATH breakout:227.52 meta:{}
+2026-02-03 08:27:53,KO,ATH breakout:74.81 meta:{}
+2026-02-03 08:31:36,LPLA,"EMA28_Breakout breakout:367.1001605495715 meta:{""type"": ""ema28_cross"", ""price_now"": 376.32999}"
+2026-02-03 08:32:35,LSTR,"EMA28_Breakout breakout:150.61250444627967 meta:{""type"": ""ema28_cross"", ""price_now"": 158.7}"
+2026-02-03 08:49:26,ORIC,"EMA28_Breakout breakout:10.597740543352636 meta:{""type"": ""ema28_cross"", ""price_now"": 11.16}"
+2026-02-03 08:54:56,PNC,ATH breakout:225.49001 meta:{}
+2026-02-03 08:59:59,QURE,"EMA28_Breakout breakout:23.931774324172235 meta:{""type"": ""ema28_cross"", ""price_now"": 24.7}"
+2026-02-03 09:03:09,HALO,"Bullish Triangle breakout:74.27000066666666 meta:{""breakout_score"": 6.22, ""adx14"": 26.800875239962853, ""atr14"": 2.3596432857142844, ""stop"": 70.73053573809523, ""position_size"": 282, ""neckline"": 74.27000066666666, ""near_peaks"": [74.25, 74.080002, 74.48], ""near_positions"": [75, 107, 118]}"
+2026-02-03 09:04:53,HLT,ATH breakout:301.85999 meta:{}
+2026-02-03 09:05:24,HON,ATH breakout:227.52 meta:{}
+2026-02-03 09:16:38,KO,ATH breakout:74.81 meta:{}
+2026-02-03 09:20:56,LSTR,"EMA28_Breakout breakout:150.61250444627967 meta:{""type"": ""ema28_cross"", ""price_now"": 158.7}"
+2026-02-03 09:37:20,ORIC,"EMA28_Breakout breakout:10.597740543352636 meta:{""type"": ""ema28_cross"", ""price_now"": 11.16}"
+2026-02-03 09:42:46,PNC,ATH breakout:225.49001 meta:{}
+2026-02-03 10:02:32,TEX,"EMA28_Breakout breakout:57.55853073808466 meta:{""type"": ""ema28_cross"", ""price_now"": 58.99}"
+2026-02-03 10:03:02,TFC,ATH breakout:51.42 meta:{}
+2026-02-03 10:11:54,TIMB,"Bullish Triangle breakout:23.656666666666666 meta:{""breakout_score"": 5.98, ""adx14"": 33.80211738664508, ""atr14"": 0.6592857142857144, ""stop"": 22.667738095238093, ""position_size"": 1011, ""neckline"": 23.656666666666666, ""near_peaks"": [23.61, 23.69, 23.67], ""near_positions"": [55, 60, 76]}"
+2026-02-03 10:24:59,TOWN,"EMA28_Breakout breakout:35.130639722197074 meta:{""type"": ""ema28_cross"", ""price_now"": 35.66}"
+2026-02-03 10:30:41,TRMK,ATH breakout:42.64 meta:{}
+2026-02-03 10:36:41,TSCO,"EMA28_Breakout breakout:52.45822971693944 meta:{""type"": ""ema28_cross"", ""price_now"": 52.98}"
+2026-02-03 10:50:52,TEX,"EMA28_Breakout breakout:57.55853073808466 meta:{""type"": ""ema28_cross"", ""price_now"": 58.99}"
+2026-02-03 10:51:24,TFC,ATH breakout:51.42 meta:{}
+2026-02-03 10:51:44,UBSI,"Flying Wedge breakout:40.85 meta:{""breakout_score"": 6.29, ""adx14"": 27.656138248724275, ""adx_ok"": true, ""atr14"": 0.9814288357142864, ""stop"": 39.37785674642857, ""position_size"": 679, ""retest_status"": ""confirmed"", ""high_slope"": 3.259999999999999, ""low_slope"": 3.2399999999999958}"
+2026-02-03 10:58:32,UMBF,ATH breakout:127.6 meta:{}
+2026-02-03 11:00:40,TIMB,"Bullish Triangle breakout:23.656666666666666 meta:{""breakout_score"": 5.98, ""adx14"": 33.80211738664508, ""atr14"": 0.6592857142857144, ""stop"": 22.667738095238093, ""position_size"": 1011, ""neckline"": 23.656666666666666, ""near_peaks"": [23.61, 23.69, 23.67], ""near_positions"": [55, 60, 76]}"
+2026-02-03 11:14:19,TOWN,"EMA28_Breakout breakout:35.130639722197074 meta:{""type"": ""ema28_cross"", ""price_now"": 35.66}"
+2026-02-03 11:19:54,TRMK,ATH breakout:42.64 meta:{}
+2026-02-03 11:25:40,VIS,"Cup & Handle breakout:324.45001 meta:{""breakout_score"": 5.39, ""adx14"": 26.246839841941668, ""adx_ok"": true, ""atr14"": 4.077024285714283, ""stop"": 318.3344735714286, ""position_size"": 163, ""retest_status"": ""unknown"", ""neckline"": 324.45001, ""price_now"": 324.39999}"
+2026-02-03 11:26:07,TSCO,"EMA28_Breakout breakout:52.45822971693944 meta:{""type"": ""ema28_cross"", ""price_now"": 52.98}"
+2026-02-03 11:41:37,UBSI,"Flying Wedge breakout:40.85 meta:{""breakout_score"": 6.29, ""adx14"": 27.656138248724275, ""adx_ok"": true, ""atr14"": 0.9814288357142864, ""stop"": 39.37785674642857, ""position_size"": 679, ""retest_status"": ""confirmed"", ""high_slope"": 3.259999999999999, ""low_slope"": 3.2399999999999958}"
+2026-02-03 11:48:23,UMBF,ATH breakout:127.6 meta:{}
+2026-02-03 12:05:12,WLK,"EMA28_Breakout breakout:80.52608561485087 meta:{""type"": ""ema28_cross"", ""price_now"": 83.77}"
+2026-02-03 12:15:29,VIS,"Cup & Handle breakout:324.45001 meta:{""breakout_score"": 5.39, ""adx14"": 26.246839841941668, ""adx_ok"": true, ""atr14"": 4.077024285714283, ""stop"": 318.3344735714286, ""position_size"": 163, ""retest_status"": ""unknown"", ""neckline"": 324.45001, ""price_now"": 324.39999}"
+2026-02-03 12:19:35,WWD,"EMA28_Breakout breakout:319.74299611990614 meta:{""type"": ""ema28_cross"", ""price_now"": 327.25}"
+2026-02-03 12:54:18,WLK,"EMA28_Breakout breakout:80.52608561485087 meta:{""type"": ""ema28_cross"", ""price_now"": 83.77}"
+2026-02-03 13:09:28,WWD,"EMA28_Breakout breakout:319.74299611990614 meta:{""type"": ""ema28_cross"", ""price_now"": 327.25}"
+2026-02-04 09:09:26,ATO,"Bullish Triangle breakout:167.10999999999999 meta:{""breakout_score"": 6.34, ""adx14"": 18.39771858200614, ""atr14"": 2.950716000000002, ""stop"": 162.68392599999999, ""position_size"": 225, ""neckline"": 167.10999999999999, ""near_peaks"": [167.44, 166.75, 167.14], ""near_positions"": [1, 13, 21]}"
+2026-02-04 09:09:26,ATO,"EMA28_Breakout breakout:167.9654458130311 meta:{""type"": ""ema28_cross"", ""price_now"": 168.81}"
+2026-02-04 09:22:22,CME,ATH breakout:290.76999 meta:{}
+2026-02-04 09:27:54,CSX,ATH breakout:38.39 meta:{}
+2026-02-04 09:29:29,CVX,ATH breakout:176.89999 meta:{}
+2026-02-04 09:31:34,DE,ATH breakout:532.25 meta:{}
+2026-02-04 09:38:35,EMR,ATH breakout:150.72 meta:{}
+2026-02-04 09:39:02,ENPH,"Bullish Triangle breakout:37.53 meta:{""breakout_score"": 5.79, ""adx14"": 31.06562162785545, ""atr14"": 2.252857285714285, ""stop"": 34.150714071428574, ""position_size"": 295, ""neckline"": 37.53, ""near_peaks"": [37.39, 37.55, 37.65], ""near_positions"": [3, 52, 104]}"
+2026-02-04 09:59:33,HLT,ATH breakout:302.92999 meta:{}
+2026-02-04 10:00:05,HON,ATH breakout:227.56 meta:{}
+2026-02-04 10:01:34,HUBB,ATH breakout:497.97 meta:{}
+2026-02-04 10:08:05,ITW,ATH breakout:278.5 meta:{}
+2026-02-04 10:09:14,JCI,ATH breakout:122.98 meta:{}
+2026-02-04 10:09:57,JPM,"EMA28_Breakout breakout:311.0934175585628 meta:{""type"": ""ema28_cross"", ""price_now"": 314.85001}"
+2026-02-04 10:12:24,KO,ATH breakout:75.33 meta:{}
+2026-02-04 10:24:51,NEE,ATH breakout:88.18 meta:{}
+2026-02-04 10:24:51,NEE,"Bullish Triangle breakout:86.54 meta:{""breakout_score"": 6.21, ""adx14"": 29.862450274860905, ""atr14"": 1.939286071428574, ""stop"": 83.63107089285714, ""position_size"": 343, ""neckline"": 86.54, ""near_peaks"": [86.74, 86.26, 86.69, 86.47], ""near_positions"": [45, 64, 68, 75]}"
+2026-02-04 10:26:11,NI,"Bullish Triangle breakout:44.133334 meta:{""breakout_score"": 6.4, ""adx14"": 27.89588842365345, ""atr14"": 0.7499999285714287, ""stop"": 43.00833410714286, ""position_size"": 888, ""neckline"": 44.133334, ""near_peaks"": [44.45, 44.080002, 44.2, 44.12], ""near_positions"": [50, 64, 75, 108]}"
+2026-02-04 10:31:24,OKE,"Bullish Triangle breakout:75.41 meta:{""breakout_score"": 6.38, ""adx14"": 26.400751544772497, ""atr14"": 2.480000071428574, ""stop"": 71.68999989285713, ""position_size"": 268, ""neckline"": 75.41, ""near_peaks"": [75.53, 75.25, 75.45], ""near_positions"": [1, 31, 99]}"
+2026-02-04 11:25:33,SWK,"EMA28_Breakout breakout:79.37314527567155 meta:{""type"": ""ema28_cross"", ""price_now"": 80.96}"
+2026-02-04 11:27:22,SWX,"EMA28_Breakout breakout:82.45133653979848 meta:{""type"": ""ema28_cross"", ""price_now"": 82.94}"
+2026-02-04 11:31:37,SYY,ATH breakout:84.11 meta:{}
+2026-02-04 11:31:37,SYY,"Bullish Triangle breakout:83.29333333333334 meta:{""breakout_score"": 6.19, ""adx14"": 32.239888783364904, ""atr14"": 2.1592859285714283, ""stop"": 80.05440444047619, ""position_size"": 308, ""neckline"": 83.29333333333334, ""near_peaks"": [83.17, 83.24, 83.47], ""near_positions"": [16, 26, 35]}"
+2026-02-04 11:32:47,TAC,"EMA28_Breakout breakout:12.996435213850186 meta:{""type"": ""ema28_cross"", ""price_now"": 13.07}"
+2026-02-04 11:39:38,TCBK,ATH breakout:51.49 meta:{}
+2026-02-04 12:13:37,TRMK,ATH breakout:43.0099983 meta:{}
+2026-02-04 12:18:00,TRVI,"EMA28_Breakout breakout:11.181536523958528 meta:{""type"": ""ema28_cross"", ""price_now"": 11.48}"
+2026-02-04 12:33:36,UAMY,"EMA28_Breakout breakout:8.138926361634654 meta:{""type"": ""ema28_cross"", ""price_now"": 9.65}"
+2026-02-04 12:36:55,UEC,"EMA28_Breakout breakout:16.466931749883695 meta:{""type"": ""ema28_cross"", ""price_now"": 17.81}"
+2026-02-04 12:43:55,UNP,"Bullish Triangle breakout:237.5475 meta:{""breakout_score"": 6.61, ""adx14"": 19.79629450239655, ""atr14"": 5.592858250000006, ""stop"": 229.158212625, ""position_size"": 119, ""neckline"": 237.5475, ""near_peaks"": [237.36, 238.23, 237.72, 236.88], ""near_positions"": [32, 37, 79, 114]}"
+2026-02-04 13:09:27,VIS,ATH breakout:324.45001 meta:{}
+2026-02-04 13:43:40,WHR,"EMA28_Breakout breakout:81.13106889219493 meta:{""type"": ""ema28_cross"", ""price_now"": 85.5}"
+2026-02-04 13:49:15,WLK,"Bullish Triangle breakout:91.27000066666666 meta:{""breakout_score"": 5.74, ""adx14"": 30.034705814073458, ""atr14"": 4.028571642857144, ""stop"": 85.22714320238094, ""position_size"": 165, ""neckline"": 91.27000066666666, ""near_peaks"": [91.23, 91.5, 91.080002], ""near_positions"": [7, 24, 107]}"
+2026-02-04 13:50:55,WMB,ATH breakout:67.26 meta:{}
+2026-02-04 13:54:50,WPM,"EMA28_Breakout breakout:133.23808711901128 meta:{""type"": ""ema28_cross"", ""price_now"": 136.78}"
+2026-02-04 14:17:56,YETI,"EMA28_Breakout breakout:46.56018336566827 meta:{""type"": ""ema28_cross"", ""price_now"": 46.76}"
+2026-02-05 08:01:06,AAPL,"Bullish Triangle breakout:276.4833366666667 meta:{""breakout_score"": 6.58, ""adx14"": 25.613563333604212, ""atr14"": 6.7085762857142885, ""stop"": 266.4204722380952, ""position_size"": 99, ""neckline"": 276.4833366666667, ""near_peaks"": [277.32001, 276.70001, 275.42999, 277.84], ""near_positions"": [55, 64, 92, 97]}"
+2026-02-05 08:12:53,AON,"Bullish Triangle breakout:355.15499249999993 meta:{""breakout_score"": 6.08, ""adx14"": 28.898973887484203, ""atr14"": 7.9192804999999975, ""stop"": 343.2760717499999, ""position_size"": 84, ""neckline"": 355.15499249999993, ""near_peaks"": [354.23999, 355.62, 355.32999, 355.42999], ""near_positions"": [65, 74, 85, 101]}"
+2026-02-05 08:17:13,ATO,"Bullish Triangle breakout:169.45666333333335 meta:{""breakout_score"": 6.22, ""adx14"": 19.004276517666245, ""atr14"": 3.2328588571428605, ""stop"": 164.60737504761906, ""position_size"": 206, ""neckline"": 169.45666333333335, ""near_peaks"": [168.86, 170.11, 169.39999], ""near_positions"": [6, 97, 114]}"
+2026-02-05 08:29:22,CINF,ATH breakout:168.48 meta:{}
+2026-02-05 08:30:43,CME,ATH breakout:293.070007 meta:{}
+2026-02-05 08:31:37,CNP,ATH breakout:40.22 meta:{}
+2026-02-05 08:36:35,CSX,ATH breakout:39.15 meta:{}
+2026-02-05 08:45:15,ECL,ATH breakout:285.47 meta:{}
+2026-02-05 09:07:29,HBAN,ATH breakout:18.77 meta:{}
+2026-02-05 09:08:49,HLT,ATH breakout:304.60001 meta:{}
+2026-02-05 09:17:11,J,"EMA28_Breakout breakout:137.75793201149608 meta:{""type"": ""ema28_cross"", ""price_now"": 143.33}"
+2026-02-05 09:20:36,KO,ATH breakout:76.89 meta:{}
+2026-02-05 09:22:05,L,ATH breakout:108.26 meta:{}
+2026-02-05 09:24:12,LLY,"EMA28_Breakout breakout:1051.3830767003465 meta:{""type"": ""ema28_cross"", ""price_now"": 1107.12}"
+2026-02-05 09:27:34,MCD,ATH breakout:321.29001 meta:{}
+2026-02-05 09:30:23,MLM,ATH breakout:666.66998 meta:{}
+2026-02-05 09:34:48,NEE,ATH breakout:88.82 meta:{}
+2026-02-05 09:36:17,NI,"Bullish Triangle breakout:44.133334 meta:{""breakout_score"": 6.58, ""adx14"": 28.092538263020355, ""atr14"": 0.724285642857143, ""stop"": 43.04690553571428, ""position_size"": 920, ""neckline"": 44.133334, ""near_peaks"": [44.45, 44.080002, 44.2, 44.12], ""near_positions"": [49, 63, 74, 107]}"
+2026-02-05 09:39:52,NVST,"EMA28_Breakout breakout:23.271172058093732 meta:{""type"": ""ema28_cross"", ""price_now"": 23.66}"
+2026-02-05 09:42:55,ON,"EMA28_Breakout breakout:59.792903952295106 meta:{""type"": ""ema28_cross"", ""price_now"": 62.060001}"
+2026-02-05 09:47:41,PFE,"Bullish Triangle breakout:26.03 meta:{""breakout_score"": 6.76, ""adx14"": 27.486140844386586, ""atr14"": 0.652142857142857, ""stop"": 25.051785714285714, ""position_size"": 1022, ""neckline"": 26.03, ""near_peaks"": [26.11, 25.97, 26.19, 26.01], ""near_positions"": [6, 72, 80, 99]}"
+2026-02-05 10:21:57,RMD,"EMA28_Breakout breakout:254.20872066336972 meta:{""type"": ""ema28_cross"", ""price_now"": 263.029999}"
+2026-02-05 10:50:43,TCBK,ATH breakout:51.92 meta:{}
+2026-02-05 10:56:07,TECH,"EMA28_Breakout breakout:65.34243980599837 meta:{""type"": ""ema28_cross"", ""price_now"": 68.67}"
+2026-02-05 10:59:57,TFSL,ATH breakout:14.69 meta:{}
+2026-02-05 11:25:23,TRMK,ATH breakout:43.35 meta:{}
+2026-02-05 11:29:34,TRV,ATH breakout:294.51999 meta:{}
+2026-02-05 11:42:52,TXT,"EMA28_Breakout breakout:90.3710719811081 meta:{""type"": ""ema28_cross"", ""price_now"": 90.73}"
+2026-02-05 11:52:48,UMBF,ATH breakout:128.050003 meta:{}
+2026-02-05 12:02:22,UTHR,"EMA28_Breakout breakout:478.84013419607464 meta:{""type"": ""ema28_cross"", ""price_now"": 482.59}"
+2026-02-05 12:20:23,VIS,ATH breakout:327.54999 meta:{}
+2026-02-05 12:43:23,VZ,ATH breakout:46.49 meta:{}
+2026-02-05 13:00:17,WLK,"Bullish Triangle breakout:91.27000066666666 meta:{""breakout_score"": 6.94, ""adx14"": 31.185085564497964, ""atr14"": 4.169285785714286, ""stop"": 85.01607198809523, ""position_size"": 159, ""neckline"": 91.27000066666666, ""near_peaks"": [91.23, 91.5, 91.080002], ""near_positions"": [6, 23, 106]}"
+2026-02-05 13:08:14,WSBC,ATH breakout:37.080002 meta:{}
+2026-02-05 13:12:43,WTS,ATH breakout:305.48001 meta:{}
+2026-02-05 13:37:39,ZION,ATH breakout:62.36 meta:{}
+2026-02-06 08:05:29,AFL,ATH breakout:115.26 meta:{}
+2026-02-06 08:06:31,AIZ,ATH breakout:242.13 meta:{}
+2026-02-06 08:07:29,ALL,ATH breakout:214.64999 meta:{}
+2026-02-06 08:07:29,ALL,"Bullish Triangle breakout:215.07166500000002 meta:{""breakout_score"": 6.68, ""adx14"": 21.743806105503836, ""atr14"": 4.627857285714287, ""stop"": 208.1298790714286, ""position_size"": 144, ""neckline"": 215.07166500000002, ""near_peaks"": [214.75999, 215.7, 214.16, 215.44, 215.89, 215.37, 215.0], ""near_positions"": [3, 31, 37, 65, 69, 73, 101]}"
+2026-02-06 08:23:17,CAH,"EMA28_Breakout breakout:210.35004444075443 meta:{""type"": ""ema28_cross"", ""price_now"": 227.17999}"
+2026-02-06 08:27:59,CINF,ATH breakout:168.95 meta:{}
+2026-02-06 08:29:21,CME,ATH breakout:294.62 meta:{}
+2026-02-06 08:47:28,ENSG,"EMA28_Breakout breakout:176.98756426566473 meta:{""type"": ""ema28_cross"", ""price_now"": 197.16}"
+2026-02-06 08:51:33,EXAS,"Bullish Triangle breakout:102.29166716666667 meta:{""breakout_score"": 5.92, ""adx14"": 60.18120251141249, ""atr14"": 0.32785714285714207, ""stop"": 101.79988145238096, ""position_size"": 2033, ""neckline"": 102.29166716666667, ""near_peaks"": [101.87, 101.61, 101.95, 102.66, 102.050003, 102.56, 102.66], ""near_positions"": [68, 72, 81, 88, 96, 104, 109]}"
+2026-02-06 09:19:19,KO,ATH breakout:77.35 meta:{}
+2026-02-06 09:20:40,L,ATH breakout:109.43 meta:{}
+2026-02-06 09:26:00,MCK,"EMA28_Breakout breakout:837.3498896419422 meta:{""type"": ""ema28_cross"", ""price_now"": 957.79999}"
+2026-02-06 11:04:26,TIMB,ATH breakout:24.16 meta:{}
+2026-02-06 11:04:26,TIMB,"Bullish Triangle breakout:23.656666666666666 meta:{""breakout_score"": 6.29, ""adx14"": 34.59118507505249, ""atr14"": 0.6285714285714283, ""stop"": 22.713809523809523, ""position_size"": 1060, ""neckline"": 23.656666666666666, ""near_peaks"": [23.61, 23.69, 23.67], ""near_positions"": [52, 57, 73]}"
+2026-02-06 11:25:13,TRP,ATH breakout:59.42 meta:{}
+2026-02-06 11:27:37,TRV,ATH breakout:295.22 meta:{}
+2026-02-06 11:49:39,UHS,"EMA28_Breakout breakout:209.39835984333578 meta:{""type"": ""ema28_cross"", ""price_now"": 216.47}"
+2026-02-06 11:50:24,UI,"EMA28_Breakout breakout:561.5326874153465 meta:{""type"": ""ema28_cross"", ""price_now"": 576.0}"
+2026-02-06 11:51:38,UL,"Bullish Triangle breakout:71.5061925 meta:{""breakout_score"": 6.28, ""adx14"": 19.092643255616053, ""atr14"": 1.0964286428571401, ""stop"": 69.86154953571429, ""position_size"": 608, ""neckline"": 71.5061925, ""near_peaks"": [71.73424, 71.61036, 71.28378, 71.39639], ""near_positions"": [3, 19, 44, 48]}"
+2026-02-06 11:53:02,UMBF,ATH breakout:130.97 meta:{}
+2026-02-06 12:01:07,USFD,ATH breakout:87.89 meta:{}
+2026-02-06 12:44:29,VZ,ATH breakout:47.0099983 meta:{}
+2026-02-06 13:07:13,WPC,ATH breakout:70.26 meta:{}
+2026-02-06 13:10:26,WSBC,ATH breakout:37.24 meta:{}
+2026-02-06 13:13:50,WTM,ATH breakout:2090.8999 meta:{}
+2026-02-06 13:15:17,WTS,ATH breakout:306.91 meta:{}
+2026-02-06 13:40:16,ZION,ATH breakout:63.81 meta:{}
+2026-02-07 11:51:35,AAPL,"Bullish Triangle breakout:276.4833366666667 meta:{""breakout_score"": 6.05, ""adx14"": 26.2804334001718, ""atr14"": 6.945002642857146, ""stop"": 266.06583270238093, ""position_size"": 95, ""neckline"": 276.4833366666667, ""near_peaks"": [277.32001, 276.70001, 275.42999, 277.84], ""near_positions"": [53, 62, 90, 95]}"
+2026-02-07 12:01:01,AMKR,"EMA28_Breakout breakout:47.29604811820456 meta:{""type"": ""ema28_cross"", ""price_now"": 49.36}"
+2026-02-07 12:02:39,ANET,"EMA28_Breakout breakout:134.962836557845 meta:{""type"": ""ema28_cross"", ""price_now"": 137.49001}"
+2026-02-07 12:05:28,ARDX,"EMA28_Breakout breakout:7.153894835685185 meta:{""type"": ""ema28_cross"", ""price_now"": 7.32}"
+2026-02-07 12:07:15,ASND,"EMA28_Breakout breakout:218.99169862131933 meta:{""type"": ""ema28_cross"", ""price_now"": 222.14999}"
+2026-02-07 12:13:05,BILL,"EMA28_Breakout breakout:46.671153243257926 meta:{""type"": ""ema28_cross"", ""price_now"": 48.94}"
+2026-02-07 12:20:50,CME,ATH breakout:297.38 meta:{}
+2026-02-07 12:26:27,CSX,ATH breakout:39.87 meta:{}
+2026-02-07 12:29:00,DAWN,"EMA28_Breakout breakout:10.720189444749739 meta:{""type"": ""ema28_cross"", ""price_now"": 11.41}"
+2026-02-07 12:34:53,ECL,ATH breakout:288.16 meta:{}
+2026-02-07 13:01:53,IMVT,"EMA28_Breakout breakout:25.82518933057787 meta:{""type"": ""ema28_cross"", ""price_now"": 27.049999}"
+2026-02-07 13:06:34,JPM,"EMA28_Breakout breakout:312.1824890895564 meta:{""type"": ""ema28_cross"", ""price_now"": 322.39999}"
+2026-02-07 13:09:18,KO,ATH breakout:78.51 meta:{}
+2026-02-07 13:12:09,LLY,"EMA28_Breakout breakout:1049.8906866046998 meta:{""type"": ""ema28_cross"", ""price_now"": 1058.18005}"
+2026-02-07 13:15:30,MCD,ATH breakout:323.69 meta:{}
+2026-02-07 14:13:42,SNDX,"EMA28_Breakout breakout:20.632697063458064 meta:{""type"": ""ema28_cross"", ""price_now"": 21.01}"
+2026-02-07 14:16:51,STOK,"EMA28_Breakout breakout:31.00046956481294 meta:{""type"": ""ema28_cross"", ""price_now"": 32.4}"
+2026-02-07 14:26:37,SXI,"EMA28_Breakout breakout:241.86110522808104 meta:{""type"": ""ema28_cross"", ""price_now"": 254.24001}"
+2026-02-07 14:29:44,SYY,ATH breakout:84.65 meta:{}
+2026-02-07 14:37:29,TCBK,ATH breakout:52.19 meta:{}
+2026-02-07 14:53:46,TIMB,ATH breakout:24.22 meta:{}
+2026-02-07 15:06:52,TOWN,ATH breakout:37.64 meta:{}
+2026-02-07 15:12:13,TRMK,ATH breakout:43.84 meta:{}
+2026-02-07 15:16:44,TRVI,"EMA28_Breakout breakout:11.201281044777387 meta:{""type"": ""ema28_cross"", ""price_now"": 11.46}"
+2026-02-07 15:29:45,TY,"EMA28_Breakout breakout:33.16439569458359 meta:{""type"": ""ema28_cross"", ""price_now"": 33.19}"
+2026-02-07 15:31:46,UAL,"EMA28_Breakout breakout:109.39913654877554 meta:{""type"": ""ema28_cross"", ""price_now"": 115.91}"
+2026-02-07 15:44:58,URI,"EMA28_Breakout breakout:864.9247475129595 meta:{""type"": ""ema28_cross"", ""price_now"": 899.54999}"
+2026-02-07 15:46:07,USAS,"EMA28_Breakout breakout:6.969160794625664 meta:{""type"": ""ema28_cross"", ""price_now"": 7.13}"
+2026-02-07 16:07:23,VIS,ATH breakout:327.60001 meta:{}
+2026-02-07 16:14:36,VNET,"EMA28_Breakout breakout:10.350899201294864 meta:{""type"": ""ema28_cross"", ""price_now"": 11.2}"
+2026-02-07 16:22:07,VRT,"EMA28_Breakout breakout:180.44777558699556 meta:{""type"": ""ema28_cross"", ""price_now"": 195.58}"
+2026-02-07 16:23:05,VRTX,"EMA28_Breakout breakout:462.9739987765954 meta:{""type"": ""ema28_cross"", ""price_now"": 477.92001}"
+2026-02-07 16:23:50,VSAT,"EMA28_Breakout breakout:41.33049443006771 meta:{""type"": ""ema28_cross"", ""price_now"": 41.7}"
+2026-02-07 16:24:37,VSEC,"EMA28_Breakout breakout:198.5795441969828 meta:{""type"": ""ema28_cross"", ""price_now"": 199.99001}"
+2026-02-07 16:28:07,VTR,ATH breakout:81.0 meta:{}
+2026-02-07 16:39:38,WEX,"EMA28_Breakout breakout:154.27441403871399 meta:{""type"": ""ema28_cross"", ""price_now"": 158.95}"
+2026-02-07 16:54:31,WPM,"EMA28_Breakout breakout:133.69504092433058 meta:{""type"": ""ema28_cross"", ""price_now"": 135.98}"
+2026-02-07 16:58:15,WSM,ATH breakout:217.71001 meta:{}
+2026-02-07 17:02:47,WULF,"EMA28_Breakout breakout:13.618804257647282 meta:{""type"": ""ema28_cross"", ""price_now"": 14.29}"
+2026-02-07 17:05:25,WYNN,"EMA28_Breakout breakout:115.52725897823636 meta:{""type"": ""ema28_cross"", ""price_now"": 117.96}"
+2026-02-07 17:10:47,XMTR,"EMA28_Breakout breakout:62.05065569016002 meta:{""type"": ""ema28_cross"", ""price_now"": 66.029999}"
+2026-02-09 07:03:01,AAPL,"Bullish Triangle breakout:276.4833366666667 meta:{""breakout_score"": 6.05, ""adx14"": 26.2804334001718, ""atr14"": 6.945002642857146, ""stop"": 266.06583270238093, ""position_size"": 95, ""neckline"": 276.4833366666667, ""near_peaks"": [277.32001, 276.70001, 275.42999, 277.84], ""near_positions"": [53, 62, 90, 95]}"
+2026-02-09 07:12:09,AMKR,"EMA28_Breakout breakout:47.29604811820456 meta:{""type"": ""ema28_cross"", ""price_now"": 49.36}"
+2026-02-09 07:13:47,ANET,"EMA28_Breakout breakout:134.962836557845 meta:{""type"": ""ema28_cross"", ""price_now"": 137.49001}"
+2026-02-09 07:16:25,ARDX,"EMA28_Breakout breakout:7.153894835685185 meta:{""type"": ""ema28_cross"", ""price_now"": 7.32}"
+2026-02-09 07:18:11,ASND,"EMA28_Breakout breakout:218.99169862131933 meta:{""type"": ""ema28_cross"", ""price_now"": 222.14999}"
+2026-02-09 07:23:52,BILL,"EMA28_Breakout breakout:46.671153243257926 meta:{""type"": ""ema28_cross"", ""price_now"": 48.94}"
+2026-02-09 07:31:34,CME,ATH breakout:297.38 meta:{}
+2026-02-09 07:37:02,CSX,ATH breakout:39.87 meta:{}
+2026-02-09 07:39:29,DAWN,"EMA28_Breakout breakout:10.720189444749739 meta:{""type"": ""ema28_cross"", ""price_now"": 11.41}"
+2026-02-09 07:45:20,ECL,ATH breakout:288.16 meta:{}
+2026-02-09 08:11:41,IMVT,"EMA28_Breakout breakout:25.82518933057787 meta:{""type"": ""ema28_cross"", ""price_now"": 27.049999}"
+2026-02-09 08:16:23,JPM,"EMA28_Breakout breakout:312.1824890895564 meta:{""type"": ""ema28_cross"", ""price_now"": 322.39999}"
+2026-02-09 08:18:58,KO,ATH breakout:78.51 meta:{}
+2026-02-09 08:22:04,LLY,"EMA28_Breakout breakout:1049.8906866046998 meta:{""type"": ""ema28_cross"", ""price_now"": 1058.18005}"
+2026-02-09 08:25:16,MCD,ATH breakout:323.69 meta:{}
+2026-02-09 09:07:47,IMVT,"EMA28_Breakout breakout:25.82518933057787 meta:{""type"": ""ema28_cross"", ""price_now"": 27.049999}"
+2026-02-09 09:12:51,JPM,"EMA28_Breakout breakout:312.1824890895564 meta:{""type"": ""ema28_cross"", ""price_now"": 322.39999}"
+2026-02-09 09:15:25,KO,ATH breakout:78.51 meta:{}
+2026-02-09 09:18:25,LLY,"EMA28_Breakout breakout:1049.8906866046998 meta:{""type"": ""ema28_cross"", ""price_now"": 1058.18005}"
+2026-02-09 09:21:33,SNDX,"EMA28_Breakout breakout:20.632697063458064 meta:{""type"": ""ema28_cross"", ""price_now"": 21.01}"
+2026-02-09 09:21:36,MCD,ATH breakout:323.69 meta:{}
+2026-02-09 09:24:44,STOK,"EMA28_Breakout breakout:31.00046956481294 meta:{""type"": ""ema28_cross"", ""price_now"": 32.4}"
+2026-02-09 09:34:41,SXI,"EMA28_Breakout breakout:241.86110522808104 meta:{""type"": ""ema28_cross"", ""price_now"": 254.24001}"
+2026-02-09 09:37:45,SYY,ATH breakout:84.65 meta:{}
+2026-02-09 10:01:11,TIMB,ATH breakout:24.22 meta:{}
+2026-02-09 10:14:21,TOWN,ATH breakout:37.64 meta:{}
+2026-02-09 10:19:53,TRMK,ATH breakout:43.84 meta:{}
+2026-02-09 10:24:15,TRVI,"EMA28_Breakout breakout:11.201281044777387 meta:{""type"": ""ema28_cross"", ""price_now"": 11.46}"
+2026-02-09 10:37:33,TY,"EMA28_Breakout breakout:33.16439569458359 meta:{""type"": ""ema28_cross"", ""price_now"": 33.19}"
+2026-02-09 10:39:32,UAL,"EMA28_Breakout breakout:109.39913654877554 meta:{""type"": ""ema28_cross"", ""price_now"": 115.91}"
+2026-02-09 10:52:41,URI,"EMA28_Breakout breakout:864.9247475129595 meta:{""type"": ""ema28_cross"", ""price_now"": 899.54999}"
+2026-02-09 10:53:47,USAS,"EMA28_Breakout breakout:6.969160794625664 meta:{""type"": ""ema28_cross"", ""price_now"": 7.13}"
+2026-02-09 10:57:01,TIMB,ATH breakout:24.22 meta:{}
+2026-02-09 11:10:20,TOWN,ATH breakout:37.64 meta:{}
+2026-02-09 11:14:32,VIS,ATH breakout:327.60001 meta:{}
+2026-02-09 11:15:51,TRMK,ATH breakout:43.84 meta:{}
+2026-02-09 11:20:08,TRVI,"EMA28_Breakout breakout:11.201281044777387 meta:{""type"": ""ema28_cross"", ""price_now"": 11.46}"
+2026-02-09 11:21:39,VNET,"EMA28_Breakout breakout:10.350899201294864 meta:{""type"": ""ema28_cross"", ""price_now"": 11.2}"
+2026-02-09 11:29:02,VRT,"EMA28_Breakout breakout:180.44777558699556 meta:{""type"": ""ema28_cross"", ""price_now"": 195.58}"
+2026-02-09 11:29:59,VRTX,"EMA28_Breakout breakout:462.9739987765954 meta:{""type"": ""ema28_cross"", ""price_now"": 477.92001}"
+2026-02-09 11:30:42,VSAT,"EMA28_Breakout breakout:41.33049443006771 meta:{""type"": ""ema28_cross"", ""price_now"": 41.7}"
+2026-02-09 11:31:39,VSEC,"EMA28_Breakout breakout:198.5795441969828 meta:{""type"": ""ema28_cross"", ""price_now"": 199.99001}"
+2026-02-09 11:33:24,TY,"EMA28_Breakout breakout:33.16439569458359 meta:{""type"": ""ema28_cross"", ""price_now"": 33.19}"
+2026-02-09 11:35:03,VTR,ATH breakout:81.0 meta:{}
+2026-02-09 11:35:28,UAL,"EMA28_Breakout breakout:109.39913654877554 meta:{""type"": ""ema28_cross"", ""price_now"": 115.91}"
+2026-02-09 11:46:38,WEX,"EMA28_Breakout breakout:154.27441403871399 meta:{""type"": ""ema28_cross"", ""price_now"": 158.95}"
+2026-02-09 11:48:43,URI,"EMA28_Breakout breakout:864.9247475129595 meta:{""type"": ""ema28_cross"", ""price_now"": 899.54999}"
+2026-02-09 11:49:48,USAS,"EMA28_Breakout breakout:6.969160794625664 meta:{""type"": ""ema28_cross"", ""price_now"": 7.13}"
+2026-02-09 12:00:54,WPM,"EMA28_Breakout breakout:133.69504092433058 meta:{""type"": ""ema28_cross"", ""price_now"": 135.98}"
+2026-02-09 12:04:33,WSM,ATH breakout:217.71001 meta:{}
+2026-02-09 12:09:25,WULF,"EMA28_Breakout breakout:13.618804257647282 meta:{""type"": ""ema28_cross"", ""price_now"": 14.29}"
+2026-02-09 12:10:47,VIS,ATH breakout:327.60001 meta:{}
+2026-02-09 12:12:21,WYNN,"EMA28_Breakout breakout:115.52725897823636 meta:{""type"": ""ema28_cross"", ""price_now"": 117.96}"
+2026-02-09 12:17:34,XMTR,"EMA28_Breakout breakout:62.05065569016002 meta:{""type"": ""ema28_cross"", ""price_now"": 66.029999}"
+2026-02-09 12:17:42,VNET,"EMA28_Breakout breakout:10.350899201294864 meta:{""type"": ""ema28_cross"", ""price_now"": 11.2}"
+2026-02-09 12:24:48,VRT,"EMA28_Breakout breakout:180.44777558699556 meta:{""type"": ""ema28_cross"", ""price_now"": 195.58}"
+2026-02-09 12:25:48,VRTX,"EMA28_Breakout breakout:462.9739987765954 meta:{""type"": ""ema28_cross"", ""price_now"": 477.92001}"
+2026-02-09 12:26:33,VSAT,"EMA28_Breakout breakout:41.33049443006771 meta:{""type"": ""ema28_cross"", ""price_now"": 41.7}"
+2026-02-09 12:27:10,VSEC,"EMA28_Breakout breakout:198.5795441969828 meta:{""type"": ""ema28_cross"", ""price_now"": 199.99001}"
+2026-02-09 12:30:30,VTR,ATH breakout:81.0 meta:{}
+2026-02-09 12:42:02,WEX,"EMA28_Breakout breakout:154.27441403871399 meta:{""type"": ""ema28_cross"", ""price_now"": 158.95}"
+2026-02-09 12:55:54,WPM,"EMA28_Breakout breakout:133.69504092433058 meta:{""type"": ""ema28_cross"", ""price_now"": 135.98}"
+2026-02-09 12:59:34,WSM,ATH breakout:217.71001 meta:{}
+2026-02-09 13:04:12,WULF,"EMA28_Breakout breakout:13.618804257647282 meta:{""type"": ""ema28_cross"", ""price_now"": 14.29}"
+2026-02-09 13:06:56,WYNN,"EMA28_Breakout breakout:115.52725897823636 meta:{""type"": ""ema28_cross"", ""price_now"": 117.96}"
+2026-02-09 13:12:16,XMTR,"EMA28_Breakout breakout:62.05065569016002 meta:{""type"": ""ema28_cross"", ""price_now"": 66.029999}"
+2026-02-10 08:16:12,AVGO,"EMA28_Breakout breakout:335.2591714697777 meta:{""type"": ""ema28_cross"", ""price_now"": 343.94}"
+2026-02-10 08:23:39,CBOE,ATH breakout:277.12 meta:{}
+2026-02-10 08:25:43,CELC,"EMA28_Breakout breakout:107.15845060593722 meta:{""type"": ""ema28_cross"", ""price_now"": 107.9}"
+2026-02-10 08:28:26,CME,ATH breakout:302.26999 meta:{}
+2026-02-10 09:05:43,HUBB,ATH breakout:503.85999 meta:{}
+2026-02-10 09:17:24,LEVI,"EMA28_Breakout breakout:20.879040979169567 meta:{""type"": ""ema28_cross"", ""price_now"": 21.33}"
+2026-02-10 09:20:49,LYV,"EMA28_Breakout breakout:143.69567795589805 meta:{""type"": ""ema28_cross"", ""price_now"": 147.91}"
+2026-02-10 09:24:18,MLM,ATH breakout:690.0 meta:{}
+2026-02-10 09:32:10,NVAX,"EMA28_Breakout breakout:8.311648740936109 meta:{""type"": ""ema28_cross"", ""price_now"": 8.7}"
+2026-02-10 10:16:14,SCHW,ATH breakout:105.17 meta:{}
+2026-02-10 11:17:12,TRP,ATH breakout:59.91 meta:{}
+2026-02-10 11:59:06,VCTR,ATH breakout:72.67 meta:{}
+2026-02-10 12:09:32,VIS,ATH breakout:335.64001 meta:{}
+2026-02-10 12:15:07,VMC,ATH breakout:323.72 meta:{}
+2026-02-10 12:40:17,WEX,"Bullish Triangle breakout:163.52999716666667 meta:{""breakout_score"": 6.23, ""adx14"": 19.765180990197678, ""atr14"": 6.762147000000001, ""stop"": 153.38677666666666, ""position_size"": 98, ""neckline"": 163.52999716666667, ""near_peaks"": [163.50999, 164.0099945, 163.070007], ""near_positions"": [48, 102, 108]}"
+2026-02-10 12:54:38,WPC,ATH breakout:71.38 meta:{}
+2026-02-10 13:11:42,XP,"Bullish Triangle breakout:20.255 meta:{""breakout_score"": 5.39, ""adx14"": 27.107471503259507, ""atr14"": 0.9396429285714287, ""stop"": 18.845535607142857, ""position_size"": 709, ""neckline"": 20.255, ""near_peaks"": [20.35, 20.195, 20.22], ""near_positions"": [19, 58, 72]}"
+2026-02-11 08:18:08,AXP,"EMA28_Breakout breakout:361.46551911226913 meta:{""type"": ""ema28_cross"", ""price_now"": 363.20001}"
+2026-02-11 08:36:11,CYTK,"EMA28_Breakout breakout:63.55291863503108 meta:{""type"": ""ema28_cross"", ""price_now"": 64.85}"
+2026-02-11 08:46:53,ETR,ATH breakout:98.15 meta:{}
+2026-02-11 08:46:53,ETR,"Bullish Triangle breakout:98.32 meta:{""breakout_score"": 6.25, ""adx14"": 18.993787293339267, ""atr14"": 1.9928574999999975, ""stop"": 95.33071375, ""position_size"": 334, ""neckline"": 98.32, ""near_peaks"": [98.58, 98.56, 98.0, 98.46, 97.66, 98.0], ""near_positions"": [32, 40, 48, 57, 70, 111]}"
+2026-02-11 08:47:53,EVRG,ATH breakout:78.73 meta:{}
+2026-02-11 09:13:27,ITW,ATH breakout:293.57001 meta:{}
+2026-02-11 09:19:32,LH,"Bullish Triangle breakout:282.95000000000005 meta:{""breakout_score"": 6.32, ""adx14"": 31.457944418030728, ""atr14"": 5.792856428571428, ""stop"": 274.2607153571429, ""position_size"": 115, ""neckline"": 282.95000000000005, ""near_peaks"": [281.69, 283.47, 283.69], ""near_positions"": [15, 23, 33]}"
+2026-02-11 09:26:00,MLM,ATH breakout:695.72998 meta:{}
+2026-02-11 09:30:32,NEE,ATH breakout:89.97 meta:{}
+2026-02-11 09:31:58,NI,ATH breakout:44.65 meta:{}
+2026-02-11 09:32:51,NKTR,"EMA28_Breakout breakout:40.59196724180681 meta:{""type"": ""ema28_cross"", ""price_now"": 56.0}"
+2026-02-11 09:49:45,RACE,"EMA28_Breakout breakout:349.3785386623413 meta:{""type"": ""ema28_cross"", ""price_now"": 363.22}"
+2026-02-11 10:36:06,SYY,ATH breakout:86.53 meta:{}
+2026-02-11 10:46:16,TDC,"EMA28_Breakout breakout:28.979443071406795 meta:{""type"": ""ema28_cross"", ""price_now"": 29.23}"
+2026-02-11 10:50:15,TENB,"EMA28_Breakout breakout:22.42759721100066 meta:{""type"": ""ema28_cross"", ""price_now"": 22.9}"
+2026-02-11 10:52:51,TFSL,ATH breakout:14.97 meta:{}
+2026-02-11 11:45:26,UNF,"EMA28_Breakout breakout:203.35882214991855 meta:{""type"": ""ema28_cross"", ""price_now"": 230.0099945}"
+2026-02-11 11:46:49,UNP,ATH breakout:256.91 meta:{}
+2026-02-11 12:11:53,VIS,ATH breakout:337.12 meta:{}
+2026-02-11 12:34:28,VZ,ATH breakout:47.099998 meta:{}
+2026-02-11 12:53:22,WMB,ATH breakout:68.5 meta:{}
+2026-02-11 12:53:50,WMG,"Bullish Triangle breakout:30.679999999999996 meta:{""breakout_score"": 5.52, ""adx14"": 21.01844061507663, ""atr14"": 1.0641428571428564, ""stop"": 29.08378571428571, ""position_size"": 626, ""neckline"": 30.679999999999996, ""near_peaks"": [30.78, 30.58, 30.68], ""near_positions"": [59, 84, 108]}"
+2026-02-11 12:53:50,WMG,"EMA28_Breakout breakout:29.763472745088396 meta:{""type"": ""ema28_cross"", ""price_now"": 30.8}"
+2026-02-11 12:57:14,WPC,ATH breakout:71.52 meta:{}
+2026-02-12 08:06:16,AIG,"EMA28_Breakout breakout:76.1310476679006 meta:{""type"": ""ema28_cross"", ""price_now"": 78.44}"
+2026-02-12 08:29:09,CNP,ATH breakout:40.97 meta:{}
+2026-02-12 08:42:01,ECL,ATH breakout:299.62 meta:{}
+2026-02-12 08:46:50,ETN,ATH breakout:392.76001 meta:{}
+2026-02-12 08:48:00,EVRG,ATH breakout:78.75 meta:{}
+2026-02-12 08:49:33,F,"EMA28_Breakout breakout:13.685553988460333 meta:{""type"": ""ema28_cross"", ""price_now"": 13.85}"
+2026-02-12 08:51:00,FE,ATH breakout:47.72 meta:{}
+2026-02-12 08:51:00,FE,"Bullish Triangle breakout:47.815 meta:{""breakout_score"": 6.1, ""adx14"": 27.432681561775937, ""atr14"": 0.8721427857142865, ""stop"": 46.506785821428565, ""position_size"": 764, ""neckline"": 47.815, ""near_peaks"": [47.99, 47.72, 47.61, 47.94], ""near_positions"": [39, 69, 104, 110]}"
+2026-02-12 09:17:25,KSS,"EMA28_Breakout breakout:18.680269238275148 meta:{""type"": ""ema28_cross"", ""price_now"": 18.78}"
+2026-02-12 09:42:23,PM,ATH breakout:184.95 meta:{}
+2026-02-12 10:34:58,SYY,ATH breakout:87.62 meta:{}
+2026-02-12 10:54:06,THC,"EMA28_Breakout breakout:197.04551894674083 meta:{""type"": ""ema28_cross"", ""price_now"": 226.35001}"
+2026-02-12 11:25:30,TT,ATH breakout:472.54001 meta:{}
+2026-02-12 12:02:54,VEON,"Bullish Triangle breakout:55.53666666666666 meta:{""breakout_score"": 5.91, ""adx14"": 18.85117541622134, ""atr14"": 1.4100001214285716, ""stop"": 53.421666484523804, ""position_size"": 472, ""neckline"": 55.53666666666666, ""near_peaks"": [55.43, 55.55, 55.63], ""near_positions"": [39, 67, 101]}"
+2026-02-12 12:11:35,VIS,ATH breakout:337.23001 meta:{}
+2026-02-12 13:12:44,XP,"Bullish Triangle breakout:20.255 meta:{""breakout_score"": 6.26, ""adx14"": 28.074115670294923, ""atr14"": 0.9400000714285718, ""stop"": 18.844999892857142, ""position_size"": 709, ""neckline"": 20.255, ""near_peaks"": [20.35, 20.195, 20.22], ""near_positions"": [17, 56, 70]}"
+2026-02-13 08:01:30,ABBV,"EMA28_Breakout breakout:222.4469215745388 meta:{""type"": ""ema28_cross"", ""price_now"": 227.5}"
+2026-02-13 08:05:54,AEP,ATH breakout:123.77 meta:{}
+2026-02-13 08:15:54,ARR,"EMA28_Breakout breakout:17.867523692871604 meta:{""type"": ""ema28_cross"", ""price_now"": 18.14}"
+2026-02-13 08:25:43,CB,ATH breakout:331.28 meta:{}
+2026-02-13 08:31:59,CNP,ATH breakout:41.049999 meta:{}
+2026-02-13 08:41:55,DLR,"Bullish Triangle breakout:176.27999666666668 meta:{""breakout_score"": 7.25, ""adx14"": 28.49436327676817, ""atr14"": 5.019996428571425, ""stop"": 168.75000202380954, ""position_size"": 132, ""neckline"": 176.27999666666668, ""near_peaks"": [175.83, 176.14999, 176.86], ""near_positions"": [15, 20, 37]}"
+2026-02-13 08:50:37,ETR,ATH breakout:100.2 meta:{}
+2026-02-13 08:51:42,EVRG,ATH breakout:79.31 meta:{}
+2026-02-13 08:54:51,FE,ATH breakout:47.93 meta:{}
+2026-02-13 09:27:16,MCD,ATH breakout:327.16 meta:{}
+2026-02-13 09:35:16,NI,ATH breakout:44.73 meta:{}
+2026-02-13 10:36:58,SWX,ATH breakout:86.27 meta:{}
+2026-02-13 10:41:18,SYY,ATH breakout:88.040001 meta:{}
+2026-02-13 11:07:32,TJX,"EMA28_Breakout breakout:153.26321826642553 meta:{""type"": ""ema28_cross"", ""price_now"": 154.17999}"
+2026-02-13 13:01:20,WPC,ATH breakout:72.59 meta:{}
+2026-02-14 08:15:58,ATO,ATH breakout:179.19 meta:{}
+2026-02-14 08:22:42,BURL,"EMA28_Breakout breakout:299.07442745589424 meta:{""type"": ""ema28_cross"", ""price_now"": 302.26999}"
+2026-02-14 08:42:37,ED,ATH breakout:113.3 meta:{}
+2026-02-14 08:48:20,EVRG,ATH breakout:80.69 meta:{}
+2026-02-14 08:49:34,EXC,ATH breakout:48.24 meta:{}
+2026-02-14 08:51:46,FE,ATH breakout:48.84 meta:{}
+2026-02-14 09:45:35,PSA,"Bullish Triangle breakout:295.5475 meta:{""breakout_score"": 6.67, ""adx14"": 20.012684043347665, ""atr14"": 7.012849714285713, ""stop"": 285.02822542857143, ""position_size"": 95, ""neckline"": 295.5475, ""near_peaks"": [294.82999, 295.91, 295.73001, 295.72], ""near_positions"": [4, 13, 28, 100]}"
+2026-02-14 10:22:32,SRE,ATH breakout:94.77 meta:{}
+2026-02-14 10:43:40,TCBK,"EMA28_Breakout breakout:50.12903198219613 meta:{""type"": ""ema28_cross"", ""price_now"": 50.3}"
+2026-02-14 10:50:25,TEL,"EMA28_Breakout breakout:227.2704684609671 meta:{""type"": ""ema28_cross"", ""price_now"": 236.19}"
+2026-02-14 11:18:28,TRMK,ATH breakout:44.69 meta:{}
+2026-02-14 11:44:19,UL,ATH breakout:73.86261 meta:{}
+2026-02-14 12:35:26,WABC,"Cup & Handle breakout:52.48 meta:{""breakout_score"": 6.35, ""adx14"": 34.347648316385516, ""adx_ok"": true, ""atr14"": 1.2200000714285706, ""stop"": 50.64999989285714, ""position_size"": 546, ""retest_status"": ""unknown"", ""neckline"": 52.48, ""price_now"": 52.21}"
+2026-02-14 12:41:48,WES,ATH breakout:42.89 meta:{}
+2026-02-14 12:56:43,WPC,ATH breakout:73.099998 meta:{}
+2026-02-14 13:00:44,WSM,"EMA28_Breakout breakout:207.64369772771948 meta:{""type"": ""ema28_cross"", ""price_now"": 214.57001}"
+2026-02-14 13:03:22,WTM,ATH breakout:2185.0 meta:{}
+2026-02-14 13:28:16,ZION,"EMA28_Breakout breakout:61.02950611309241 meta:{""type"": ""ema28_cross"", ""price_now"": 61.26}"
+2026-02-15 08:16:04,ATO,ATH breakout:179.19 meta:{}
+2026-02-15 08:22:30,BURL,"EMA28_Breakout breakout:299.08132469727354 meta:{""type"": ""ema28_cross"", ""price_now"": 302.37}"
+2026-02-15 08:29:38,CMS,ATH breakout:75.51 meta:{}
+2026-02-15 08:29:38,CMS,"Bullish Triangle breakout:75.3199985 meta:{""breakout_score"": 6.37, ""adx14"": 23.709886518958612, ""atr14"": 1.557142857142857, ""stop"": 72.98428421428571, ""position_size"": 428, ""neckline"": 75.3199985, ""near_peaks"": [75.6, 75.059998, 75.089996, 75.53], ""near_positions"": [41, 56, 60, 67]}"
+2026-02-15 08:30:09,CNP,ATH breakout:41.66 meta:{}
+2026-02-15 08:41:23,DTE,ATH breakout:143.32001 meta:{}
+2026-02-15 08:43:30,ED,ATH breakout:113.3 meta:{}
+2026-02-15 08:49:00,EVRG,ATH breakout:80.69 meta:{}
+2026-02-15 08:49:59,EXC,ATH breakout:48.24 meta:{}
+2026-02-15 09:46:30,PSA,"Bullish Triangle breakout:295.5475 meta:{""breakout_score"": 6.67, ""adx14"": 20.012684043347665, ""atr14"": 7.012849714285713, ""stop"": 285.02822542857143, ""position_size"": 95, ""neckline"": 295.5475, ""near_peaks"": [294.82999, 295.91, 295.73001, 295.72], ""near_positions"": [4, 13, 28, 100]}"
+2026-02-15 10:23:49,SRE,ATH breakout:94.77 meta:{}
+2026-02-15 10:44:46,TCBK,"EMA28_Breakout breakout:50.12903198219613 meta:{""type"": ""ema28_cross"", ""price_now"": 50.3}"
+2026-02-15 10:51:25,TEL,"EMA28_Breakout breakout:227.2704684609671 meta:{""type"": ""ema28_cross"", ""price_now"": 236.19}"
+2026-02-15 11:20:08,TRMK,ATH breakout:44.69 meta:{}
+2026-02-15 11:46:02,UL,ATH breakout:73.86261 meta:{}
+2026-02-15 12:37:05,WABC,"Cup & Handle breakout:52.48 meta:{""breakout_score"": 6.35, ""adx14"": 34.347648316385516, ""adx_ok"": true, ""atr14"": 1.2200000714285706, ""stop"": 50.64999989285714, ""position_size"": 546, ""retest_status"": ""unknown"", ""neckline"": 52.48, ""price_now"": 52.21}"
+2026-02-15 12:43:27,WES,ATH breakout:42.89 meta:{}
+2026-02-15 12:58:34,WPC,ATH breakout:73.099998 meta:{}
+2026-02-15 13:02:32,WSM,"EMA28_Breakout breakout:207.64369772771948 meta:{""type"": ""ema28_cross"", ""price_now"": 214.57001}"
+2026-02-15 13:04:56,WTM,ATH breakout:2185.0 meta:{}
+2026-02-15 13:30:34,ZION,"EMA28_Breakout breakout:61.02950611309241 meta:{""type"": ""ema28_cross"", ""price_now"": 61.26}"
+2026-02-23 14:35:58,ATO,ATH breakout:180.24001 meta:{}
+2026-02-23 14:48:58,CME,ATH breakout:307.23999 meta:{}
+2026-02-23 14:50:00,CNP,ATH breakout:42.65 meta:{}
+2026-02-23 14:54:42,CSCO,"EMA28_Breakout breakout:78.97249957899412 meta:{""type"": ""ema28_cross"", ""price_now"": 79.2}"
+2026-02-23 15:02:43,EBAY,"EMA28_Breakout breakout:87.28047093883711 meta:{""type"": ""ema28_cross"", ""price_now"": 88.07}"
+2026-02-23 15:03:30,ECL,ATH breakout:303.79999 meta:{}
+2026-02-23 15:10:06,EXPD,"EMA28_Breakout breakout:156.01074661280285 meta:{""type"": ""ema28_cross"", ""price_now"": 156.3}"
+2026-02-23 15:11:57,FE,ATH breakout:50.099998 meta:{}
+2026-02-23 15:26:26,HD,"EMA28_Breakout breakout:379.0128666200639 meta:{""type"": ""ema28_cross"", ""price_now"": 382.25}"
+2026-02-23 15:38:15,KO,ATH breakout:79.56 meta:{}
+2026-02-23 15:40:39,LH,"Bullish Triangle breakout:282.95000000000005 meta:{""breakout_score"": 5.75, ""adx14"": 26.613450777238416, ""atr14"": 8.214996357142857, ""stop"": 270.6275054642858, ""position_size"": 81, ""neckline"": 282.95000000000005, ""near_peaks"": [281.69, 283.47, 283.69], ""near_positions"": [8, 16, 26]}"
+2026-02-23 15:41:08,LIN,ATH breakout:490.10999 meta:{}
+2026-02-23 15:43:08,LSTR,"EMA28_Breakout breakout:151.93816728260194 meta:{""type"": ""ema28_cross"", ""price_now"": 153.14}"
+2026-02-23 15:43:37,LULU,"EMA28_Breakout breakout:184.0106681227777 meta:{""type"": ""ema28_cross"", ""price_now"": 187.3}"
+2026-02-23 15:53:52,NRG,ATH breakout:178.5 meta:{}
+2026-02-23 16:34:14,MCD,ATH breakout:332.079987 meta:{}
+2026-02-23 16:59:48,SYY,"Cup & Handle breakout:90.56 meta:{""breakout_score"": 5.92, ""adx14"": 52.431526666146304, ""adx_ok"": true, ""atr14"": 1.908928285714287, ""stop"": 87.69660757142857, ""position_size"": 349, ""retest_status"": ""unknown"", ""neckline"": 90.56, ""price_now"": 90.435}"
+2026-02-23 19:20:49,WMT,"EMA28_Breakout breakout:123.69486525597591 meta:{""type"": ""ema28_cross"", ""price_now"": 125.29}"
+2026-02-23 19:51:21,YUM,ATH breakout:163.48 meta:{}
+2026-02-24 15:53:07,AEP,ATH breakout:130.24001 meta:{}
+2026-02-24 16:09:19,ATO,ATH breakout:180.97 meta:{}
+2026-02-24 16:18:20,CB,ATH breakout:332.51001 meta:{}
+2026-02-24 16:23:22,CME,ATH breakout:308.089996 meta:{}
+2026-02-24 16:37:16,ECL,ATH breakout:305.67001 meta:{}
+2026-02-24 17:14:44,LIN,ATH breakout:498.19 meta:{}
+2026-02-24 18:54:34,THRM,"EMA28_Breakout breakout:33.75201690286567 meta:{""type"": ""ema28_cross"", ""price_now"": 34.785}"
+2026-02-24 19:40:15,UFPI,"EMA28_Breakout breakout:107.9103286317025 meta:{""type"": ""ema28_cross"", ""price_now"": 108.84}"
+2026-02-25 16:25:50,AEP,ATH breakout:132.029999 meta:{}
+2026-02-25 16:37:31,ATO,ATH breakout:182.020004 meta:{}
+2026-02-25 17:30:09,IDXX,"Bullish Triangle breakout:651.14667 meta:{""breakout_score"": 5.8, ""adx14"": 34.06914203663082, ""atr14"": 18.028563642857154, ""stop"": 624.1038245357142, ""position_size"": 36, ""neckline"": 651.14667, ""near_peaks"": [655.77002, 651.5, 650.37, 651.57001], ""near_positions"": [2, 29, 35, 111]}"
+2026-02-25 17:30:09,IDXX,"EMA28_Breakout breakout:655.1240755858393 meta:{""type"": ""ema28_cross"", ""price_now"": 659.51}"
+2026-02-25 17:43:14,LVMUY,"EMA28_Breakout breakout:131.80251644397228 meta:{""type"": ""ema28_cross"", ""price_now"": 133.12}"
+2026-02-25 20:21:31,VCTR,ATH breakout:76.86 meta:{}
+2026-02-26 14:11:30,AEP,ATH breakout:132.39 meta:{}
+2026-02-26 14:22:55,ATO,ATH breakout:182.020004 meta:{}
+2026-02-26 14:36:21,CNP,ATH breakout:43.0 meta:{}
+2026-02-26 14:41:39,YOU,"EMA28_Breakout breakout:34.45675422344228 meta:{""type"": ""ema28_cross"", ""price_now"": 46.51}"
+2026-02-26 14:54:27,ETR,ATH breakout:105.2 meta:{}
+2026-02-26 14:55:35,EVRG,ATH breakout:82.69 meta:{}
+2026-02-26 14:56:43,EXC,ATH breakout:48.59 meta:{}
+2026-02-26 15:16:18,IDXX,"Bullish Triangle breakout:651.14667 meta:{""breakout_score"": 6.33, ""adx14"": 34.01336918756389, ""atr14"": 18.082849357142866, ""stop"": 624.0223959642857, ""position_size"": 36, ""neckline"": 651.14667, ""near_peaks"": [655.77002, 651.5, 650.37, 651.57001], ""near_positions"": [2, 29, 35, 111]}"
+2026-02-26 15:16:18,IDXX,"EMA28_Breakout breakout:654.9771790341151 meta:{""type"": ""ema28_cross"", ""price_now"": 657.38}"
+2026-02-26 15:27:23,LIN,ATH breakout:504.0 meta:{}
+2026-02-26 15:34:34,MO,ATH breakout:69.25 meta:{}
+2026-02-26 15:38:56,NFLX,"EMA28_Breakout breakout:82.1428422431053 meta:{""type"": ""ema28_cross"", ""price_now"": 82.7}"
+2026-02-26 15:54:06,PRVA,"EMA28_Breakout breakout:22.42657564164191 meta:{""type"": ""ema28_cross"", ""price_now"": 22.65}"
+2026-02-26 16:30:10,SNDX,"EMA28_Breakout breakout:20.599301851317083 meta:{""type"": ""ema28_cross"", ""price_now"": 20.75}"
+2026-02-26 16:40:58,SWK,"EMA28_Breakout breakout:85.88224981619024 meta:{""type"": ""ema28_cross"", ""price_now"": 87.31}"
+2026-02-26 16:44:00,SXI,"EMA28_Breakout breakout:249.41726146310873 meta:{""type"": ""ema28_cross"", ""price_now"": 255.67}"
+2026-02-26 17:05:20,TGNA,"Cup & Handle breakout:21.06 meta:{""breakout_score"": 6.04, ""adx14"": 45.33924069172668, ""adx_ok"": true, ""atr14"": 0.2828571428571432, ""stop"": 20.635714285714283, ""position_size"": 2356, ""retest_status"": ""unknown"", ""neckline"": 21.06, ""price_now"": 21.06}"
+2026-02-27 08:08:15,ALRM,"EMA28_Breakout breakout:47.45198708693455 meta:{""type"": ""ema28_cross"", ""price_now"": 48.69}"
+2026-02-27 08:16:06,ATO,ATH breakout:182.059998 meta:{}
+2026-02-27 08:23:41,C,"EMA28_Breakout breakout:115.2047402572764 meta:{""type"": ""ema28_cross"", ""price_now"": 116.19}"
+2026-02-28 18:49:13,ABBV,"EMA28_Breakout breakout:225.4161942590517 meta:{""type"": ""ema28_cross"", ""price_now"": 232.080002}"
+2026-02-28 18:53:15,ADSK,"EMA28_Breakout breakout:243.26395357009187 meta:{""type"": ""ema28_cross"", ""price_now"": 245.87}"
+2026-03-01 08:57:24,ABBV,"EMA28_Breakout breakout:225.4161942590517 meta:{""type"": ""ema28_cross"", ""price_now"": 232.080002}"
+2026-03-01 09:01:04,ADSK,"EMA28_Breakout breakout:243.26395357009187 meta:{""type"": ""ema28_cross"", ""price_now"": 245.87}"
+2026-03-01 09:02:00,AEP,ATH breakout:132.46001 meta:{}
+2026-03-01 09:13:35,ATO,ATH breakout:183.63 meta:{}
+2026-03-01 09:27:01,CMS,ATH breakout:77.050003 meta:{}
+2026-03-01 09:27:45,CNP,ATH breakout:43.19 meta:{}
+2026-03-01 09:38:58,DTE,ATH breakout:146.59 meta:{}
+2026-03-01 09:39:40,DUK,ATH breakout:129.23 meta:{}
+2026-03-01 09:39:40,DUK,"Bullish Triangle breakout:129.51332966666666 meta:{""breakout_score"": 6.21, ""adx14"": 29.817973042619386, ""atr14"": 2.3721422857142875, ""stop"": 125.95511623809523, ""position_size"": 281, ""neckline"": 129.51332966666666, ""near_peaks"": [129.50999, 130.029999, 129.0], ""near_positions"": [28, 32, 111]}"
+2026-03-01 09:41:22,ECL,ATH breakout:308.16 meta:{}
+2026-03-01 09:45:19,ES,ATH breakout:75.13 meta:{}
+2026-03-01 09:46:57,ETR,ATH breakout:106.26 meta:{}
+2026-03-01 09:48:59,EVRG,ATH breakout:82.99 meta:{}
+2026-03-01 09:50:19,EXC,ATH breakout:48.8 meta:{}
+2026-03-01 09:52:29,FE,ATH breakout:50.64 meta:{}
+2026-03-02 08:09:54,ABBV,"EMA28_Breakout breakout:225.4161942590517 meta:{""type"": ""ema28_cross"", ""price_now"": 232.080002}"
+2026-03-02 08:13:31,ADSK,"EMA28_Breakout breakout:243.26395357009187 meta:{""type"": ""ema28_cross"", ""price_now"": 245.87}"
+2026-03-02 08:15:00,AEP,ATH breakout:132.46001 meta:{}
+2026-03-02 08:26:37,ATO,ATH breakout:183.63 meta:{}
+2026-03-02 08:40:31,CMS,ATH breakout:77.050003 meta:{}
+2026-03-02 08:41:09,CNP,ATH breakout:43.19 meta:{}
+2026-03-02 08:52:42,DTE,ATH breakout:146.59 meta:{}
+2026-03-02 08:53:18,DUK,ATH breakout:129.23 meta:{}
+2026-03-02 08:53:18,DUK,"Bullish Triangle breakout:129.51332966666666 meta:{""breakout_score"": 6.21, ""adx14"": 29.817973042619386, ""atr14"": 2.3721422857142875, ""stop"": 125.95511623809523, ""position_size"": 281, ""neckline"": 129.51332966666666, ""near_peaks"": [129.50999, 130.029999, 129.0], ""near_positions"": [28, 32, 111]}"
+2026-03-02 08:55:12,ECL,ATH breakout:308.16 meta:{}
+2026-03-02 08:59:26,ES,ATH breakout:75.13 meta:{}
+2026-03-02 09:01:04,ETR,ATH breakout:106.26 meta:{}
+2026-03-02 09:02:14,EVRG,ATH breakout:82.99 meta:{}
+2026-03-02 09:03:26,EXC,ATH breakout:48.8 meta:{}
+2026-03-02 09:05:44,FE,ATH breakout:50.64 meta:{}
+2026-03-02 09:16:52,GILD,"EMA28_Breakout breakout:144.38455229514253 meta:{""type"": ""ema28_cross"", ""price_now"": 148.95}"
+2026-03-02 09:25:02,ILMN,"EMA28_Breakout breakout:128.42070215610846 meta:{""type"": ""ema28_cross"", ""price_now"": 134.46001}"
+2026-03-02 09:38:59,MCD,ATH breakout:334.56 meta:{}
+2026-03-02 09:44:53,MUR,"EMA28_Breakout breakout:32.26453776640152 meta:{""type"": ""ema28_cross"", ""price_now"": 33.15}"
+2026-03-02 09:47:23,NI,ATH breakout:46.71 meta:{}
+2026-03-02 10:01:10,PNTG,"EMA28_Breakout breakout:30.94314577428695 meta:{""type"": ""ema28_cross"", ""price_now"": 33.71}"
+2026-03-02 10:40:53,SRE,ATH breakout:95.2 meta:{}
+2026-03-02 10:40:53,SRE,"Bullish Triangle breakout:95.50333433333333 meta:{""breakout_score"": 6.55, ""adx14"": 32.435275967702374, ""atr14"": 2.1964278571428557, ""stop"": 92.20869254761905, ""position_size"": 303, ""neckline"": 95.50333433333333, ""near_peaks"": [95.72, 94.75, 95.050003, 95.74], ""near_positions"": [22, 42, 55, 110]}"
+2026-03-02 10:55:25,TAC,"EMA28_Breakout breakout:13.174676568047612 meta:{""type"": ""ema28_cross"", ""price_now"": 13.74}"
+2026-03-02 11:21:06,TJX,ATH breakout:158.69 meta:{}
+2026-03-02 11:41:07,TRV,ATH breakout:306.23999 meta:{}
+2026-03-02 11:51:11,TUYA,"Bullish Triangle breakout:2.455 meta:{""breakout_score"": 6.68, ""adx14"": 22.9179027027864, ""atr14"": 0.12728571428571428, ""stop"": 2.2640714285714285, ""position_size"": 5237, ""neckline"": 2.455, ""near_peaks"": [2.465, 2.45, 2.45], ""near_positions"": [31, 35, 87]}"
+2026-03-02 13:00:50,WES,"EMA28_Breakout breakout:41.398497872027924 meta:{""type"": ""ema28_cross"", ""price_now"": 41.59}"
+2026-03-02 13:16:04,WPC,ATH breakout:74.25 meta:{}
+2026-03-02 13:43:45,YUM,ATH breakout:166.45 meta:{}
+2026-03-03 08:16:02,ATO,ATH breakout:186.78999 meta:{}
+2026-03-03 08:29:21,CMS,ATH breakout:78.07 meta:{}
+2026-03-03 08:41:01,DUK,ATH breakout:130.85001 meta:{}
+2026-03-03 08:47:57,EVRG,ATH breakout:83.66 meta:{}
+2026-03-03 09:18:14,L,ATH breakout:111.27 meta:{}
+2026-03-03 09:19:46,LIN,ATH breakout:508.26999 meta:{}
+2026-03-03 09:43:40,PLTR,"EMA28_Breakout breakout:144.49608256100586 meta:{""type"": ""ema28_cross"", ""price_now"": 145.17}"
+2026-03-03 09:50:51,RCUS,"EMA28_Breakout breakout:20.843690779224595 meta:{""type"": ""ema28_cross"", ""price_now"": 23.94}"
+2026-03-05 08:37:14,CMS,ATH breakout:78.080002 meta:{}
+2026-03-05 08:37:48,CNP,ATH breakout:43.5 meta:{}
+2026-03-05 08:39:07,COIN,"EMA28_Breakout breakout:185.94242652504175 meta:{""type"": ""ema28_cross"", ""price_now"": 208.92999}"
+2026-03-05 08:45:24,DAWN,"EMA28_Breakout breakout:11.134825496749425 meta:{""type"": ""ema28_cross"", ""price_now"": 12.87}"
+2026-03-05 08:49:59,DTE,ATH breakout:148.24001 meta:{}
+2026-03-05 08:50:40,DUK,ATH breakout:131.63 meta:{}
+2026-03-07 09:51:54,AMGN,"EMA28_Breakout breakout:368.0278138719606 meta:{""type"": ""ema28_cross"", ""price_now"": 369.53}"
+2026-03-07 10:25:13,DTE,ATH breakout:150.11 meta:{}
+2026-03-07 10:25:42,DUK,ATH breakout:131.88 meta:{}
+2026-03-07 11:12:47,NDAQ,"Bullish Triangle breakout:89.16666633333334 meta:{""breakout_score"": 6.12, ""adx14"": 25.745428599315616, ""atr14"": 2.5528571428571425, ""stop"": 85.33738061904762, ""position_size"": 261, ""neckline"": 89.16666633333334, ""near_peaks"": [89.28, 89.19, 89.029999], ""near_positions"": [10, 42, 113]}"
+2026-03-07 12:41:57,TIP,"Cup & Handle breakout:112.2 meta:{""breakout_score"": 5.42, ""adx14"": 20.26580405373267, ""adx_ok"": true, ""atr14"": 0.2878570714285717, ""stop"": 111.76821439285715, ""position_size"": 2315, ""retest_status"": ""unknown"", ""neckline"": 112.2, ""price_now"": 111.43}"
+2026-03-07 13:23:27,UGP,"EMA28_Breakout breakout:4.930816266937484 meta:{""type"": ""ema28_cross"", ""price_now"": 4.99}"
+2026-03-07 13:55:31,VKTX,"EMA28_Breakout breakout:31.884101762116753 meta:{""type"": ""ema28_cross"", ""price_now"": 32.98}"
+2026-03-08 09:10:10,AMGN,"EMA28_Breakout breakout:368.0278138719606 meta:{""type"": ""ema28_cross"", ""price_now"": 369.53}"
+2026-03-09 08:12:04,AMGN,"EMA28_Breakout breakout:368.0278138719606 meta:{""type"": ""ema28_cross"", ""price_now"": 369.53}"
+2026-03-10 08:43:44,AVGO,"Bullish Triangle breakout:339.6666566666666 meta:{""breakout_score"": 6.46, ""adx14"": 19.917947606456337, ""atr14"": 14.303576357142864, ""stop"": 318.2112921309523, ""position_size"": 46, ""neckline"": 339.6666566666666, ""near_peaks"": [339.98999, 338.89999, 340.10999], ""near_positions"": [92, 96, 108]}"
+2026-03-10 09:10:09,DNLI,"EMA28_Breakout breakout:20.252007737876 meta:{""type"": ""ema28_cross"", ""price_now"": 21.31}"
+2026-03-10 10:13:26,ODFL,"EMA28_Breakout breakout:194.51243456289717 meta:{""type"": ""ema28_cross"", ""price_now"": 197.22}"
+2026-03-10 11:11:01,SXI,"EMA28_Breakout breakout:253.65058147248013 meta:{""type"": ""ema28_cross"", ""price_now"": 260.44}"
+2026-03-10 11:26:10,TDY,"EMA28_Breakout breakout:649.4144102121422 meta:{""type"": ""ema28_cross"", ""price_now"": 654.059998}"
+2026-03-10 11:40:04,TIP,"Cup & Handle breakout:112.2 meta:{""breakout_score"": 5.85, ""adx14"": 20.141383857425964, ""adx_ok"": true, ""atr14"": 0.2992856428571429, ""stop"": 111.75107153571429, ""position_size"": 2227, ""retest_status"": ""unknown"", ""neckline"": 112.2, ""price_now"": 111.61}"
+2026-03-10 12:16:27,TUYA,"Bullish Triangle breakout:2.455 meta:{""breakout_score"": 6.03, ""adx14"": 26.63170259454876, ""atr14"": 0.1402857142857142, ""stop"": 2.2445714285714287, ""position_size"": 4752, ""neckline"": 2.455, ""near_peaks"": [2.465, 2.45, 2.45], ""near_positions"": [25, 29, 81]}"
+2026-03-10 12:42:24,UTHR,"EMA28_Breakout breakout:489.5467338011023 meta:{""type"": ""ema28_cross"", ""price_now"": 529.16998}"
+2026-03-10 13:18:41,VSEC,"EMA28_Breakout breakout:213.24157409492105 meta:{""type"": ""ema28_cross"", ""price_now"": 217.74001}"
+2026-03-10 13:44:51,WM,ATH breakout:246.089996 meta:{}
+2026-03-10 13:49:18,WPM,"EMA28_Breakout breakout:147.45375735010185 meta:{""type"": ""ema28_cross"", ""price_now"": 147.95}"
+2026-03-10 13:59:55,WWD,"EMA28_Breakout breakout:375.04346318825117 meta:{""type"": ""ema28_cross"", ""price_now"": 384.56}"
+2026-03-10 14:03:42,XENE,"EMA28_Breakout breakout:44.030466245954315 meta:{""type"": ""ema28_cross"", ""price_now"": 62.76}"
+2026-03-10 14:11:20,XPEV,"EMA28_Breakout breakout:17.79954552745362 meta:{""type"": ""ema28_cross"", ""price_now"": 18.45}"
+2026-03-11 10:11:28,ORIC,"EMA28_Breakout breakout:12.067752770996933 meta:{""type"": ""ema28_cross"", ""price_now"": 12.59}"
+2026-03-11 11:33:22,TGS,"EMA28_Breakout breakout:29.790349894708424 meta:{""type"": ""ema28_cross"", ""price_now"": 30.21}"
+2026-03-11 12:01:02,TRS,"EMA28_Breakout breakout:36.95035811702735 meta:{""type"": ""ema28_cross"", ""price_now"": 38.11}"
+2026-03-11 12:22:49,UCTT,"EMA28_Breakout breakout:53.95946289742721 meta:{""type"": ""ema28_cross"", ""price_now"": 56.25}"
+2026-03-11 12:56:17,VICR,"EMA28_Breakout breakout:172.61145189122283 meta:{""type"": ""ema28_cross"", ""price_now"": 175.8}"
+2026-03-11 13:16:55,VRTX,"EMA28_Breakout breakout:473.27538522957235 meta:{""type"": ""ema28_cross"", ""price_now"": 499.17001}"
+2026-03-11 13:40:09,WIT,"EMA28_Breakout breakout:2.3706605309654014 meta:{""type"": ""ema28_cross"", ""price_now"": 2.55}"
+2026-03-11 13:56:45,WTM,"EMA28_Breakout breakout:2169.8435313627415 meta:{""type"": ""ema28_cross"", ""price_now"": 2223.45996}"
+2026-03-12 10:00:12,PRCT,"EMA28_Breakout breakout:27.090309159280032 meta:{""type"": ""ema28_cross"", ""price_now"": 27.8}"
+2026-03-12 11:21:57,TKR,"EMA28_Breakout breakout:103.07057642120886 meta:{""type"": ""ema28_cross"", ""price_now"": 103.33}"
+2026-03-12 11:59:50,UE,"EMA28_Breakout breakout:20.518404051895413 meta:{""type"": ""ema28_cross"", ""price_now"": 20.7}"
+2026-03-12 12:07:50,UNFI,"EMA28_Breakout breakout:38.22471641919048 meta:{""type"": ""ema28_cross"", ""price_now"": 40.76}"
+2026-03-13 09:12:03,CBOE,"EMA28_Breakout breakout:286.36018508746247 meta:{""type"": ""ema28_cross"", ""price_now"": 290.25}"
+2026-03-13 09:16:41,CME,"EMA28_Breakout breakout:307.08681853065934 meta:{""type"": ""ema28_cross"", ""price_now"": 311.19}"
+2026-03-13 09:36:55,EXC,ATH breakout:49.47 meta:{}
+2026-03-13 09:36:55,EXC,"Cup & Handle breakout:49.48 meta:{""breakout_score"": 5.48, ""adx14"": 30.2261523006308, ""adx_ok"": true, ""atr14"": 0.9028568571428579, ""stop"": 48.12571471428571, ""position_size"": 738, ""retest_status"": ""unknown"", ""neckline"": 49.48, ""price_now"": 49.48}"
+2026-03-13 10:05:13,KR,ATH breakout:74.35 meta:{}
+2026-03-13 12:49:53,USFD,"EMA28_Breakout breakout:91.48998821896389 meta:{""type"": ""ema28_cross"", ""price_now"": 92.61}"
+2026-03-14 20:51:46,DUK,ATH breakout:132.5 meta:{}
+2026-03-14 21:01:43,FE,ATH breakout:51.16 meta:{}
+2026-03-14 21:28:23,KR,ATH breakout:74.96 meta:{}
+2026-03-14 23:04:41,THC,"EMA28_Breakout breakout:226.7966245098894 meta:{""type"": ""ema28_cross"", ""price_now"": 227.63}"
+2026-03-15 00:03:16,USLM,"EMA28_Breakout breakout:117.30524290480167 meta:{""type"": ""ema28_cross"", ""price_now"": 119.23}"
+2026-03-15 09:18:26,DUK,ATH breakout:132.5 meta:{}
+2026-03-15 09:28:00,FE,ATH breakout:51.16 meta:{}
+2026-03-15 09:55:00,KR,ATH breakout:74.96 meta:{}
+2026-03-15 11:33:15,THC,"EMA28_Breakout breakout:226.7966245098894 meta:{""type"": ""ema28_cross"", ""price_now"": 227.63}"
+2026-03-15 12:32:40,USLM,"EMA28_Breakout breakout:117.30524290480167 meta:{""type"": ""ema28_cross"", ""price_now"": 119.23}"
+2026-03-16 09:30:39,DUK,ATH breakout:132.5 meta:{}
+2026-03-16 09:40:37,FE,ATH breakout:51.16 meta:{}
+2026-03-16 10:07:37,KR,ATH breakout:74.96 meta:{}
+2026-03-16 11:47:04,THC,"EMA28_Breakout breakout:226.7966245098894 meta:{""type"": ""ema28_cross"", ""price_now"": 227.63}"
+2026-03-16 12:45:29,USLM,"EMA28_Breakout breakout:117.30524290480167 meta:{""type"": ""ema28_cross"", ""price_now"": 119.23}"
+2026-03-17 08:04:55,AEP,ATH breakout:133.82001 meta:{}
+2026-03-17 08:50:52,EXC,ATH breakout:49.82 meta:{}
+2026-03-17 08:53:05,FE,ATH breakout:51.16 meta:{}
+2026-03-17 10:42:00,TAK,"EMA28_Breakout breakout:17.924695412844482 meta:{""type"": ""ema28_cross"", ""price_now"": 18.22}"
+2026-03-17 11:11:55,TME,"EMA28_Breakout breakout:14.861093450173732 meta:{""type"": ""ema28_cross"", ""price_now"": 15.09}"
+2026-03-18 09:55:23,PFE,"EMA28_Breakout breakout:26.856541641131813 meta:{""type"": ""ema28_cross"", ""price_now"": 27.45}"
+2026-03-18 11:08:29,TGTX,"EMA28_Breakout breakout:29.316773014069554 meta:{""type"": ""ema28_cross"", ""price_now"": 31.51}"
+2026-03-18 11:33:59,TROX,"EMA28_Breakout breakout:6.960209926082241 meta:{""type"": ""ema28_cross"", ""price_now"": 7.84}"
+2026-03-18 12:02:18,UNM,"EMA28_Breakout breakout:73.41952874505783 meta:{""type"": ""ema28_cross"", ""price_now"": 75.19}"
+2026-03-19 09:24:12,LMT,"EMA28_Breakout breakout:640.8543189245465 meta:{""type"": ""ema28_cross"", ""price_now"": 642.28003}"
+2026-03-19 11:15:49,TPH,"Bullish Triangle breakout:46.56333333333333 meta:{""breakout_score"": 6.14, ""adx14"": 64.46239685884744, ""atr14"": 0.14000000000000107, ""stop"": 46.35333333333333, ""position_size"": 4761, ""neckline"": 46.56333333333333, ""near_peaks"": [46.47, 46.62, 46.6], ""near_positions"": [97, 102, 113]}"
+2026-03-23 15:45:59,NVAX,"EMA28_Breakout breakout:9.743945339152011 meta:{""type"": ""ema28_cross"", ""price_now"": 9.83}"
+2026-03-24 09:08:17,CAR,"EMA28_Breakout breakout:103.36336761352841 meta:{""type"": ""ema28_cross"", ""price_now"": 107.28}"
+2026-03-24 09:24:42,DNLI,"EMA28_Breakout breakout:20.431510676416057 meta:{""type"": ""ema28_cross"", ""price_now"": 21.09}"
+2026-03-24 11:04:48,SLB,"EMA28_Breakout breakout:47.792717848346236 meta:{""type"": ""ema28_cross"", ""price_now"": 49.25}"
+2026-03-24 11:08:26,SRPT,"EMA28_Breakout breakout:17.60318606051278 meta:{""type"": ""ema28_cross"", ""price_now"": 17.71}"
+2026-03-24 11:46:24,TIMB,"EMA28_Breakout breakout:25.429715709322057 meta:{""type"": ""ema28_cross"", ""price_now"": 25.68}"
+2026-03-24 12:29:29,UGP,"EMA28_Breakout breakout:4.998194358856199 meta:{""type"": ""ema28_cross"", ""price_now"": 5.2}"
+2026-03-24 13:14:49,VSAT,"EMA28_Breakout breakout:46.624494204680495 meta:{""type"": ""ema28_cross"", ""price_now"": 49.16}"
+2026-03-24 13:40:13,WLYB,"EMA28_Breakout breakout:34.20477660598253 meta:{""type"": ""ema28_cross"", ""price_now"": 37.0}"
+2026-03-24 13:53:02,WULF,"EMA28_Breakout breakout:15.310875038725923 meta:{""type"": ""ema28_cross"", ""price_now"": 16.19}"
+2026-03-25 09:45:16,ASML,"EMA28_Breakout breakout:1378.3123236569743 meta:{""type"": ""ema28_cross"", ""price_now"": 1399.42004}"
+2026-03-25 12:47:43,TRN,"EMA28_Breakout breakout:31.257488707109058 meta:{""type"": ""ema28_cross"", ""price_now"": 31.29}"
+2026-03-25 13:09:15,UBSI,"EMA28_Breakout breakout:40.801319860824336 meta:{""type"": ""ema28_cross"", ""price_now"": 40.85}"
+2026-03-26 09:48:58,CORT,"EMA28_Breakout breakout:36.10945148158261 meta:{""type"": ""ema28_cross"", ""price_now"": 40.47}"
+2026-03-26 10:21:41,GSK,"EMA28_Breakout breakout:54.608043453328406 meta:{""type"": ""ema28_cross"", ""price_now"": 54.7}"
+2026-03-26 10:24:22,HPQ,"EMA28_Breakout breakout:18.967991094338284 meta:{""type"": ""ema28_cross"", ""price_now"": 19.46}"
+2026-03-26 10:29:47,INTC,"EMA28_Breakout breakout:45.44764009666344 meta:{""type"": ""ema28_cross"", ""price_now"": 47.18}"
+2026-03-26 10:33:46,JPM,"EMA28_Breakout breakout:294.83024854563854 meta:{""type"": ""ema28_cross"", ""price_now"": 295.42001}"
+2026-03-26 10:42:56,MDGL,"EMA28_Breakout breakout:451.4367627978757 meta:{""type"": ""ema28_cross"", ""price_now"": 461.92999}"
+2026-03-26 11:03:59,PRAX,"EMA28_Breakout breakout:307.84398593641026 meta:{""type"": ""ema28_cross"", ""price_now"": 311.92001}"
+2026-03-26 11:38:33,SCL,"EMA28_Breakout breakout:50.22869412130622 meta:{""type"": ""ema28_cross"", ""price_now"": 50.27}"
+2026-03-26 14:50:12,ZION,"EMA28_Breakout breakout:56.76671040504045 meta:{""type"": ""ema28_cross"", ""price_now"": 57.2}"
+2026-03-27 15:34:51,CYTK,"EMA28_Breakout breakout:62.61399052698038 meta:{""type"": ""ema28_cross"", ""price_now"": 63.48}"
+2026-03-29 13:59:23,AEP,"EMA28_Breakout breakout:129.2287421265271 meta:{""type"": ""ema28_cross"", ""price_now"": 130.10001}"
+2026-03-29 14:44:49,ETR,"EMA28_Breakout breakout:103.53237162669707 meta:{""type"": ""ema28_cross"", ""price_now"": 109.88}"
+2026-03-30 08:06:18,AEP,"EMA28_Breakout breakout:129.2287421265271 meta:{""type"": ""ema28_cross"", ""price_now"": 130.10001}"
+2026-03-30 08:48:24,ETR,"EMA28_Breakout breakout:103.53237162669707 meta:{""type"": ""ema28_cross"", ""price_now"": 109.88}"
+2026-03-31 08:39:32,ALKS,"EMA28_Breakout breakout:29.456244964566167 meta:{""type"": ""ema28_cross"", ""price_now"": 30.15}"
+2026-03-31 08:50:28,AZN,"Bullish Triangle breakout:192.7574985 meta:{""breakout_score"": 5.56, ""adx14"": 26.169805141518175, ""atr14"": 4.219085714285713, ""stop"": 186.42886992857143, ""position_size"": 158, ""neckline"": 192.7574985, ""near_peaks"": [193.020004, 192.86, 192.36, 192.78999, 193.96001], ""near_positions"": [63, 68, 76, 80, 110]}"
+2026-03-31 08:50:28,AZN,"EMA28_Breakout breakout:191.92908416521468 meta:{""type"": ""ema28_cross"", ""price_now"": 193.88}"
+2026-03-31 09:16:16,EMN,"EMA28_Breakout breakout:71.37856232391478 meta:{""type"": ""ema28_cross"", ""price_now"": 72.55}"
+2026-03-31 09:43:22,INSM,"EMA28_Breakout breakout:147.05844943604876 meta:{""type"": ""ema28_cross"", ""price_now"": 153.32001}"
+2026-03-31 11:16:19,TAK,"EMA28_Breakout breakout:18.003304693063978 meta:{""type"": ""ema28_cross"", ""price_now"": 18.27}"
+2026-04-01 11:26:16,ACAD,"EMA28_Breakout breakout:22.08465375103918 meta:{""type"": ""ema28_cross"", ""price_now"": 22.26}"
+2026-04-01 11:37:36,APLS,"EMA28_Breakout breakout:20.585167193035854 meta:{""type"": ""ema28_cross"", ""price_now"": 40.23}"
+2026-04-01 11:40:29,ASND,"EMA28_Breakout breakout:225.43597265317186 meta:{""type"": ""ema28_cross"", ""price_now"": 228.73}"
+2026-04-01 11:48:13,C,"EMA28_Breakout breakout:110.89646066287001 meta:{""type"": ""ema28_cross"", ""price_now"": 113.41}"
+2026-04-01 11:58:18,CRL,"EMA28_Breakout breakout:166.8650910815596 meta:{""type"": ""ema28_cross"", ""price_now"": 172.5}"
+2026-04-01 11:59:48,CSX,"EMA28_Breakout breakout:39.9533501757895 meta:{""type"": ""ema28_cross"", ""price_now"": 41.049999}"
+2026-04-01 12:08:09,EBC,"EMA28_Breakout breakout:19.435431041795642 meta:{""type"": ""ema28_cross"", ""price_now"": 19.56}"
+2026-04-01 12:29:42,GSK,"EMA28_Breakout breakout:54.54080794038055 meta:{""type"": ""ema28_cross"", ""price_now"": 55.19}"
+2026-04-01 12:37:56,IONS,"EMA28_Breakout breakout:75.02282900022055 meta:{""type"": ""ema28_cross"", ""price_now"": 75.089996}"
+2026-04-01 12:40:39,JBHT,"EMA28_Breakout breakout:210.07050639803924 meta:{""type"": ""ema28_cross"", ""price_now"": 211.89999}"
+2026-04-01 12:43:12,KLAC,"EMA28_Breakout breakout:1466.3829247275855 meta:{""type"": ""ema28_cross"", ""price_now"": 1472.41003}"
+2026-04-01 13:04:25,ON,"EMA28_Breakout breakout:61.29870442555034 meta:{""type"": ""ema28_cross"", ""price_now"": 61.92}"
+2026-04-01 13:08:24,PCVX,"EMA28_Breakout breakout:55.94705890080314 meta:{""type"": ""ema28_cross"", ""price_now"": 58.11}"
+2026-04-01 13:12:19,PRAX,"EMA28_Breakout breakout:305.4693238936883 meta:{""type"": ""ema28_cross"", ""price_now"": 322.19}"
+2026-04-01 13:42:54,RIO,"EMA28_Breakout breakout:90.10885353404291 meta:{""type"": ""ema28_cross"", ""price_now"": 93.29}"
+2026-04-01 13:53:10,STLD,"EMA28_Breakout breakout:177.9869944002532 meta:{""type"": ""ema28_cross"", ""price_now"": 180.0}"
+2026-04-01 14:07:06,T,"Cup & Handle breakout:29.1 meta:{""breakout_score"": 6.1, ""adx14"": 21.80125296999317, ""adx_ok"": true, ""atr14"": 0.5867857142857148, ""stop"": 28.21982142857143, ""position_size"": 1136, ""retest_status"": ""unknown"", ""neckline"": 29.1, ""price_now"": 28.99}"
+2026-04-01 14:09:14,TAL,"EMA28_Breakout breakout:11.117424900505512 meta:{""type"": ""ema28_cross"", ""price_now"": 11.37}"
+2026-04-01 14:11:34,TARS,"EMA28_Breakout breakout:68.65234667769137 meta:{""type"": ""ema28_cross"", ""price_now"": 70.15}"
+2026-04-01 14:24:18,TFII,"EMA28_Breakout breakout:107.93864342656056 meta:{""type"": ""ema28_cross"", ""price_now"": 108.63}"
+2026-04-01 14:25:17,TFSL,"Bullish Triangle breakout:13.807500000000001 meta:{""breakout_score"": 6.2, ""adx14"": 23.9459347581573, ""atr14"": 0.24357142857142833, ""stop"": 13.442142857142859, ""position_size"": 2737, ""neckline"": 13.807500000000001, ""near_peaks"": [13.83, 13.84, 13.75, 13.81], ""near_positions"": [13, 17, 108, 115]}"
+2026-04-01 14:25:17,TFSL,"EMA28_Breakout breakout:13.85891989342337 meta:{""type"": ""ema28_cross"", ""price_now"": 14.05}"
+2026-04-01 14:28:03,TGTX,"Bullish Triangle breakout:32.440666666666665 meta:{""breakout_score"": 6.46, ""adx14"": 31.437783075221663, ""atr14"": 1.5772142142857142, ""stop"": 30.074845345238096, ""position_size"": 422, ""neckline"": 32.440666666666665, ""near_peaks"": [32.302, 32.55, 32.47], ""near_positions"": [46, 73, 109]}"
+2026-04-01 14:33:57,TIMB,"EMA28_Breakout breakout:25.57859922821777 meta:{""type"": ""ema28_cross"", ""price_now"": 26.49}"
+2026-04-01 15:03:20,TTMI,"EMA28_Breakout breakout:97.2720040586131 meta:{""type"": ""ema28_cross"", ""price_now"": 97.42}"
+2026-04-01 15:07:06,TVTX,"EMA28_Breakout breakout:28.404072837096457 meta:{""type"": ""ema28_cross"", ""price_now"": 29.71}"
+2026-04-01 15:09:59,TWST,"EMA28_Breakout breakout:45.8767012558193 meta:{""type"": ""ema28_cross"", ""price_now"": 47.52}"
+2026-04-01 15:12:43,U,"EMA28_Breakout breakout:20.84718581612054 meta:{""type"": ""ema28_cross"", ""price_now"": 21.94}"
+2026-04-01 15:15:18,UBS,"EMA28_Breakout breakout:38.99678342645993 meta:{""type"": ""ema28_cross"", ""price_now"": 39.07}"
+2026-04-01 15:15:50,UBSI,"EMA28_Breakout breakout:40.82849066736579 meta:{""type"": ""ema28_cross"", ""price_now"": 41.42}"
+2026-04-01 15:17:02,UCTT,"EMA28_Breakout breakout:57.76940688710247 meta:{""type"": ""ema28_cross"", ""price_now"": 62.18}"
+2026-04-01 15:54:08,VLY,"EMA28_Breakout breakout:12.233829481139086 meta:{""type"": ""ema28_cross"", ""price_now"": 12.28}"
+2026-04-08 22:07:01,ORA,
+2026-04-08 22:13:51,GM,
+2026-04-09 14:13:58,IEP,
+2026-04-09 16:37:28,CNA,
+2026-04-11 13:41:37,VKTX,
+2026-04-11 14:16:46,AFG,
+2026-04-11 14:27:59,NOVT,
+2026-04-11 14:34:57,AD,
+2026-04-12 19:01:23,AD,
+2026-04-12 19:50:12,NOVT,
+2026-04-12 21:21:30,AFG,
+2026-04-12 22:09:55,VOYA,
+2026-04-12 22:56:51,MTCH,
+2026-04-13 00:01:48,VKTX,
+2026-04-13 00:57:01,VNT,
+2026-04-14 22:03:55,RDN,"A1 ❌ תבנית קצרה מדי (0.0 שבועות) (+1) | A2 ⚠️ תבנית רדודה (7.0%) (+3) | A3 ✅ מחיר 0.4% מעל MA150 — קרוב (+6) | A4 ✅ נר פריצה טוב (body=52%) (+4) | A5 ❌ נפח נמוך ×0.0 (+0) | B1 ⚠️ RS לא זמין (+3) | B2 ⚠️ סקטור לא מזוהה (Financial Services) (+3) | B3 ❌ סקטור קר: Sector 🔴 COLD (XLF, RS vs SPY: +2.2%) (+0.0) | B4 ⚠️ ATR לא זמין (+2) | C1 ⚠️ Insider שגיאה (+3) | C2 ✅ מוסדיים: 96% אחזקה גבוהה (+7) | C3 ❌ אין Dark Pool (+1) | C4 ℹ️ Short Interest 3.9% (+1.5) | D1 ⚠️ חדשות נייטרליות (+2) | D2 ✅ Earnings Growth 15% (+5) | D3 ⚠️ Analyst: hold (+2) | D4 ⚠️ Google Trends יציב (+1) | E1 ⚠️ Market Regime: NEUTRAL (+0) | E2 ✅ דוחות רחוקים (+0) | E3 ✅ נזילות תקינה (1,538,107) (+0)"
+2026-04-14 22:49:11,ATAT,
+2026-04-14 22:58:15,NZF,
+2026-04-16 23:44:52,RZB,
+2026-04-19 19:30:21,POST,
+2026-04-19 19:36:22,GH,
+2026-04-19 23:52:06,MIDD,
+2026-04-20 00:17:33,RZB,
+2026-04-20 00:18:31,BRC,
+2026-04-20 00:37:16,NBIX,
+2026-04-21 23:44:50,PUK,
+2026-04-22 10:29:56,RZB,
+2026-04-22 11:21:01,BRC,
+2026-04-22 22:04:59,MIDD,
+2026-04-23 00:13:03,BANC,
+2026-04-23 07:35:51,PUK,
+2026-04-23 08:23:07,SFBS,
+2026-04-25 21:19:19,VLYPO,
+2026-04-25 21:21:46,RZB,
+2026-04-26 00:31:57,CCI,
+2026-04-26 07:21:35,CBSH,
+2026-04-26 07:49:13,PUK,
+2026-04-26 08:53:59,ARR,
+2026-04-26 09:29:31,BIRK,
+2026-04-26 21:57:14,RZB,
+2026-04-26 22:00:52,VLYPO,
+2026-04-27 00:33:37,CCI,
+2026-04-27 10:09:26,PUK,
+2026-04-27 20:00:25,TOWN,
+2026-04-27 22:15:22,BIRK,
+2026-04-28 01:24:35,ETY,
+2026-04-28 07:53:46,RJF,
+2026-04-28 08:22:38,FCNCA,
+2026-04-28 22:01:24,CINF,
+2026-04-28 22:43:29,ARR,
+2026-04-28 23:54:47,VLYPO,
+2026-04-29 00:56:11,AMT,
+2026-04-29 02:01:21,CCI,
+2026-04-29 08:31:10,CCEP,
+2026-04-30 22:06:26,VLYPO,
+2026-04-30 22:13:28,AUB,
+2026-04-30 22:21:28,WOR,
+2026-04-30 22:46:34,ARR,
+2026-05-01 01:09:21,MLM,
+2026-05-01 01:39:53,WCN,
+2026-05-01 18:41:14,TOWN,
+2026-05-01 19:48:30,SAIC,
+2026-05-01 21:06:52,FCNCA,
+2026-05-01 21:39:01,EXG,
+2026-05-01 21:44:20,CRH,
+2026-05-01 21:54:03,IONS,
+2026-05-02 19:12:34,TOWN,
+2026-05-02 19:25:19,AMT,
+2026-05-02 19:30:47,PEP,
+2026-05-02 19:46:11,SFBS,
+2026-05-02 21:53:51,FCNCA,
+2026-05-02 22:20:38,TXNM,
+2026-05-02 23:13:09,AZO,
+2026-05-03 03:01:55,SAIC,
+2026-05-03 03:06:49,VLYPO,
+2026-05-05 00:37:15,BLK,
+2026-05-05 01:00:20,GLPI,
+2026-05-05 01:02:05,AB,
+2026-05-05 01:34:16,VLYPO,
+2026-05-05 01:35:11,ORLY,
+2026-05-05 02:27:31,TXNM,
+2026-05-05 02:37:32,IONS,
+2026-05-05 04:08:19,FNB,
+2026-05-05 22:10:50,EXG,
+2026-05-05 23:43:58,HWC,
+2026-05-05 23:59:16,INCY,
+2026-05-06 01:06:53,SFBS,
+2026-05-06 01:11:26,BIP,
+2026-05-06 01:21:18,WOR,
+2026-05-06 02:38:51,PRU,
+2026-05-06 02:44:10,BANC,
+2026-05-06 08:34:31,FCNCA,
+2026-05-06 09:57:14,BLK,
+2026-05-06 20:27:46,GRFS,
+2026-05-06 20:59:47,AMT,
+2026-05-06 21:48:02,SSB,
+2026-05-06 22:25:51,ARCC,
+2026-05-06 22:43:55,SF,
+2026-05-07 00:03:13,SOJC,
+2026-05-07 00:22:18,CNM,
+2026-05-07 00:39:52,VLYPO,
+2026-05-07 00:45:44,CNH,
+2026-05-07 01:14:03,NZF,
+2026-05-07 01:32:05,TXNM,
+2026-05-07 06:35:46,NVG,
+2026-05-07 08:06:37,RYN,
+2026-05-10 09:36:36,NZF,
+2026-05-10 10:37:06,BANC,
+2026-05-10 10:57:57,VLYPO,
+2026-05-10 11:20:34,AUB,
+2026-05-10 11:43:10,F,
+2026-05-10 12:29:49,RCL,
+2026-05-10 12:58:04,CPT,
+2026-05-10 13:00:00,KVUE,
+2026-05-10 15:04:54,ARR,
+2026-05-10 15:38:49,SOJC,
+2026-05-10 17:35:34,GM,
+2026-05-11 20:13:25,SUPN,
+2026-05-12 10:18:45,HALO,
+2026-05-12 10:25:47,ONC,
+2026-05-12 10:37:57,NXST,
+2026-05-12 11:39:52,ARR,
+2026-05-12 12:11:02,NVG,
+2026-05-12 12:30:06,NZF,
+2026-05-12 13:29:56,EXR,
+2026-05-12 13:36:20,SOJC,
+2026-05-13 10:14:24,BANC,
+2026-05-13 10:28:55,PKG,
+2026-05-13 10:44:37,DIS,
+2026-05-13 10:52:52,WTS,
+2026-05-13 11:06:10,FWONA,
+2026-05-13 11:56:03,SLMBP,
+2026-05-13 12:34:43,FWONK,
+2026-05-13 12:56:55,AFL,
+2026-05-13 13:33:19,IBOC,
+2026-05-13 13:35:13,IBOC,
+2026-05-13 14:07:20,AMT,
+2026-05-13 14:15:36,EXR,
+2026-05-13 16:08:10,EXG,
+2026-05-13 16:21:26,ARR,
+2026-05-13 16:26:33,AMT,
+2026-05-13 16:46:29,EXG,
+2026-05-14 19:20:54,WOR,
+2026-05-14 19:25:48,SLMBP,
+2026-05-14 20:30:11,ARR,
+2026-05-14 21:25:50,AFL,
+2026-05-14 21:55:06,CBSH,
+2026-05-14 22:05:52,LAUR,
+2026-05-14 23:14:59,GM,
+2026-05-15 00:31:45,WAT,
+2026-05-15 20:20:10,EQH,
+2026-05-15 20:27:17,TEO,
+2026-05-15 22:30:02,SLMBP,
+2026-05-16 23:51:15,SLMBP,
+2026-05-17 02:12:03,PRU,
+2026-05-18 21:04:58,ACI,
+2026-05-18 21:18:39,UDR,
+2026-05-18 22:15:25,TKO,
+2026-05-18 23:29:54,SCHW,
+2026-05-18 23:35:15,IBOC,
+2026-05-19 01:16:15,CINF,
+2026-05-19 01:23:57,LAUR,
+2026-05-19 07:34:22,SLMBP,
+2026-05-20 20:24:45,BANC,
+2026-05-20 20:50:49,IONS,
+2026-05-20 20:52:20,HOVNP,
+2026-05-20 21:11:33,INDB,
+2026-05-20 22:12:30,DRI,
+2026-05-20 22:16:45,FCNCA,
+2026-05-25 10:17:16,WSBC,
+2026-05-25 10:37:17,EXC,
+2026-05-25 10:42:07,GM,
+2026-05-25 11:16:00,MPLX,
+2026-05-25 12:58:38,INDB,
+2026-05-25 14:46:18,FRME,
+2026-05-25 16:00:05,MC,
+2026-05-25 16:30:50,CR,
+2026-05-25 17:00:49,PKG,
+2026-05-25 17:05:27,RCI,
+2026-05-25 17:16:34,AXS,
+2026-05-25 17:21:38,PNC,
+2026-05-29 13:10:31,VRTX,
+2026-05-29 13:18:58,DGX,
+2026-05-29 15:39:50,FCNCA,
+2026-05-29 17:11:54,BMRN,
+2026-05-29 17:39:37,REYN,
+2026-05-31 23:21:34,HWC,
+2026-05-31 23:29:47,HOVNP,
+2026-05-31 23:59:34,EAT,
+2026-06-01 01:11:58,GILD,
+2026-06-01 01:17:20,DGX,
+2026-06-01 01:29:31,VRTX,
+2026-06-01 02:24:20,RYN,
+2026-06-01 03:02:39,BANC,
+2026-06-01 03:47:38,MTB,
+2026-06-02 09:15:39,LYG,
+2026-06-02 09:45:14,RACE,
+2026-06-02 12:02:15,NMR,
+2026-06-02 13:29:40,WBD,
+2026-06-02 15:15:04,EAT,
+2026-06-30 07:51:30,EPRT,
+2026-06-30 08:04:57,AQN,
+2026-06-30 08:56:47,BJ,
+2026-06-30 09:28:18,MWA,
+2026-06-30 09:33:39,CALM,
+2026-06-30 12:14:08,PI,
+2026-06-30 12:37:08,SSB,
+2026-06-30 14:03:28,NKTR,
+2026-06-30 14:29:58,DX,
+2026-06-30 14:35:58,ITW,
+2026-06-30 15:03:41,SWX,
