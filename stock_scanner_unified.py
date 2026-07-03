@@ -77,7 +77,27 @@ if not TO_EMAILS:
     raise RuntimeError("TO_EMAILS environment variable is missing")
 CHARTS_DIR = os.getenv("CHARTS_DIR", "temp_images")
 os.makedirs(CHARTS_DIR, exist_ok=True)
-LOGFILE = os.getenv("LOGFILE", "stock_scanner_unified_log.txt")
+
+# --- GitHub Actions persistent state folder ---
+# כל קובצי המעקב נשמרים כאן, כדי שאפשר יהיה לשחזר אותם בין ריצות עם actions/cache.
+STATE_DIR = os.getenv("STATE_DIR", "scanner_state")
+os.makedirs(STATE_DIR, exist_ok=True)
+
+
+def _state_path(path: str) -> str:
+    """מחזיר נתיב לקובץ state. אם הוגדר נתיב מלא/תיקייה — משאיר כמו שהוא."""
+    path = str(path or "").strip()
+    if not path:
+        return path
+    if os.path.isabs(path) or os.path.dirname(path):
+        parent = os.path.dirname(path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        return path
+    return os.path.join(STATE_DIR, path)
+
+
+LOGFILE = _state_path(os.getenv("LOGFILE", "stock_scanner_unified_log.txt"))
 
 API_KEYS = [
     key.strip()
@@ -460,15 +480,15 @@ DEBUG_SCAN_REASONS    = os.getenv("DEBUG_SCAN_REASONS","True").lower() in ("1","
 TOP_ALERTS_TO_SEND    = int(os.getenv("TOP_ALERTS_TO_SEND", "3"))
 
 # --- קבצים ---
-PROGRESS_FILE      = os.getenv("PROGRESS_FILE",      "progress.json")
-ALERT_HISTORY_FILE = os.getenv("ALERT_HISTORY_FILE", "alerts_sent.json")
-SIGNALS_CSV        = os.getenv("SIGNALS_CSV",         "signals_log.csv")
-BLOCKLIST_FILE     = os.getenv("BLOCKLIST_FILE",      "twelvedata_blocklist.json")
+PROGRESS_FILE      = _state_path(os.getenv("PROGRESS_FILE",      "progress.json"))
+ALERT_HISTORY_FILE = _state_path(os.getenv("ALERT_HISTORY_FILE", "alerts_sent.json"))
+SIGNALS_CSV        = _state_path(os.getenv("SIGNALS_CSV",         "signals_log.csv"))
+BLOCKLIST_FILE     = _state_path(os.getenv("BLOCKLIST_FILE",      "twelvedata_blocklist.json"))
 CHARTS_DIR         = os.getenv("CHARTS_DIR",          "temp_images")
 os.makedirs(CHARTS_DIR, exist_ok=True)
 
 # --- מעקב ביצועים ---
-PERFORMANCE_CSV    = os.getenv("PERFORMANCE_CSV",     "performance_log.csv")
+PERFORMANCE_CSV    = _state_path(os.getenv("PERFORMANCE_CSV",     "performance_log.csv"))
 PERF_CHECK_DAYS    = [5, 10, 20]   # בודק ביצועים אחרי X ימי מסחר
 
 # --- סינון דוחות ---
@@ -497,10 +517,10 @@ SECTOR_ETF_MAP = {
 }
 
 # LOGFILE
-LOGFILE = os.getenv("LOGFILE", "stock_scanner_unified_log.txt")
+LOGFILE = _state_path(os.getenv("LOGFILE", "stock_scanner_unified_log.txt"))
 
 # WATCHLIST LOG — מניות שעברו EMA28+MA150+דוחות אבל נפסלו בשלב אחרון
-WATCHLIST_LOG = os.getenv("WATCHLIST_LOG", "watchlist_log.txt")
+WATCHLIST_LOG = _state_path(os.getenv("WATCHLIST_LOG", "watchlist_log.txt"))
 try:
     open(WATCHLIST_LOG, "a").close()
 except Exception:
@@ -524,7 +544,7 @@ else:
 # ============================================================
 #  UNIVERSE — טוען את כל מניות NYSE + NASDAQ ומסנן מעל $1B
 # ============================================================
-UNIVERSE_CACHE_FILE = os.getenv("UNIVERSE_CACHE_FILE", "universe_cache.json")
+UNIVERSE_CACHE_FILE = _state_path(os.getenv("UNIVERSE_CACHE_FILE", "universe_cache.json"))
 UNIVERSE_MIN_CAP    = float(os.getenv("UNIVERSE_MIN_CAP", "1e9"))   # $1B מינימום
 UNIVERSE_MIN_PRICE  = float(os.getenv("UNIVERSE_MIN_PRICE", "5.0")) # לא פני-סטוק
 UNIVERSE_MIN_VOL    = int(os.getenv("UNIVERSE_MIN_VOL", "100000"))  # volume מינימלי
@@ -838,6 +858,9 @@ def _load_json(path: str) -> dict:
 
 def _save_json(path: str, data) -> None:
     try:
+        parent = os.path.dirname(path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2, default=str)
     except Exception as e:
@@ -3132,7 +3155,7 @@ def compute_rs_score(ticker: str, df: pd.DataFrame) -> dict:
 #  רץ כל שבת, מנתח performance_log.csv ומעדכן פרמטרים
 # ============================================================
 
-LEARNING_CONFIG_FILE = os.getenv("LEARNING_CONFIG_FILE", "scanner_learned_params.json")
+LEARNING_CONFIG_FILE = _state_path(os.getenv("LEARNING_CONFIG_FILE", "scanner_learned_params.json"))
 LEARNING_MIN_SAMPLES = 30    # מינימום סטאפים לניתוח
 LEARNING_LOOKBACK_DAYS = 90  # מנתח את 90 הימים האחרונים
 
@@ -3373,9 +3396,10 @@ def get_sector_rotation_adjustment(ticker: str, rotation_map: dict) -> tuple[flo
 #  רץ בכל ריצה, בודק כל סטאפ שנשלח ועדיין פתוח
 # ============================================================
 
-POSITIONS_FILE      = os.getenv("POSITIONS_FILE",      "open_positions.json")
+POSITIONS_FILE      = _state_path(os.getenv("POSITIONS_FILE",      "open_positions.json"))
 TRAILING_ATR_MULT   = float(os.getenv("TRAILING_ATR_MULT",   "1.5"))   # trailing stop = ATR × 1.5 מתחת לשיא
 POSITION_MAX_DAYS   = int(os.getenv("POSITION_MAX_DAYS",     "30"))    # סגור פוזיציה אחרי 30 יום
+SEND_POSITIONS_STATUS_EMAIL = os.getenv("SEND_POSITIONS_STATUS_EMAIL", "True").lower() in ("1", "true", "yes")
 
 
 def _load_positions() -> list[dict]:
@@ -3392,6 +3416,9 @@ def _load_positions() -> list[dict]:
 def _save_positions(positions: list[dict]) -> None:
     """שומר פוזיציות פתוחות ל-JSON."""
     try:
+        parent = os.path.dirname(POSITIONS_FILE)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
         with open(POSITIONS_FILE, "w") as f:
             json.dump(positions, f, indent=2, default=str)
     except Exception as e:
@@ -3629,6 +3656,139 @@ def send_exit_email(exit_alerts: list[dict]) -> None:
         log(f"📧 Exit email sent: {len(exit_alerts)} positions closed")
     except Exception as e:
         log(f"send_exit_email error: {e}")
+
+
+def send_positions_status_email() -> None:
+    """
+    שולח מייל יומי על פוזיציות פתוחות:
+    האם עדיין להישאר, איפה המחיר מול הסטופ/יעד, ומה ה-P&L.
+    """
+    if not SEND_POSITIONS_STATUS_EMAIL:
+        return
+    if not APP_PASSWORD:
+        log("APP_PASSWORD not set — positions status email disabled.")
+        return
+
+    try:
+        positions = _load_positions()
+        open_pos = [p for p in positions if not p.get("closed")]
+        if not open_pos:
+            log("📭 Positions status: no open positions.")
+            return
+
+        cards = []
+        today = datetime.now().strftime("%d/%m/%Y")
+
+        for p in open_pos:
+            ticker = str(p.get("ticker", "")).strip().upper()
+            if not ticker:
+                continue
+
+            try:
+                df = yf.download(ticker, period="60d", interval="1d", progress=False, auto_adjust=True)
+                if df is None or df.empty:
+                    cards.append(f"""
+<div dir="rtl" style="font-family:Arial,sans-serif;max-width:560px;margin:12px auto;border:1px solid #e5e7eb;border-radius:10px;background:#fff;padding:14px 16px;">
+  <div style="font-size:19px;font-weight:700;color:#374151;">⚠️ {ticker}</div>
+  <div style="font-size:13px;color:#6b7280;margin-top:6px;">לא הצלחתי להוריד נתונים עדכניים. לא סוגר אוטומטית — בדיקה ידנית מומלצת.</div>
+</div>""")
+                    continue
+
+                if isinstance(df.columns, pd.MultiIndex):
+                    df.columns = [c[0].lower() for c in df.columns]
+                else:
+                    df.columns = [str(c).lower() for c in df.columns]
+
+                price_now = float(df["close"].iloc[-1])
+                entry = float(p.get("entry", 0) or 0)
+                stop = float(p.get("stop_current", p.get("stop_initial", 0)) or 0)
+                target = float(p.get("target", 0) or 0)
+                highest = max(float(p.get("highest_price", entry) or entry), price_now)
+
+                # עדכון highest_price גם אם אין יציאה — כדי שהמעקב יישמר בקובץ state.
+                p["highest_price"] = highest
+
+                pnl_pct = ((price_now - entry) / max(entry, 1e-9)) * 100 if entry > 0 else 0.0
+                to_stop_pct = ((price_now - stop) / max(price_now, 1e-9)) * 100 if stop > 0 else 0.0
+                to_target_pct = ((target - price_now) / max(price_now, 1e-9)) * 100 if target > 0 else 0.0
+
+                # החלטת סטטוס ברורה למייל
+                if stop > 0 and price_now <= stop:
+                    status_emoji = "🛑"
+                    status_text = "יציאה — המחיר הגיע/ירד מתחת לסטופ"
+                    status_color = "#b91c1c"
+                    status_bg = "#fef2f2"
+                elif target > 0 and price_now >= target:
+                    status_emoji = "🎯"
+                    status_text = "יציאה/מימוש — המחיר הגיע ליעד"
+                    status_color = "#15803d"
+                    status_bg = "#f0fdf4"
+                else:
+                    status_emoji = "✅"
+                    status_text = "להישאר — לא הופעל סטופ ולא הגיע יעד"
+                    status_color = "#1d4ed8"
+                    status_bg = "#eff6ff"
+
+                pnl_color = "#15803d" if pnl_pct >= 0 else "#b91c1c"
+                date_open = p.get("date_open", "")
+                try:
+                    days_open = (datetime.now().date() - pd.Timestamp(date_open).date()).days if date_open else "N/A"
+                except Exception:
+                    days_open = "N/A"
+
+                cards.append(f"""
+<div dir="rtl" style="font-family:Arial,sans-serif;max-width:560px;margin:12px auto;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;background:#fff;">
+  <div style="padding:14px 16px;background:{status_bg};border-bottom:1px solid #e5e7eb;">
+    <div style="font-size:20px;font-weight:700;color:{status_color};">{status_emoji} {ticker} — {status_text}</div>
+    <div style="font-size:13px;color:#374151;margin-top:4px;">{p.get('pattern', '')} | פתוח {days_open} ימים</div>
+  </div>
+  <div style="padding:12px 16px;font-size:13px;color:#374151;">
+    <table style="width:100%;border-collapse:collapse;">
+      <tr><td style="padding:4px 0;font-weight:600;">מחיר כניסה</td><td>${entry:.2f}</td><td style="font-weight:600;">מחיר עכשיו</td><td>${price_now:.2f}</td></tr>
+      <tr><td style="padding:4px 0;font-weight:600;">Stop נוכחי</td><td>${stop:.2f}</td><td style="font-weight:600;">יעד</td><td>${target:.2f}</td></tr>
+      <tr><td style="padding:4px 0;font-weight:600;">רווח/הפסד</td><td style="color:{pnl_color};font-weight:700;">{pnl_pct:+.1f}%</td><td style="font-weight:600;">מרחק מהסטופ</td><td>{to_stop_pct:.1f}%</td></tr>
+      <tr><td style="padding:4px 0;font-weight:600;">מרחק מהיעד</td><td>{to_target_pct:.1f}%</td><td style="font-weight:600;">שיא מאז כניסה</td><td>${highest:.2f}</td></tr>
+    </table>
+  </div>
+</div>""")
+
+            except Exception as e:
+                cards.append(f"""
+<div dir="rtl" style="font-family:Arial,sans-serif;max-width:560px;margin:12px auto;border:1px solid #e5e7eb;border-radius:10px;background:#fff;padding:14px 16px;">
+  <div style="font-size:19px;font-weight:700;color:#b91c1c;">⚠️ {ticker}</div>
+  <div style="font-size:13px;color:#6b7280;margin-top:6px;">שגיאה בבדיקת פוזיציה: {e}</div>
+</div>""")
+
+        _save_positions(positions)
+
+        if not cards:
+            return
+
+        html_body = f"""
+<html><body style="background:#f8fafc;padding:18px;">
+  <div dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:auto;">
+    <h2 style="text-align:center;color:#111827;margin:0 0 14px;">📊 דוח פוזיציות פתוחות — {today}</h2>
+    <p style="text-align:center;color:#6b7280;margin:0 0 16px;">זה דוח מעקב יומי: להישאר / לצאת לפי stop, יעד ונתוני מחיר עדכניים.</p>
+    {''.join(cards)}
+  </div>
+</body></html>
+"""
+
+        subject = f"📊 דוח פוזיציות פתוחות — {len(open_pos)} מניות — {today}"
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = FROM_EMAIL
+        msg["To"] = ", ".join(TO_EMAILS) if isinstance(TO_EMAILS, list) else TO_EMAILS
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as s:
+            s.login(FROM_EMAIL, APP_PASSWORD)
+            s.send_message(msg)
+
+        log(f"📧 Positions status email sent: {len(open_pos)} open positions")
+
+    except Exception as e:
+        log(f"send_positions_status_email error: {e}")
 
 
 def _load_learned_params() -> dict:
@@ -5715,6 +5875,13 @@ def main() -> None:
     if not API_KEYS:
         log("❌ FATAL: אין מפתחות TwelveData API. הגדר TWELVEDATA_API_KEYS.")
         return
+
+    # ── שלח דוח יומי על פוזיציות פתוחות — להישאר / לצאת ─────
+    try:
+        send_positions_status_email()
+    except Exception as e:
+        log(f"Positions status email error: {e}")
+
     # ── בנה Universe — כל מניות NYSE + NASDAQ מעל $1B ──────
     if not tickers:
         log("🌐 Loading universe (first run or no cache)...")
