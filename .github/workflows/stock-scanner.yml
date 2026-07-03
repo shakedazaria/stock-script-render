@@ -2,15 +2,25 @@ name: Stock Scanner Daily
 
 on:
   schedule:
-    - cron: "10 * * * *"
+    # GitHub בודק כל 5 דקות
+    - cron: "*/5 * * * *"
   workflow_dispatch:
+
+concurrency:
+  group: stock-scanner-daily
+  cancel-in-progress: false
+
 jobs:
   run-stock-scanner:
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
     env:
-      TARGET_HOUR_ISRAEL: "6"
+      # שעה לבדיקה עכשיו: 12:40 שעון ישראל
+      TARGET_HOUR_ISRAEL: "12"
+      TARGET_MINUTE_ISRAEL: "40"
+      RUN_WINDOW_MINUTES: "15"
+
       FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
       APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
       TWELVEDATA_API_KEYS: ${{ secrets.TWELVEDATA_API_KEYS }}
@@ -21,14 +31,24 @@ jobs:
         id: timecheck
         run: |
           ISRAEL_HOUR=$(TZ="Asia/Jerusalem" date +%H)
-          echo "Israel hour now: $ISRAEL_HOUR"
-          echo "Target hour: $TARGET_HOUR_ISRAEL"
+          ISRAEL_MINUTE=$(TZ="Asia/Jerusalem" date +%M)
+
+          echo "Israel time now: $ISRAEL_HOUR:$ISRAEL_MINUTE"
+          echo "Target time: $TARGET_HOUR_ISRAEL:$TARGET_MINUTE_ISRAEL"
+          echo "Run window minutes: $RUN_WINDOW_MINUTES"
+
+          CURRENT_TOTAL=$((10#$ISRAEL_HOUR * 60 + 10#$ISRAEL_MINUTE))
+          TARGET_TOTAL=$((10#$TARGET_HOUR_ISRAEL * 60 + 10#$TARGET_MINUTE_ISRAEL))
+          WINDOW_END=$((TARGET_TOTAL + RUN_WINDOW_MINUTES))
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual run — bypassing time check"
             echo "should_run=true" >> $GITHUB_OUTPUT
-          elif [ "$ISRAEL_HOUR" = "$TARGET_HOUR_ISRAEL" ]; then
+          elif [ "$CURRENT_TOTAL" -ge "$TARGET_TOTAL" ] && [ "$CURRENT_TOTAL" -lt "$WINDOW_END" ]; then
+            echo "Inside target window — running scanner"
             echo "should_run=true" >> $GITHUB_OUTPUT
           else
+            echo "Outside target window — skipping scanner"
             echo "should_run=false" >> $GITHUB_OUTPUT
           fi
 
@@ -68,4 +88,4 @@ jobs:
 
       - name: Skip message
         if: steps.timecheck.outputs.should_run == 'false'
-        run: echo "Not target hour in Israel. Skipping scanner."
+        run: echo "Not inside target time window in Israel. Skipping scanner."
