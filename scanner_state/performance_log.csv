@@ -210,3 +210,4 @@ date_sent,ticker,pattern,entry,stop,target,score,rr,price_5d,price_10d,price_20d
 2026-06-30,DX,Falling Wedge,13.17,12.86,14.01,34.0,2.56,,,,,,,False
 2026-06-30,ITW,Falling Wedge,267.37,259.26,309.69,42.5,5.15,,,,,,,False
 2026-06-30,SWX,Falling Wedge,89.3,87.24,96.79,48.5,2.99,,,,,,,False
+2026-07-04,SYF,Falling Wedge,76.03,73.2,87.45,49.0,3.55,,,,,,,False
