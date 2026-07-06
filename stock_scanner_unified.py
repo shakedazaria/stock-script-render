@@ -99,6 +99,15 @@ def _state_path(path: str) -> str:
 
 LOGFILE = _state_path(os.getenv("LOGFILE", "stock_scanner_unified_log.txt"))
 
+# --- מניעת סריקה כפולה / סריקה ביום בלי מסחר ---
+# הקוד בודק אם יש נר יומי חדש ב-SPY שלא נסרק עדיין.
+# אם אין נר חדש — הוא מדלג על הסריקה כדי לא לשלוח התראות כפולות.
+MARKET_DAY_GUARD_ENABLED = os.getenv("MARKET_DAY_GUARD_ENABLED", "True").lower() in ("1", "true", "yes")
+SKIP_ISRAEL_WEEKENDS = os.getenv("SKIP_ISRAEL_WEEKENDS", "True").lower() in ("1", "true", "yes")
+MARKET_SCAN_SYMBOL = os.getenv("MARKET_SCAN_SYMBOL", "SPY")
+MARKET_SCAN_STATE_FILE = _state_path(os.getenv("MARKET_SCAN_STATE_FILE", "last_market_scan_date.txt"))
+FORCE_SCAN = os.getenv("FORCE_SCAN", "False").lower() in ("1", "true", "yes")
+
 API_KEYS = [
     key.strip()
     for key in os.getenv("TWELVEDATA_API_KEYS", "").split(",")
@@ -474,8 +483,13 @@ VOLUME_AVG_LOOKBACK   = int(os.getenv("VOLUME_AVG_LOOKBACK",  "20"))
 # --- כללי ---
 MIN_MARKET_CAP_USD    = float(os.getenv("MIN_MARKET_CAP_USD",  "2e9"))   # $2B
 SCAN_DELAY_SECONDS    = int(os.getenv("SCAN_DELAY_SECONDS",    "10"))
-ALERT_COOLDOWN_HOURS  = int(os.getenv("ALERT_COOLDOWN_HOURS",  "24"))
+# --- מניעת כפילויות התראות ---
+# ברירת מחדל: לא לשלוח אותו סטאפ שוב במשך 7 ימים.
+# זה מונע מצב שבו אותו סטאפ נשלח שוב יום אחרי רק כי עברו 24 שעות.
+ALERT_COOLDOWN_HOURS  = int(os.getenv("ALERT_COOLDOWN_HOURS",  "168"))
 DEDUP_ALERT_HOURS     = ALERT_COOLDOWN_HOURS
+# אם כבר יש פוזיציה פתוחה על אותו טיקר — לא שולחים עליו התראת כניסה נוספת.
+SUPPRESS_ALERTS_FOR_OPEN_POSITIONS = os.getenv("SUPPRESS_ALERTS_FOR_OPEN_POSITIONS", "True").lower() in ("1", "true", "yes")
 DEBUG_SCAN_REASONS    = os.getenv("DEBUG_SCAN_REASONS","True").lower() in ("1","true","yes")
 TOP_ALERTS_TO_SEND    = int(os.getenv("TOP_ALERTS_TO_SEND", "3"))
 
@@ -548,6 +562,15 @@ UNIVERSE_CACHE_FILE = _state_path(os.getenv("UNIVERSE_CACHE_FILE", "universe_cac
 UNIVERSE_MIN_CAP    = float(os.getenv("UNIVERSE_MIN_CAP", "1e9"))   # $1B מינימום
 UNIVERSE_MIN_PRICE  = float(os.getenv("UNIVERSE_MIN_PRICE", "5.0")) # לא פני-סטוק
 UNIVERSE_MIN_VOL    = int(os.getenv("UNIVERSE_MIN_VOL", "100000"))  # volume מינימלי
+
+# --- Universe refresh policy ---
+# ברירת המחדל החדשה: בכל ריצה מנסים לבנות Universe חדש מהאינטרנט.
+# universe_cache.json הוא גיבוי בלבד, ומשמש רק אם הבנייה החדשה נכשלה או יצאה קטנה מדי.
+UNIVERSE_ALWAYS_REFRESH      = os.getenv("UNIVERSE_ALWAYS_REFRESH", "True").lower() in ("1", "true", "yes")
+UNIVERSE_REQUIRE_MARKET_CAP  = os.getenv("UNIVERSE_REQUIRE_MARKET_CAP", "True").lower() in ("1", "true", "yes")
+UNIVERSE_MIN_RAW_ROWS        = int(os.getenv("UNIVERSE_MIN_RAW_ROWS", "4000"))
+UNIVERSE_MIN_FRESH_TICKERS   = int(os.getenv("UNIVERSE_MIN_FRESH_TICKERS", "1200"))
+UNIVERSE_MIN_CACHE_TICKERS   = int(os.getenv("UNIVERSE_MIN_CACHE_TICKERS", "500"))
 
 
 def _parse_market_number(value) -> float | None:
@@ -633,62 +656,139 @@ def _fetch_exchange_tickers(exchange: str) -> list[str]:
     return symbols
 
 
-def build_universe(force_refresh: bool = False) -> list[str]:
+def _get_universe_cache() -> tuple[list[str], dict]:
+    """טוען universe_cache.json כגיבוי בלבד. לא משתמש בו כמקור ראשי."""
+    try:
+        if not os.path.exists(UNIVERSE_CACHE_FILE):
+            return [], {}
+        with open(UNIVERSE_CACHE_FILE, "r", encoding="utf-8") as f:
+            cached = json.load(f)
+        cached_tickers = cached.get("tickers", []) if isinstance(cached, dict) else []
+        clean = []
+        seen = set()
+        for t in cached_tickers:
+            sym = str(t).strip().upper().replace("$", "")
+            if sym and sym.isalpha() and len(sym) <= 5 and sym not in seen:
+                seen.add(sym)
+                clean.append(sym)
+        return clean, cached if isinstance(cached, dict) else {}
+    except Exception as e:
+        log(f"Universe cache read error: {e}")
+        return [], {}
+
+
+def _save_universe_cache(tickers_list: list[str], meta: dict) -> None:
+    """שומר את ה-Universe האחרון שהצליח, כדי שישמש גיבוי בריצה הבאה."""
+    try:
+        parent = os.path.dirname(UNIVERSE_CACHE_FILE)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        cache_data = {
+            "date": datetime.now().isoformat(),
+            "tickers": tickers_list,
+            **(meta or {}),
+        }
+        with open(UNIVERSE_CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(cache_data, f, indent=2)
+        log(f"💾 Universe cache updated: {len(tickers_list)} tickers → {UNIVERSE_CACHE_FILE}")
+    except Exception as e:
+        log(f"Universe cache save error: {e}")
+
+
+def _is_probably_common_stock_row(row: dict) -> tuple[bool, str]:
     """
-    מוריד את כל מניות NASDAQ + NYSE ומסנן לפי Market Cap/Price מתוך NASDAQ screener.
-
-    שינוי חשוב:
-    לא משתמש יותר ב-yf.Ticker(sym).info על אלפי מניות, כי זה גורם לחסימות/חוסר נתונים.
-    אם Market Cap לא זמין — לא פוסלים את המניה; היא תעבור לשלבים הבאים.
+    מסנן מוצרים שהם בדרך כלל לא מניות רגילות: ETF/קרנות/Preferred/Warrants/Units/Notes.
+    המטרה היא Universe נקי יותר של מניות רגילות מעל $1B.
     """
-    # בדוק cache
-    if not force_refresh and os.path.exists(UNIVERSE_CACHE_FILE):
-        try:
-            with open(UNIVERSE_CACHE_FILE) as f:
-                cached = json.load(f)
-            # cache תקף שבוע
-            saved_date = datetime.fromisoformat(cached.get("date","2000-01-01")).date()
-            if (datetime.now().date() - saved_date).days < 7:
-                tickers_cached = cached.get("tickers", [])
-                log(f"📋 Universe loaded from cache: {len(tickers_cached)} tickers (date: {saved_date})")
-                return tickers_cached
-        except Exception:
-            pass
+    try:
+        text_parts = []
+        for k in (
+            "name", "companyName", "companyname", "securityName", "securityname",
+            "assetClass", "assetclass", "instrumentType", "instrumenttype",
+        ):
+            v = row.get(k)
+            if v:
+                text_parts.append(str(v))
+        txt = " ".join(text_parts).lower()
 
-    log("🌐 Building universe — downloading NASDAQ + NYSE rows...")
+        bad_phrases = (
+            " exchange traded fund", " etf", "etf ",
+            " exchange traded note", " etn", "etn ",
+            "closed end", "closed-end", "closed end fund", "closed-end fund",
+            "mutual fund", "index fund", "income fund", "bond fund",
+            "preferred", "preference", "depositary share", "depositary shares",
+            "warrant", "warrants", " right", " rights", " unit", " units",
+            "notes due", "senior notes", "subordinated notes", "baby bond", "debenture",
+        )
+        if any(p in txt for p in bad_phrases):
+            return False, "fund_etf_preferred_unit_note"
 
-    # שלב 1: הורד rows מלאים מה-NASDAQ screener
+        # קרנות סגורות רבות מופיעות כ-Trust בלי מילת Fund. לא נפסול REIT רגיל לפי Trust בלבד,
+        # אבל כן נפסול שילובים נפוצים של קרנות השקעה.
+        trust_fund_managers = (
+            "blackrock", "nuveen", "eaton vance", "pimco", "abrdn", "aberdeen",
+            "gabelli", "guggenheim", "invesco", "virtus", "cohen & steers", "mfs ",
+            "calamos", "flaherty", "first trust", "clearbridge", "tekla",
+        )
+        if "trust" in txt and any(m in txt for m in trust_fund_managers):
+            return False, "closed_end_trust"
+
+        return True, "common_stock_like"
+    except Exception:
+        return True, "classification_error_allowed"
+
+
+def _build_fresh_universe_from_screener() -> tuple[list[str], dict]:
+    """בונה Universe חדש מהאינטרנט, בלי להשתמש בקאש."""
+    log("🌐 Building fresh universe — downloading NASDAQ + NYSE rows...")
+
     nasdaq_rows = _fetch_exchange_rows("NASDAQ")
     nyse_rows   = _fetch_exchange_rows("NYSE")
     all_rows    = nasdaq_rows + nyse_rows
+
+    meta = {
+        "source": "fresh_nasdaq_screener",
+        "total_rows": len(all_rows),
+        "nasdaq_rows": len(nasdaq_rows),
+        "nyse_rows": len(nyse_rows),
+        "passed": 0,
+        "failed": 0,
+        "filtered_market_cap": 0,
+        "filtered_price": 0,
+        "filtered_not_common_stock": 0,
+        "filtered_bad_symbol": 0,
+        "unknown_market_cap_rejected": 0,
+        "unknown_price_passed": 0,
+    }
+
     log(f"   Raw rows: {len(nasdaq_rows)} NASDAQ + {len(nyse_rows)} NYSE = {len(all_rows)} total")
+    log(
+        f"   Filtering: common stocks only | market cap >= ${UNIVERSE_MIN_CAP/1e9:.0f}B "
+        f"| price >= ${UNIVERSE_MIN_PRICE:.0f}"
+    )
 
-    if not all_rows:
-        log("⚠️ FALLBACK MODE — NASDAQ API נכשל, סורק רק 66 מניות! בדוק חיבור לאינטרנט.")
-        return _FALLBACK_TICKERS
-
-    log(f"   Filtering by NASDAQ row data: market cap > ${UNIVERSE_MIN_CAP/1e9:.0f}B, price > ${UNIVERSE_MIN_PRICE:.0f}")
     passed: list[str] = []
     seen: set[str] = set()
 
-    failed = 0
-    filtered_market_cap = 0
-    filtered_price = 0
-    unknown_market_cap = 0
-    unknown_price = 0
-
     for i, row in enumerate(all_rows):
         try:
-            sym = (row.get("symbol") or "").strip().upper()
-            # דלג על preferred/warrants וסימולים עם נקודה/מקף כדי להפחית שגיאות API
+            sym = (row.get("symbol") or "").strip().upper().replace("$", "")
+
+            # מניות רגילות בלבד — בלי preferred/warrants/symbols עם סימנים מיוחדים.
             if not sym or not sym.isalpha() or len(sym) > 5:
-                failed += 1
+                meta["filtered_bad_symbol"] += 1
+                meta["failed"] += 1
                 continue
             if sym in seen:
                 continue
             seen.add(sym)
 
-            # NASDAQ screener בדרך כלל מחזיר marketCap + lastsale.
+            is_common, common_reason = _is_probably_common_stock_row(row)
+            if not is_common:
+                meta["filtered_not_common_stock"] += 1
+                meta["failed"] += 1
+                continue
+
             mc = _parse_market_number(
                 row.get("marketCap")
                 or row.get("marketcap")
@@ -703,57 +803,100 @@ def build_universe(force_refresh: bool = False) -> list[str]:
                 or row.get("previousClose")
             )
 
-            # אם יש Market Cap והוא נמוך — פוסלים. אם אין נתון — לא פוסלים.
-            if mc is not None and mc < UNIVERSE_MIN_CAP:
-                filtered_market_cap += 1
-                failed += 1
+            # עכשיו ברירת המחדל קשוחה יותר: אם אין Market Cap — לא מכניסים לרשימה.
+            # אם NASDAQ לא מחזיר Market Cap למספיק מניות, הרשימה תיחשב לא תקינה ונשתמש בקאש.
+            if mc is None and UNIVERSE_REQUIRE_MARKET_CAP:
+                meta["unknown_market_cap_rejected"] += 1
+                meta["failed"] += 1
                 continue
-            if price is not None and price < UNIVERSE_MIN_PRICE:
-                filtered_price += 1
-                failed += 1
+            if mc is not None and mc < UNIVERSE_MIN_CAP:
+                meta["filtered_market_cap"] += 1
+                meta["failed"] += 1
                 continue
 
-            if mc is None:
-                unknown_market_cap += 1
+            if price is not None and price < UNIVERSE_MIN_PRICE:
+                meta["filtered_price"] += 1
+                meta["failed"] += 1
+                continue
             if price is None:
-                unknown_price += 1
+                meta["unknown_price_passed"] += 1
 
             passed.append(sym)
 
         except Exception:
-            failed += 1
+            meta["failed"] += 1
 
         if (i + 1) % 500 == 0 or (i + 1) == len(all_rows):
             log(f"   Progress: {i+1}/{len(all_rows)} rows — passed so far: {len(passed)}")
 
-    if not passed:
-        log("⚠️ Universe filter returned 0 tickers — using fallback list.")
-        return _FALLBACK_TICKERS
+    meta["passed"] = len(passed)
+    return passed, meta
 
-    # שמור cache
-    try:
-        cache_data = {
-            "date":    datetime.now().isoformat(),
-            "tickers": passed,
-            "total_rows": len(all_rows),
-            "passed": len(passed),
-            "failed": failed,
-            "filtered_market_cap": filtered_market_cap,
-            "filtered_price": filtered_price,
-            "unknown_market_cap_passed": unknown_market_cap,
-            "unknown_price_passed": unknown_price,
-            "source": "nasdaq_screener_no_yfinance_info",
-        }
-        with open(UNIVERSE_CACHE_FILE, "w") as f:
-            json.dump(cache_data, f, indent=2)
-        log(f"💾 Universe cache saved: {len(passed)} tickers → {UNIVERSE_CACHE_FILE}")
-    except Exception as e:
-        log(f"Universe cache save error: {e}")
 
-    log(f"✅ Universe built: {len(passed)} tickers passed out of {len(all_rows)} rows")
-    log(f"   Filtered: market_cap={filtered_market_cap}, price={filtered_price}, unknown_mc_passed={unknown_market_cap}, unknown_price_passed={unknown_price}")
-    return passed
+def _fresh_universe_is_healthy(tickers_list: list[str], meta: dict) -> tuple[bool, str]:
+    """בדיקת בטיחות: אם הבנייה החדשה יצאה קטנה/חסרה מדי — לא משתמשים בה."""
+    raw_rows = int(meta.get("total_rows", 0) or 0)
+    passed = len(tickers_list)
 
+    if raw_rows < UNIVERSE_MIN_RAW_ROWS:
+        return False, f"raw rows too low ({raw_rows} < {UNIVERSE_MIN_RAW_ROWS})"
+    if passed < UNIVERSE_MIN_FRESH_TICKERS:
+        return False, f"fresh universe too small ({passed} < {UNIVERSE_MIN_FRESH_TICKERS})"
+    if passed <= 0:
+        return False, "fresh universe is empty"
+    return True, "fresh universe healthy"
+
+
+def build_universe(force_refresh: bool = False) -> list[str]:
+    """
+    בונה Universe חדש בכל ריצה.
+
+    שיטה חדשה:
+      1) קודם מנסים לבנות רשימה חדשה מהאינטרנט.
+      2) אם הרשימה החדשה בריאה — משתמשים בה ומעדכנים universe_cache.json.
+      3) אם הבנייה נכשלה / הרשימה קטנה מדי — משתמשים ב-cache האחרון כגיבוי.
+      4) רק אם אין cache תקין — משתמשים ברשימת fallback קטנה.
+    """
+    cached_tickers, cached_meta = _get_universe_cache()
+    if cached_tickers:
+        cache_date = str(cached_meta.get("date", "unknown"))[:10]
+        log(f"📋 Universe cache available as fallback: {len(cached_tickers)} tickers (date: {cache_date})")
+    else:
+        log("📋 No universe cache available — fresh build is required")
+
+    # במקרה מיוחד בלבד אפשר להחזיר cache קודם דרך env, אבל ברירת המחדל היא לבנות חדש בכל ריצה.
+    use_cache_first = (not UNIVERSE_ALWAYS_REFRESH) or os.getenv("UNIVERSE_USE_CACHE_FIRST", "False").lower() in ("1", "true", "yes")
+    if use_cache_first and not force_refresh and cached_tickers:
+        log(f"📋 UNIVERSE SOURCE: cache first mode ({len(cached_tickers)} tickers)")
+        return cached_tickers
+
+    fresh_tickers, fresh_meta = _build_fresh_universe_from_screener()
+    healthy, reason = _fresh_universe_is_healthy(fresh_tickers, fresh_meta)
+
+    log(
+        "📊 Universe rebuild report: "
+        f"raw={fresh_meta.get('total_rows', 0)}, "
+        f"passed={len(fresh_tickers)}, "
+        f"market_cap_rejected={fresh_meta.get('filtered_market_cap', 0)}, "
+        f"unknown_mc_rejected={fresh_meta.get('unknown_market_cap_rejected', 0)}, "
+        f"not_common_stock={fresh_meta.get('filtered_not_common_stock', 0)}, "
+        f"bad_symbol={fresh_meta.get('filtered_bad_symbol', 0)}, "
+        f"price_rejected={fresh_meta.get('filtered_price', 0)}"
+    )
+
+    if healthy:
+        _save_universe_cache(fresh_tickers, fresh_meta)
+        log(f"✅ UNIVERSE SOURCE: fresh rebuild ({len(fresh_tickers)} tickers) — cache updated")
+        return fresh_tickers
+
+    log(f"⚠️ Fresh universe not healthy: {reason}")
+    if len(cached_tickers) >= UNIVERSE_MIN_CACHE_TICKERS:
+        log(f"📋 UNIVERSE SOURCE: cache fallback ({len(cached_tickers)} tickers)")
+        return cached_tickers
+
+    log("⚠️ Cache fallback missing or too small — using emergency fallback tickers")
+    log(f"📋 UNIVERSE SOURCE: emergency fallback ({len(_FALLBACK_TICKERS)} tickers)")
+    return _FALLBACK_TICKERS
 
 # רשימת fallback — אם ה-API נכשל לגמרי
 _FALLBACK_TICKERS = [
@@ -865,6 +1008,91 @@ def _save_json(path: str, data) -> None:
             json.dump(data, f, ensure_ascii=False, indent=2, default=str)
     except Exception as e:
         log(f"_save_json error {path}: {e}")
+
+
+def _is_israel_weekend_now() -> bool:
+    """מחזיר True בשבת/ראשון לפי שעון ישראל."""
+    try:
+        from zoneinfo import ZoneInfo
+        weekday = datetime.now(ZoneInfo("Asia/Jerusalem")).weekday()
+    except Exception:
+        # fallback פשוט אם zoneinfo לא זמין
+        weekday = (datetime.utcnow() + timedelta(hours=3)).weekday()
+    return weekday in (5, 6)  # שבת=5, ראשון=6
+
+
+def get_latest_market_session_date(symbol: str = MARKET_SCAN_SYMBOL) -> str | None:
+    """
+    מזהה את יום המסחר האחרון לפי הנר היומי האחרון של SPY.
+    לא משתמשים בלוח חגים ידני — אם אין נר חדש, אין סריקה חדשה.
+    """
+    try:
+        df = yf.download(
+            symbol,
+            period="10d",
+            interval="1d",
+            progress=False,
+            auto_adjust=True,
+            threads=False,
+            timeout=15,
+        )
+        if df is None or df.empty:
+            return None
+        last_idx = pd.to_datetime(df.index[-1])
+        return last_idx.date().isoformat()
+    except Exception as e:
+        log(f"Market day guard error while checking {symbol}: {e}")
+        return None
+
+
+def load_last_market_scan_date() -> str:
+    try:
+        if os.path.exists(MARKET_SCAN_STATE_FILE):
+            return open(MARKET_SCAN_STATE_FILE, "r", encoding="utf-8").read().strip()
+    except Exception as e:
+        log(f"load_last_market_scan_date error: {e}")
+    return ""
+
+
+def save_last_market_scan_date(market_date: str | None) -> None:
+    if not market_date:
+        return
+    try:
+        parent = os.path.dirname(MARKET_SCAN_STATE_FILE)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        with open(MARKET_SCAN_STATE_FILE, "w", encoding="utf-8") as f:
+            f.write(str(market_date).strip())
+        log(f"💾 Market scan date saved: {market_date}")
+    except Exception as e:
+        log(f"save_last_market_scan_date error: {e}")
+
+
+def should_run_for_new_market_session() -> tuple[bool, str | None, str]:
+    """
+    מחליט אם להתחיל סריקה.
+    מחזיר: (should_run, market_date, reason)
+    """
+    if FORCE_SCAN:
+        return True, None, "FORCE_SCAN=True — bypass market day guard"
+
+    if not MARKET_DAY_GUARD_ENABLED:
+        return True, None, "MARKET_DAY_GUARD_ENABLED=False — guard disabled"
+
+    if SKIP_ISRAEL_WEEKENDS and _is_israel_weekend_now():
+        return False, None, "שבת/ראשון לפי שעון ישראל — מדלג כדי לא לסרוק ביום בלי מסחר"
+
+    latest_market_date = get_latest_market_session_date(MARKET_SCAN_SYMBOL)
+    if not latest_market_date:
+        # אם לא הצלחנו לבדוק — לא חוסמים את הסריקה, כדי לא לפספס יום מסחר בגלל תקלה זמנית.
+        return True, None, "לא הצלחתי לזהות יום מסחר אחרון — ממשיך כדי לא לפספס סריקה"
+
+    last_scanned = load_last_market_scan_date()
+    if last_scanned == latest_market_date:
+        return False, latest_market_date, f"אין נר מסחר חדש מאז הסריקה האחרונה ({latest_market_date})"
+
+    return True, latest_market_date, f"נר מסחר חדש זוהה: {latest_market_date} (נסרק קודם: {last_scanned or 'אף פעם'})"
+
 
 def load_progress() -> dict:
     return _load_json(PROGRESS_FILE) or {"current_key": 0, "start_index": 0}
@@ -2685,6 +2913,13 @@ def alert_already_sent(ticker: str, pattern_name: str, break_level,
         key  = f"{ticker}|{pattern_name}|{norm}"
         if key in recent_sent:
             return True
+        if SUPPRESS_ALERTS_FOR_OPEN_POSITIONS:
+            try:
+                if is_position_open(ticker):
+                    log(f"{ticker}: duplicate alert suppressed — open position already exists")
+                    return True
+            except Exception as e:
+                log(f"open-position dedup check error for {ticker}: {e}")
         # dedup key style 2 (מקובץ 2)
         if break_level and ALERT_DEDUP_LEVEL_PCT > 0:
             bucket = int(float(break_level) / max(float(break_level) * ALERT_DEDUP_LEVEL_PCT, 1e-9))
@@ -3411,6 +3646,24 @@ def _load_positions() -> list[dict]:
     except Exception:
         pass
     return []
+
+
+
+def is_position_open(ticker: str) -> bool:
+    """בודק אם כבר קיימת פוזיציה פתוחה על הטיקר, כדי לא לשלוח התראת כניסה כפולה."""
+    try:
+        symbol = str(ticker or "").strip().upper().replace("$", "")
+        if not symbol:
+            return False
+        positions = _load_positions()
+        for p in positions:
+            if not isinstance(p, dict):
+                continue
+            if str(p.get("ticker", "")).strip().upper().replace("$", "") == symbol and not p.get("closed", False):
+                return True
+    except Exception as e:
+        log(f"is_position_open error for {ticker}: {e}")
+    return False
 
 
 def _save_positions(positions: list[dict]) -> None:
@@ -5850,6 +6103,18 @@ def main() -> None:
     except Exception:
         pass
 
+    # ── Market Day Guard — לא לסרוק אם אין נר מסחר חדש ─────
+    market_session_date = None
+    try:
+        should_run_market, market_session_date, market_guard_reason = should_run_for_new_market_session()
+        log(f"🗓️ Market Day Guard: {market_guard_reason}")
+        if not should_run_market:
+            log("⏸️ No new market session — exiting before scan to prevent duplicate alerts.")
+            return
+    except Exception as e:
+        log(f"Market Day Guard failed — continuing scan: {e}")
+        market_session_date = None
+
     # ── טען פרמטרים שנלמדו מריצות קודמות ──────────────────
     _apply_learned_params()
 
@@ -5914,6 +6179,10 @@ def main() -> None:
             )
         except Exception as e:
             log(f"Daily summary email error while skipping BEAR market: {e}")
+        try:
+            save_last_market_scan_date(market_session_date)
+        except Exception as e:
+            log(f"Market scan date save error while skipping BEAR market: {e}")
         return
 
     # ── ציון מינימלי דינמי לפי מצב השוק ─────────────────────
@@ -6072,6 +6341,11 @@ def main() -> None:
             log(f"🧠 Self-learning scheduled for Saturday ({days_left} days away)")
     except Exception as e:
         log(f"Self-learning error: {e}")
+
+    try:
+        save_last_market_scan_date(market_session_date)
+    except Exception as e:
+        log(f"Market scan date save error: {e}")
 
     log("Stock Scanner Unified — DONE")
     log("=" * 60)
