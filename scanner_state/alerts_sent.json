@@ -12390,5 +12390,21 @@
       }
     ]
   },
-  "PCG_Falling Wedge_66": "2026-07-07T04:39:51.408388"
+  "PCG_Falling Wedge_66": "2026-07-07T04:39:51.408388",
+  "MHK": {
+    "time": 1783485703.986756,
+    "patterns": [
+      {
+        "name": "Double Bottom",
+        "level": 112.76,
+        "time": 1783485703.981847
+      },
+      {
+        "name": "Double Bottom",
+        "level": 112.76,
+        "time": 1783485703.986756
+      }
+    ]
+  },
+  "MHK_Double Bottom_66": "2026-07-08T04:41:43.986758"
 }

@@ -213,3 +213,5 @@ date_sent,ticker,pattern,entry,stop,target,score,rr,price_5d,price_10d,price_20d
 2026-07-04,SYF,Falling Wedge,76.03,73.2,87.45,49.0,3.55,,,,,,,False
 2026-07-05,SYF,Falling Wedge,76.03,73.2,87.45,49.0,3.55,,,,,,,False
 2026-07-07,PCG,Falling Wedge,16.74,16.25,18.57,46.0,3.08,,,,,,,False
+2026-07-08,MHK,Double Bottom,112.76,105.76,136.9,58.0,3.37,,,,,,,False
+2026-07-08,MHK,Double Bottom,112.76,105.76,136.9,59.0,3.37,,,,,,,False
