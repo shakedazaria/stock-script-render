@@ -1984,7 +1984,7 @@
     "pattern": "Falling Wedge",
     "entry": 30.40837837837838,
     "stop_initial": 29.507607142857143,
-    "stop_current": 30.29,
+    "stop_current": 30.3,
     "target": 33.13,
     "date_open": "2026-06-30",
     "highest_price": 31.280000686645508,
@@ -2044,7 +2044,7 @@
     "pattern": "Falling Wedge",
     "entry": 79.06617647058823,
     "stop_initial": 75.68001050000001,
-    "stop_current": 81.51,
+    "stop_current": 81.57,
     "target": 92.59,
     "date_open": "2026-06-30",
     "highest_price": 85.41000366210938,
@@ -2078,11 +2078,11 @@
     "target": 109.910001,
     "date_open": "2026-06-30",
     "highest_price": 100.83999633789062,
-    "closed": false,
-    "close_reason": null,
-    "close_price": null,
-    "close_date": null,
-    "pnl_pct": null
+    "closed": true,
+    "close_reason": "\ud83d\uded1 \u05e4\u05d2\u05e2 \u05d1-Stop Loss (97.61 \u2264 97.94)",
+    "close_price": 97.61000061035156,
+    "close_date": "2026-07-09",
+    "pnl_pct": -1.92
   },
   {
     "ticker": "NKTR",
@@ -2093,11 +2093,11 @@
     "target": 93.09,
     "date_open": "2026-06-30",
     "highest_price": 74.9000015258789,
-    "closed": false,
-    "close_reason": null,
-    "close_price": null,
-    "close_date": null,
-    "pnl_pct": null
+    "closed": true,
+    "close_reason": "\ud83d\udcc9 \u05d9\u05e8\u05d3 \u05de\u05ea\u05d7\u05ea \u05dc-Low \u05d0\u05ea\u05de\u05d5\u05dc (71.90 < 73.15) | \u05e8\u05d5\u05d5\u05d7: +10.2%",
+    "close_price": 71.9000015258789,
+    "close_date": "2026-07-09",
+    "pnl_pct": 10.24
   },
   {
     "ticker": "DX",
@@ -2108,11 +2108,11 @@
     "target": 14.01,
     "date_open": "2026-06-30",
     "highest_price": 13.239999771118164,
-    "closed": false,
-    "close_reason": null,
-    "close_price": null,
-    "close_date": null,
-    "pnl_pct": null
+    "closed": true,
+    "close_reason": "\ud83d\udcc9 \u05d9\u05e8\u05d3 \u05de\u05ea\u05d7\u05ea \u05dc-Low \u05d0\u05ea\u05de\u05d5\u05dc (13.02 < 13.09) | \u05e8\u05d5\u05d5\u05d7: -1.2%",
+    "close_price": 13.020000457763672,
+    "close_date": "2026-07-09",
+    "pnl_pct": -1.17
   },
   {
     "ticker": "ITW",
@@ -2134,7 +2134,7 @@
     "pattern": "Falling Wedge",
     "entry": 89.30264705882352,
     "stop_initial": 87.23857110714286,
-    "stop_current": 88.57,
+    "stop_current": 88.63,
     "target": 96.79,
     "date_open": "2026-06-30",
     "highest_price": 91.08999633789062,
@@ -2164,7 +2164,7 @@
     "pattern": "Falling Wedge",
     "entry": 16.741071428571427,
     "stop_initial": 16.252142857142857,
-    "stop_current": 16.62,
+    "stop_current": 16.64,
     "target": 18.57,
     "date_open": "2026-07-07",
     "highest_price": 17.18000030517578,
@@ -2183,10 +2183,10 @@
     "target": 136.89999,
     "date_open": "2026-07-08",
     "highest_price": 112.76,
-    "closed": false,
-    "close_reason": null,
-    "close_price": null,
-    "close_date": null,
-    "pnl_pct": null
+    "closed": true,
+    "close_reason": "\u26a0\ufe0f \u05d9\u05e8\u05d3 \u05de\u05ea\u05d7\u05ea \u05dc-EMA28 (107.52)",
+    "close_price": 107.5199966430664,
+    "close_date": "2026-07-09",
+    "pnl_pct": -4.65
   }
 ]
