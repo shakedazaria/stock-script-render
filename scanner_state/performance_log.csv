@@ -210,7 +210,7 @@ date_sent,ticker,pattern,entry,stop,target,score,rr,price_5d,price_10d,price_20d
 2026-06-30,DX,Falling Wedge,13.17,12.86,14.01,34.0,2.56,13.24,,,OPEN (+0.5%),,,False
 2026-06-30,ITW,Falling Wedge,267.37,259.26,309.69,42.5,5.15,274.27,,,OPEN (+2.6%),,,False
 2026-06-30,SWX,Falling Wedge,89.3,87.24,96.79,48.5,2.99,88.66,,,OPEN (-0.7%),,,False
-2026-07-04,SYF,Falling Wedge,76.03,73.2,87.45,49.0,3.55,,,,,,,False
+2026-07-04,SYF,Falling Wedge,76.03,73.2,87.45,49.0,3.55,71.57,,,LOSS (-5.9%),,,False
 2026-07-05,SYF,Falling Wedge,76.03,73.2,87.45,49.0,3.55,,,,,,,False
 2026-07-07,PCG,Falling Wedge,16.74,16.25,18.57,46.0,3.08,,,,,,,False
 2026-07-08,MHK,Double Bottom,112.76,105.76,136.9,58.0,3.37,,,,,,,False
