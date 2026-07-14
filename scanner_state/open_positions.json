@@ -1984,7 +1984,7 @@
     "pattern": "Falling Wedge",
     "entry": 30.40837837837838,
     "stop_initial": 29.507607142857143,
-    "stop_current": 30.51,
+    "stop_current": 30.59,
     "target": 33.13,
     "date_open": "2026-06-30",
     "highest_price": 31.3799991607666,
@@ -2134,10 +2134,10 @@
     "pattern": "Falling Wedge",
     "entry": 89.30264705882352,
     "stop_initial": 87.23857110714286,
-    "stop_current": 89.51,
+    "stop_current": 90.42,
     "target": 96.79,
     "date_open": "2026-06-30",
-    "highest_price": 91.81999969482422,
+    "highest_price": 92.8499984741211,
     "closed": false,
     "close_reason": null,
     "close_price": null,
@@ -2188,5 +2188,20 @@
     "close_price": 107.5199966430664,
     "close_date": "2026-07-09",
     "pnl_pct": -4.65
+  },
+  {
+    "ticker": "SRE",
+    "pattern": "Falling Wedge",
+    "entry": 93.381818,
+    "stop_initial": 91.17178582142857,
+    "stop_current": 91.17178582142857,
+    "target": 102.540001,
+    "date_open": "2026-07-14",
+    "highest_price": 93.381818,
+    "closed": false,
+    "close_reason": null,
+    "close_price": null,
+    "close_date": null,
+    "pnl_pct": null
   }
 ]
