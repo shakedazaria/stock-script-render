@@ -41887,3 +41887,2831 @@
 [2026-07-21 04:55:31] 💾 Market scan date saved: 2026-07-20
 [2026-07-21 04:55:31] Stock Scanner Unified — DONE
 [2026-07-21 04:55:31] ============================================================
+[2026-07-22 04:27:24] ============================================================
+[2026-07-22 04:27:24] Stock Scanner Unified — START
+[2026-07-22 04:27:24] ============================================================
+[2026-07-22 04:27:25] 🗓️ Market Day Guard: נר מסחר חדש זוהה: 2026-07-21 (נסרק קודם: 2026-07-20)
+[2026-07-22 04:27:28] Performance log updated: scanner_state/performance_log.csv
+[2026-07-22 04:27:28] 📭 Positions status: no open positions.
+[2026-07-22 04:27:28] 🌐 Loading universe (first run or no cache)...
+[2026-07-22 04:27:28] 📋 Universe cache available as fallback: 2385 tickers (date: 2026-07-21)
+[2026-07-22 04:27:28] 🌐 Building fresh universe — downloading NASDAQ + NYSE rows...
+[2026-07-22 04:27:33]    Raw rows: 4150 NASDAQ + 2715 NYSE = 6865 total
+[2026-07-22 04:27:33]    Filtering: common stocks only | market cap >= $1B | price >= $5
+[2026-07-22 04:27:33]    Progress: 500/6865 rows — passed so far: 439
+[2026-07-22 04:27:33]    Progress: 1000/6865 rows — passed so far: 860
+[2026-07-22 04:27:33]    Progress: 4500/6865 rows — passed so far: 1334
+[2026-07-22 04:27:33]    Progress: 5000/6865 rows — passed so far: 1786
+[2026-07-22 04:27:33]    Progress: 5500/6865 rows — passed so far: 2227
+[2026-07-22 04:27:33] 📊 Universe rebuild report: raw=6865, passed=2397, market_cap_rejected=2338, unknown_mc_rejected=386, not_common_stock=1319, bad_symbol=382, price_rejected=43
+[2026-07-22 04:27:33] 💾 Universe cache updated: 2397 tickers → scanner_state/universe_cache.json
+[2026-07-22 04:27:33] ✅ UNIVERSE SOURCE: fresh rebuild (2397 tickers) — cache updated
+[2026-07-22 04:27:33] ✅ הגדרות: 7 API keys, 2397 טיקרים (universe), MIN_SCORE=45.0
+[2026-07-22 04:27:33] 🌊 Building sector rotation map...
+[2026-07-22 04:27:38] 🌊 Sector Rotation: HOT=['Energy', 'Healthcare', 'Real Estate'] | COLD/FROZEN=['Technology', 'Consumer Cyclical', 'Industrials', 'Basic Materials', 'Communication Services']
+[2026-07-22 04:27:38] 🌍 🟢 Market Regime: BULL | SPY +0.6% vs MA50
+[2026-07-22 04:27:38] 🎯 MIN_ALERT_SCORE דינמי: 55.0 (Regime=BULL)
+[2026-07-22 04:27:38] ============================================================
+[2026-07-22 04:27:38] 🔍 Market Reversal Detector — בודק סיגנלי היפוך שוק...
+[2026-07-22 04:27:40]    ❌ VIX: 17.0 (מתחת ל-30)
+[2026-07-22 04:27:40]    ❌ Fear & Greed: 33/100 (Fear)
+[2026-07-22 04:27:40]    ❌ SPY vs MA200: +7.8% (תקין)
+[2026-07-22 04:27:40]    ❌ SPY: 2 ימים אדומים ברצף (-0.3% ירידה)
+[2026-07-22 04:27:40]    📊 סיגנלים פעילים: 0/4
+[2026-07-22 04:27:40]    🔄 זוהה שינוי כיוון! SPY +0.4% מ-EMA28 | חצה מעל!
+[2026-07-22 04:27:40] 🔄 שולח התראת שינוי כיוון שוק...
+[2026-07-22 04:27:42] 📧 Reversal email sent: 🔄 שינוי כיוון שוק מתחיל — 22/07/2026
+[2026-07-22 04:27:42] ============================================================
+[2026-07-22 04:27:42] ⚡ מריץ Pre-filter...
+[2026-07-22 04:27:42] ⚡ Pre-filter: בודק 2397 מניות לפי EMA28...
+[2026-07-22 04:27:42] ⚡ Pre-filter settings: batch=50, retries=3, threads=False
+[2026-07-22 04:27:42]    Downloading prefilter batch 1-50 / 2397 | attempt 1
+[2026-07-22 04:28:01]    Pre-filter: 50/2397 — עברו: 15 | נכשלו: 35
+[2026-07-22 04:28:01]    Downloading prefilter batch 51-100 / 2397 | attempt 1
+[2026-07-22 04:28:20]    Pre-filter: 100/2397 — עברו: 30 | נכשלו: 70
+[2026-07-22 04:28:20]    Downloading prefilter batch 101-150 / 2397 | attempt 1
+[2026-07-22 04:28:38]    Pre-filter: 150/2397 — עברו: 43 | נכשלו: 107
+[2026-07-22 04:28:38]    Downloading prefilter batch 151-200 / 2397 | attempt 1
+[2026-07-22 04:28:56]    Pre-filter: 200/2397 — עברו: 57 | נכשלו: 143
+[2026-07-22 04:28:56]    Downloading prefilter batch 201-250 / 2397 | attempt 1
+[2026-07-22 04:29:15]    Pre-filter: 250/2397 — עברו: 73 | נכשלו: 177
+[2026-07-22 04:29:15]    Downloading prefilter batch 251-300 / 2397 | attempt 1
+[2026-07-22 04:29:34]    Pre-filter: 300/2397 — עברו: 91 | נכשלו: 209
+[2026-07-22 04:29:34]    Downloading prefilter batch 301-350 / 2397 | attempt 1
+[2026-07-22 04:29:53]    Pre-filter: 350/2397 — עברו: 105 | נכשלו: 245
+[2026-07-22 04:29:53]    Downloading prefilter batch 351-400 / 2397 | attempt 1
+[2026-07-22 04:30:11]    Pre-filter: 400/2397 — עברו: 118 | נכשלו: 282
+[2026-07-22 04:30:11]    Downloading prefilter batch 401-450 / 2397 | attempt 1
+[2026-07-22 04:30:29]    Pre-filter: 450/2397 — עברו: 127 | נכשלו: 323
+[2026-07-22 04:30:29]    Downloading prefilter batch 451-500 / 2397 | attempt 1
+[2026-07-22 04:30:47]    Pre-filter: 500/2397 — עברו: 144 | נכשלו: 356
+[2026-07-22 04:30:47]    Downloading prefilter batch 501-550 / 2397 | attempt 1
+[2026-07-22 04:31:06]    Pre-filter: 550/2397 — עברו: 162 | נכשלו: 388
+[2026-07-22 04:31:06]    Downloading prefilter batch 551-600 / 2397 | attempt 1
+[2026-07-22 04:31:27]    Pre-filter: 600/2397 — עברו: 173 | נכשלו: 427
+[2026-07-22 04:31:27]    Downloading prefilter batch 601-650 / 2397 | attempt 1
+[2026-07-22 04:31:45]    Pre-filter: 650/2397 — עברו: 182 | נכשלו: 468
+[2026-07-22 04:31:45]    Downloading prefilter batch 651-700 / 2397 | attempt 1
+[2026-07-22 04:32:04]    Pre-filter: 700/2397 — עברו: 192 | נכשלו: 508
+[2026-07-22 04:32:04]    Downloading prefilter batch 701-750 / 2397 | attempt 1
+[2026-07-22 04:32:23]    Pre-filter: 750/2397 — עברו: 200 | נכשלו: 550
+[2026-07-22 04:32:23]    Downloading prefilter batch 751-800 / 2397 | attempt 1
+[2026-07-22 04:32:41]    Pre-filter: 800/2397 — עברו: 216 | נכשלו: 584
+[2026-07-22 04:32:41]    Downloading prefilter batch 801-850 / 2397 | attempt 1
+[2026-07-22 04:33:01]    Pre-filter: 850/2397 — עברו: 231 | נכשלו: 619
+[2026-07-22 04:33:01]    Downloading prefilter batch 851-900 / 2397 | attempt 1
+[2026-07-22 04:33:19]    Pre-filter: 900/2397 — עברו: 245 | נכשלו: 655
+[2026-07-22 04:33:19]    Downloading prefilter batch 901-950 / 2397 | attempt 1
+[2026-07-22 04:33:38]    Pre-filter: 950/2397 — עברו: 255 | נכשלו: 695
+[2026-07-22 04:33:38]    Downloading prefilter batch 951-1000 / 2397 | attempt 1
+[2026-07-22 04:33:57]    Pre-filter: 1000/2397 — עברו: 271 | נכשלו: 729
+[2026-07-22 04:33:57]    Downloading prefilter batch 1001-1050 / 2397 | attempt 1
+[2026-07-22 04:34:15]    Pre-filter: 1050/2397 — עברו: 282 | נכשלו: 768
+[2026-07-22 04:34:15]    Downloading prefilter batch 1051-1100 / 2397 | attempt 1
+[2026-07-22 04:34:34]    Pre-filter: 1100/2397 — עברו: 295 | נכשלו: 805
+[2026-07-22 04:34:34]    Downloading prefilter batch 1101-1150 / 2397 | attempt 1
+[2026-07-22 04:34:53]    Pre-filter: 1150/2397 — עברו: 309 | נכשלו: 841
+[2026-07-22 04:34:53]    Downloading prefilter batch 1151-1200 / 2397 | attempt 1
+[2026-07-22 04:35:12]    Pre-filter: 1200/2397 — עברו: 319 | נכשלו: 881
+[2026-07-22 04:35:12]    Downloading prefilter batch 1201-1250 / 2397 | attempt 1
+[2026-07-22 04:35:30]    Pre-filter: 1250/2397 — עברו: 334 | נכשלו: 916
+[2026-07-22 04:35:30]    Downloading prefilter batch 1251-1300 / 2397 | attempt 1
+[2026-07-22 04:35:48]    Pre-filter: 1300/2397 — עברו: 345 | נכשלו: 955
+[2026-07-22 04:35:48]    Downloading prefilter batch 1301-1350 / 2397 | attempt 1
+[2026-07-22 04:36:08]    Pre-filter: 1350/2397 — עברו: 355 | נכשלו: 995
+[2026-07-22 04:36:08]    Downloading prefilter batch 1351-1400 / 2397 | attempt 1
+[2026-07-22 04:36:26]    Pre-filter: 1400/2397 — עברו: 366 | נכשלו: 1034
+[2026-07-22 04:36:26]    Downloading prefilter batch 1401-1450 / 2397 | attempt 1
+[2026-07-22 04:36:44]    Pre-filter: 1450/2397 — עברו: 385 | נכשלו: 1065
+[2026-07-22 04:36:44]    Downloading prefilter batch 1451-1500 / 2397 | attempt 1
+[2026-07-22 04:37:02]    Pre-filter: 1500/2397 — עברו: 394 | נכשלו: 1106
+[2026-07-22 04:37:02]    Downloading prefilter batch 1501-1550 / 2397 | attempt 1
+[2026-07-22 04:37:20]    Pre-filter: 1550/2397 — עברו: 409 | נכשלו: 1141
+[2026-07-22 04:37:20]    Downloading prefilter batch 1551-1600 / 2397 | attempt 1
+[2026-07-22 04:37:39]    Pre-filter: 1600/2397 — עברו: 424 | נכשלו: 1176
+[2026-07-22 04:37:39]    Downloading prefilter batch 1601-1650 / 2397 | attempt 1
+[2026-07-22 04:37:57]    Pre-filter: 1650/2397 — עברו: 439 | נכשלו: 1211
+[2026-07-22 04:37:57]    Downloading prefilter batch 1651-1700 / 2397 | attempt 1
+[2026-07-22 04:38:15]    Pre-filter: 1700/2397 — עברו: 449 | נכשלו: 1251
+[2026-07-22 04:38:15]    Downloading prefilter batch 1701-1750 / 2397 | attempt 1
+[2026-07-22 04:38:34]    Pre-filter: 1750/2397 — עברו: 469 | נכשלו: 1281
+[2026-07-22 04:38:34]    Downloading prefilter batch 1751-1800 / 2397 | attempt 1
+[2026-07-22 04:38:54]    Pre-filter: 1800/2397 — עברו: 485 | נכשלו: 1315
+[2026-07-22 04:38:54]    Downloading prefilter batch 1801-1850 / 2397 | attempt 1
+[2026-07-22 04:39:13]    Pre-filter: 1850/2397 — עברו: 499 | נכשלו: 1351
+[2026-07-22 04:39:13]    Downloading prefilter batch 1851-1900 / 2397 | attempt 1
+[2026-07-22 04:39:33]    Pre-filter: 1900/2397 — עברו: 509 | נכשלו: 1391
+[2026-07-22 04:39:33]    Downloading prefilter batch 1901-1950 / 2397 | attempt 1
+[2026-07-22 04:39:52]    Pre-filter: 1950/2397 — עברו: 525 | נכשלו: 1425
+[2026-07-22 04:39:52]    Downloading prefilter batch 1951-2000 / 2397 | attempt 1
+[2026-07-22 04:40:10]    Pre-filter: 2000/2397 — עברו: 543 | נכשלו: 1457
+[2026-07-22 04:40:10]    Downloading prefilter batch 2001-2050 / 2397 | attempt 1
+[2026-07-22 04:40:28]    Pre-filter: 2050/2397 — עברו: 556 | נכשלו: 1494
+[2026-07-22 04:40:28]    Downloading prefilter batch 2051-2100 / 2397 | attempt 1
+[2026-07-22 04:40:47]    Pre-filter: 2100/2397 — עברו: 571 | נכשלו: 1529
+[2026-07-22 04:40:47]    Downloading prefilter batch 2101-2150 / 2397 | attempt 1
+[2026-07-22 04:41:05]    Pre-filter: 2150/2397 — עברו: 585 | נכשלו: 1565
+[2026-07-22 04:41:05]    Downloading prefilter batch 2151-2200 / 2397 | attempt 1
+[2026-07-22 04:41:23]    Pre-filter: 2200/2397 — עברו: 597 | נכשלו: 1603
+[2026-07-22 04:41:23]    Downloading prefilter batch 2201-2250 / 2397 | attempt 1
+[2026-07-22 04:41:42]    Pre-filter: 2250/2397 — עברו: 613 | נכשלו: 1637
+[2026-07-22 04:41:42]    Downloading prefilter batch 2251-2300 / 2397 | attempt 1
+[2026-07-22 04:42:00]    Pre-filter: 2300/2397 — עברו: 632 | נכשלו: 1668
+[2026-07-22 04:42:00]    Downloading prefilter batch 2301-2350 / 2397 | attempt 1
+[2026-07-22 04:42:17]    Pre-filter: 2350/2397 — עברו: 648 | נכשלו: 1702
+[2026-07-22 04:42:17]    Downloading prefilter batch 2351-2397 / 2397 | attempt 1
+[2026-07-22 04:42:35]    Pre-filter: 2397/2397 — עברו: 667 | נכשלו: 1730
+[2026-07-22 04:42:35] ✅ PREFILTER OK: checked all 2397 tickers.
+[2026-07-22 04:42:35] ⚡ Pre-filter סיים: 667 עוברות | 1730 נדחו (72% חיסכון)
+[2026-07-22 04:42:35] ⚡ Pre-filter data issues: failed_batches=0, missing_tickers=2, ticker_errors=0
+[2026-07-22 04:42:35] ⚡ Pre-filter: 667 מניות ממשיכות לסריקה מלאה
+[2026-07-22 04:42:35] [1/667] ADBE
+[2026-07-22 04:42:38] Scanning ADBE...
+[2026-07-22 04:42:38] ADBE: 📅 next earnings: 2026-09-10 (50d away)
+[2026-07-22 04:42:39] ADBE: Cup & Handle — cup bottom at edge (88%) — V shape suspected
+[2026-07-22 04:42:39] ADBE: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:42:39] ADBE: Double Bottom — no valid W pattern found
+[2026-07-22 04:42:39] NO ALERT ADBE | close=227.16 | ma150=262.18
+[2026-07-22 04:42:39] [2/667] ENB
+[2026-07-22 04:42:42] Scanning ENB...
+[2026-07-22 04:42:43] ENB: ⏭️ Earnings filter — earnings in 9 days (2026-07-31)
+[2026-07-22 04:42:43] [3/667] SUPN
+[2026-07-22 04:42:46] Scanning SUPN...
+[2026-07-22 04:42:46] SUPN: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:42:46] [4/667] SSB
+[2026-07-22 04:42:49] Scanning SSB...
+[2026-07-22 04:42:50] SSB: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 04:42:50] [5/667] TRU
+[2026-07-22 04:42:53] Scanning TRU...
+[2026-07-22 04:42:53] TRU: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 04:42:53] [6/667] RVT
+[2026-07-22 04:42:56] Scanning RVT...
+[2026-07-22 04:42:57] RVT: Cup & Handle — V-shape detected (slope ratio=1.03)
+[2026-07-22 04:42:57] RVT: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:42:57] RVT: Double Bottom — no valid W pattern found
+[2026-07-22 04:42:57] NO ALERT RVT | close=18.13 | ma150=17.63
+[2026-07-22 04:42:57] [7/667] BC
+[2026-07-22 04:43:00] Scanning BC...
+[2026-07-22 04:43:01] BC: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 04:43:01] [8/667] MCHB
+[2026-07-22 04:43:04] Scanning MCHB...
+[2026-07-22 04:43:04] MCHB: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:43:04] [9/667] IOSP
+[2026-07-22 04:43:07] Scanning IOSP...
+[2026-07-22 04:43:08] IOSP: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:43:08] [10/667] AEO
+[2026-07-22 04:43:11] Scanning AEO...
+[2026-07-22 04:43:11] AEO: 📅 next earnings: 2026-05-28 (-55d away)
+[2026-07-22 04:43:12] AEO: Cup & Handle — cup rims differ 33.3% (max 5%)
+[2026-07-22 04:43:12] AEO: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:43:12] AEO: Double Bottom — no valid W pattern found
+[2026-07-22 04:43:13] NO ALERT AEO | close=17.36 | ma150=20.19
+[2026-07-22 04:43:13] [11/667] AXP
+[2026-07-22 04:43:16] Scanning AXP...
+[2026-07-22 04:43:17] AXP: ⏭️ Earnings filter — earnings in 2 days (2026-07-24)
+[2026-07-22 04:43:17] [12/667] BRO
+[2026-07-22 04:43:20] Scanning BRO...
+[2026-07-22 04:43:20] BRO: ⏭️ Earnings filter — earnings in 5 days (2026-07-27)
+[2026-07-22 04:43:20] [13/667] NDSN
+[2026-07-22 04:43:23] Scanning NDSN...
+[2026-07-22 04:43:24] NDSN: 📅 next earnings: 2026-08-19 (28d away)
+[2026-07-22 04:43:25] NDSN: Cup & Handle — no breakout yet (290.07 < 290.13)
+[2026-07-22 04:43:25] NDSN: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:43:25] NDSN: Double Bottom — no valid W pattern found
+[2026-07-22 04:43:25] NO ALERT NDSN | close=290.07 | ma150=277.00
+[2026-07-22 04:43:25] [14/667] SOFI
+[2026-07-22 04:43:28] Scanning SOFI...
+[2026-07-22 04:43:28] SOFI: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:43:28] [15/667] RUSHB
+[2026-07-22 04:43:31] Scanning RUSHB...
+[2026-07-22 04:43:32] RUSHB: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 04:43:32] [16/667] IRM
+[2026-07-22 04:43:35] Scanning IRM...
+[2026-07-22 04:43:35] IRM: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 04:43:35] [17/667] FICO
+[2026-07-22 04:43:38] Scanning FICO...
+[2026-07-22 04:43:39] FICO: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:43:39] [18/667] TWO
+[2026-07-22 04:43:42] Scanning TWO...
+[2026-07-22 04:43:42] TWO: market cap too low ($1271M < $1B). Skip.
+[2026-07-22 04:43:42] [19/667] OXLC
+[2026-07-22 04:43:45] Scanning OXLC...
+[2026-07-22 04:43:45] OXLC: market cap too low ($861M < $1B). Skip.
+[2026-07-22 04:43:45] [20/667] LMAT
+[2026-07-22 04:43:48] Scanning LMAT...
+[2026-07-22 04:43:49] LMAT: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:43:49] [21/667] OKE
+[2026-07-22 04:43:52] Scanning OKE...
+[2026-07-22 04:43:52] OKE: ⏭️ Earnings filter — earnings in 12 days (2026-08-03)
+[2026-07-22 04:43:52] [22/667] ALSN
+[2026-07-22 04:43:55] Scanning ALSN...
+[2026-07-22 04:43:56] ALSN: ⏭️ Earnings filter — earnings in 12 days (2026-08-03)
+[2026-07-22 04:43:56] [23/667] INSM
+[2026-07-22 04:43:59] Scanning INSM...
+[2026-07-22 04:43:59] INSM: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:44:00] INSM: Cup & Handle — cup bottom at edge (83%) — V shape suspected
+[2026-07-22 04:44:00] INSM: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:44:00] INSM: Double Bottom — no valid W pattern found
+[2026-07-22 04:44:00] NO ALERT INSM | close=108.62 | ma150=138.71
+[2026-07-22 04:44:00] [24/667] MTDR
+[2026-07-22 04:44:03] Scanning MTDR...
+[2026-07-22 04:44:04] MTDR: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 04:44:04] [25/667] TDAY
+[2026-07-22 04:44:07] Scanning TDAY...
+[2026-07-22 04:44:07] TDAY: market cap too low ($1261M < $1B). Skip.
+[2026-07-22 04:44:07] [26/667] WAY
+[2026-07-22 04:44:10] Scanning WAY...
+[2026-07-22 04:44:10] WAY: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:44:10] [27/667] ASAN
+[2026-07-22 04:44:13] Scanning ASAN...
+[2026-07-22 04:44:13] ASAN: market cap too low ($1754M < $1B). Skip.
+[2026-07-22 04:44:13] [28/667] NKTR
+[2026-07-22 04:44:16] Scanning NKTR...
+[2026-07-22 04:44:17] NKTR: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:44:18] NKTR: Cup & Handle — no breakout yet (68.67 < 74.90)
+[2026-07-22 04:44:18] NKTR: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:44:18] NKTR: Double Bottom — no valid W pattern found
+[2026-07-22 04:44:18] NO ALERT NKTR | close=68.67 | ma150=63.85
+[2026-07-22 04:44:18] [29/667] FFIN
+[2026-07-22 04:44:21] Scanning FFIN...
+[2026-07-22 04:44:21] FFIN: 📅 next earnings: 2026-07-16 (-6d away)
+[2026-07-22 04:44:22] FFIN: Cup & Handle — cup rims differ 6.0% (max 5%)
+[2026-07-22 04:44:22] FFIN: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:44:22] FFIN: Double Bottom — no valid W pattern found
+[2026-07-22 04:44:22] NO ALERT FFIN | close=34.78 | ma150=32.12
+[2026-07-22 04:44:22] [30/667] AGYS
+[2026-07-22 04:44:25] Scanning AGYS...
+[2026-07-22 04:44:25] AGYS: ⏭️ Earnings filter — earnings in 5 days (2026-07-27)
+[2026-07-22 04:44:25] [31/667] CFFN
+[2026-07-22 04:44:28] Scanning CFFN...
+[2026-07-22 04:44:29] CFFN: market cap too low ($1070M < $1B). Skip.
+[2026-07-22 04:44:29] [32/667] TTEK
+[2026-07-22 04:44:32] Scanning TTEK...
+[2026-07-22 04:44:32] TTEK: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:44:32] [33/667] GBDC
+[2026-07-22 04:44:35] Scanning GBDC...
+[2026-07-22 04:44:36] GBDC: ⏭️ Earnings filter — earnings in 12 days (2026-08-03)
+[2026-07-22 04:44:36] [34/667] MSFT
+[2026-07-22 04:44:39] Scanning MSFT...
+[2026-07-22 04:44:39] MSFT: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:44:39] [35/667] GPI
+[2026-07-22 04:44:42] Scanning GPI...
+[2026-07-22 04:44:43] GPI: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 04:44:43] [36/667] SFL
+[2026-07-22 04:44:46] Scanning SFL...
+[2026-07-22 04:44:46] SFL: market cap too low ($1521M < $1B). Skip.
+[2026-07-22 04:44:46] [37/667] COLD
+[2026-07-22 04:44:49] Scanning COLD...
+[2026-07-22 04:44:49] COLD: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:44:49] COLD: ❌ EMA28 global filter — price below EMA28 (-0.2%)
+[2026-07-22 04:44:49] [38/667] HOPE
+[2026-07-22 04:44:52] Scanning HOPE...
+[2026-07-22 04:44:52] HOPE: market cap too low ($1753M < $1B). Skip.
+[2026-07-22 04:44:52] [39/667] MSGS
+[2026-07-22 04:44:55] Scanning MSGS...
+[2026-07-22 04:44:56] MSGS: 📅 next earnings: 2026-05-08 (-75d away)
+[2026-07-22 04:44:57] MSGS: Cup & Handle — V-shape detected (slope ratio=0.81)
+[2026-07-22 04:44:57] MSGS: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:44:57] MSGS: Double Bottom — no valid W pattern found
+[2026-07-22 04:44:57] NO ALERT MSGS | close=395.96 | ma150=325.64
+[2026-07-22 04:44:57] [40/667] CLX
+[2026-07-22 04:45:00] Scanning CLX...
+[2026-07-22 04:45:00] CLX: ⏭️ Earnings filter — earnings in 12 days (2026-08-03)
+[2026-07-22 04:45:00] [41/667] FHB
+[2026-07-22 04:45:03] Scanning FHB...
+[2026-07-22 04:45:04] FHB: ⏭️ Earnings filter — earnings in 2 days (2026-07-24)
+[2026-07-22 04:45:04] [42/667] BTI
+[2026-07-22 04:45:07] Scanning BTI...
+[2026-07-22 04:45:08] BTI: Cup & Handle — V-shape detected (slope ratio=0.76)
+[2026-07-22 04:45:08] BTI: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:45:08] BTI: Double Bottom — no valid W pattern found
+[2026-07-22 04:45:08] NO ALERT BTI | close=61.42 | ma150=59.65
+[2026-07-22 04:45:08] [43/667] RRC
+[2026-07-22 04:45:11] Scanning RRC...
+[2026-07-22 04:45:13] RRC: 📅 next earnings: 2026-07-21 (-1d away)
+[2026-07-22 04:45:14] RRC: Cup & Handle — cup bottom at edge (19%) — V shape suspected
+[2026-07-22 04:45:14] RRC: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:45:14] RRC: Double Bottom — no valid W pattern found
+[2026-07-22 04:45:14] NO ALERT RRC | close=37.75 | ma150=39.14
+[2026-07-22 04:45:14] [44/667] TMUS
+[2026-07-22 04:45:17] Scanning TMUS...
+[2026-07-22 04:45:17] TMUS: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 04:45:17] [45/667] OSW
+[2026-07-22 04:45:20] Scanning OSW...
+[2026-07-22 04:45:21] OSW: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:45:21] [46/667] KLAR
+[2026-07-22 04:45:24] Scanning KLAR...
+[2026-07-22 04:45:24] KLAR: 📅 next earnings: 2026-08-18 (27d away)
+[2026-07-22 04:45:25] KLAR: Cup & Handle — cup rims differ 56.7% (max 5%)
+[2026-07-22 04:45:25] KLAR: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:45:25] KLAR: Double Bottom — no valid W pattern found
+[2026-07-22 04:45:25] NO ALERT KLAR | close=19.03 | ma150=18.99
+[2026-07-22 04:45:25] [47/667] PRAX
+[2026-07-22 04:45:28] Scanning PRAX...
+[2026-07-22 04:45:28] PRAX: 📅 next earnings: 2026-05-07 (-76d away)
+[2026-07-22 04:45:29] PRAX: Cup & Handle — no breakout yet (317.87 < 350.56)
+[2026-07-22 04:45:29] PRAX: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:45:29] PRAX: Double Bottom — no valid W pattern found
+[2026-07-22 04:45:29] NO ALERT PRAX | close=317.87 | ma150=310.62
+[2026-07-22 04:45:29] [48/667] OMF
+[2026-07-22 04:45:32] Scanning OMF...
+[2026-07-22 04:45:33] OMF: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:45:33] [49/667] EA
+[2026-07-22 04:45:36] Scanning EA...
+[2026-07-22 04:45:36] EA: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 04:45:36] [50/667] DSL
+[2026-07-22 04:45:39] Scanning DSL...
+[2026-07-22 04:45:40] DSL: market cap too low ($1236M < $1B). Skip.
+[2026-07-22 04:45:40] [51/667] COLL
+[2026-07-22 04:45:43] Scanning COLL...
+[2026-07-22 04:45:43] COLL: market cap too low ($1163M < $1B). Skip.
+[2026-07-22 04:45:43] [52/667] AFG
+[2026-07-22 04:45:46] Scanning AFG...
+[2026-07-22 04:45:46] AFG: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:45:46] [53/667] RTX
+[2026-07-22 04:45:49] Scanning RTX...
+[2026-07-22 04:45:50] RTX: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 04:45:50] [54/667] CACC
+[2026-07-22 04:45:53] Scanning CACC...
+[2026-07-22 04:45:53] CACC: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 04:45:53] [55/667] WEN
+[2026-07-22 04:45:56] Scanning WEN...
+[2026-07-22 04:45:57] WEN: market cap too low ($1453M < $1B). Skip.
+[2026-07-22 04:45:57] [56/667] DRS
+[2026-07-22 04:46:00] Scanning DRS...
+[2026-07-22 04:46:00] DRS: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 04:46:00] [57/667] CCB
+[2026-07-22 04:46:03] Scanning CCB...
+[2026-07-22 04:46:03] CCB: market cap too low ($1178M < $1B). Skip.
+[2026-07-22 04:46:03] [58/667] CYTK
+[2026-07-22 04:46:06] Scanning CYTK...
+[2026-07-22 04:46:07] CYTK: 📅 next earnings: 2026-05-05 (-78d away)
+[2026-07-22 04:46:08] CYTK: Cup & Handle — cup bottom at edge (13%) — V shape suspected
+[2026-07-22 04:46:08] CYTK: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:46:08] CYTK: Double Bottom — no valid W pattern found
+[2026-07-22 04:46:08] NO ALERT CYTK | close=81.11 | ma150=68.73
+[2026-07-22 04:46:08] [59/667] WHD
+[2026-07-22 04:46:11] Scanning WHD...
+[2026-07-22 04:46:11] WHD: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:46:11] [60/667] INDV
+[2026-07-22 04:46:14] Scanning INDV...
+[2026-07-22 04:46:15] INDV: 📅 next earnings: 2026-04-30 (-83d away)
+[2026-07-22 04:46:15] INDV: Cup & Handle — cup rims differ 11.0% (max 5%)
+[2026-07-22 04:46:15] INDV: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:46:15] INDV: Double Bottom — no valid W pattern found
+[2026-07-22 04:46:15] NO ALERT INDV | close=40.45 | ma150=35.30
+[2026-07-22 04:46:15] [61/667] XPO
+[2026-07-22 04:46:18] Scanning XPO...
+[2026-07-22 04:46:19] XPO: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 04:46:19] [62/667] ZBRA
+[2026-07-22 04:46:22] Scanning ZBRA...
+[2026-07-22 04:46:22] ZBRA: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:46:22] [63/667] PRKS
+[2026-07-22 04:46:25] Scanning PRKS...
+[2026-07-22 04:46:26] PRKS: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:46:26] [64/667] MAS
+[2026-07-22 04:46:29] Scanning MAS...
+[2026-07-22 04:46:30] MAS: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:46:30] [65/667] PFS
+[2026-07-22 04:46:33] Scanning PFS...
+[2026-07-22 04:46:33] PFS: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:46:33] [66/667] CSQR
+[2026-07-22 04:46:36] Scanning CSQR...
+[2026-07-22 04:46:36] CSQR: no data. Skip.
+[2026-07-22 04:46:36] [67/667] TRI
+[2026-07-22 04:46:39] Scanning TRI...
+[2026-07-22 04:46:40] TRI: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 04:46:40] [68/667] KMT
+[2026-07-22 04:46:43] Scanning KMT...
+[2026-07-22 04:46:43] KMT: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 04:46:43] [69/667] UMBF
+[2026-07-22 04:46:46] Scanning UMBF...
+[2026-07-22 04:46:47] UMBF: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 04:46:47] [70/667] AX
+[2026-07-22 04:46:50] Scanning AX...
+[2026-07-22 04:46:51] AX: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 04:46:51] [71/667] GCMG
+[2026-07-22 04:46:54] Scanning GCMG...
+[2026-07-22 04:46:54] GCMG: market cap too low ($765M < $1B). Skip.
+[2026-07-22 04:46:54] [72/667] EFX
+[2026-07-22 04:46:57] Scanning EFX...
+[2026-07-22 04:46:57] EFX: 📅 next earnings: 2026-07-21 (-1d away)
+[2026-07-22 04:46:58] EFX: Cup & Handle — cup bottom at edge (90%) — V shape suspected
+[2026-07-22 04:46:58] EFX: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:46:58] EFX: Double Bottom — no valid W pattern found
+[2026-07-22 04:46:58] NO ALERT EFX | close=173.00 | ma150=186.27
+[2026-07-22 04:46:58] [73/667] FHN
+[2026-07-22 04:47:01] Scanning FHN...
+[2026-07-22 04:47:02] FHN: 📅 next earnings: 2026-10-14 (84d away)
+[2026-07-22 04:47:02] FHN: Cup & Handle — overextended (1.8% > 0.5%)
+[2026-07-22 04:47:02] FHN: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:47:02] FHN: Double Bottom — no valid W pattern found
+[2026-07-22 04:47:02] NO ALERT FHN | close=25.51 | ma150=24.29
+[2026-07-22 04:47:02] [74/667] CAMT
+[2026-07-22 04:47:05] Scanning CAMT...
+[2026-07-22 04:47:06] CAMT: 📅 next earnings: 2026-08-10 (19d away)
+[2026-07-22 04:47:06] CAMT: ❌ EMA28 global filter — price below EMA28 (-0.1%)
+[2026-07-22 04:47:06] [75/667] NUTX
+[2026-07-22 04:47:09] Scanning NUTX...
+[2026-07-22 04:47:09] NUTX: market cap too low ($1158M < $1B). Skip.
+[2026-07-22 04:47:09] [76/667] BLX
+[2026-07-22 04:47:12] Scanning BLX...
+[2026-07-22 04:47:12] BLX: ⏭️ Earnings filter — earnings in 5 days (2026-07-27)
+[2026-07-22 04:47:12] [77/667] NVDA
+[2026-07-22 04:47:15] Scanning NVDA...
+[2026-07-22 04:47:16] NVDA: 📅 next earnings: 2026-08-26 (35d away)
+[2026-07-22 04:47:17] NVDA: Cup & Handle — V-shape detected (slope ratio=1.35)
+[2026-07-22 04:47:17] NVDA: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:47:17] NVDA: Double Bottom — no valid W pattern found
+[2026-07-22 04:47:17] NO ALERT NVDA | close=207.29 | ma150=194.40
+[2026-07-22 04:47:17] [78/667] HASI
+[2026-07-22 04:47:20] Scanning HASI...
+[2026-07-22 04:47:20] HASI: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:47:20] HASI: ❌ EMA28 global filter — price below EMA28 (-0.4%)
+[2026-07-22 04:47:20] [79/667] BCH
+[2026-07-22 04:47:23] Scanning BCH...
+[2026-07-22 04:47:24] BCH: ⏭️ Earnings filter — earnings in 9 days (2026-07-31)
+[2026-07-22 04:47:24] [80/667] STX
+[2026-07-22 04:47:27] Scanning STX...
+[2026-07-22 04:47:27] STX: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 04:47:27] [81/667] UFCS
+[2026-07-22 04:47:30] Scanning UFCS...
+[2026-07-22 04:47:31] UFCS: market cap too low ($1321M < $1B). Skip.
+[2026-07-22 04:47:31] [82/667] YELP
+[2026-07-22 04:47:34] Scanning YELP...
+[2026-07-22 04:47:34] YELP: market cap too low ($1418M < $1B). Skip.
+[2026-07-22 04:47:34] [83/667] DV
+[2026-07-22 04:47:37] Scanning DV...
+[2026-07-22 04:47:37] DV: market cap too low ($1736M < $1B). Skip.
+[2026-07-22 04:47:37] [84/667] OGE
+[2026-07-22 04:47:40] Scanning OGE...
+[2026-07-22 04:47:41] OGE: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:47:41] [85/667] ESTC
+[2026-07-22 04:47:44] Scanning ESTC...
+[2026-07-22 04:47:44] ESTC: 📅 next earnings: 2026-08-27 (36d away)
+[2026-07-22 04:47:45] ESTC: Cup & Handle — cup rims differ 28.0% (max 5%)
+[2026-07-22 04:47:45] ESTC: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:47:45] ESTC: Double Bottom — no valid W pattern found
+[2026-07-22 04:47:45] NO ALERT ESTC | close=60.18 | ma150=59.43
+[2026-07-22 04:47:45] [86/667] MDLN
+[2026-07-22 04:47:48] Scanning MDLN...
+[2026-07-22 04:47:48] MDLN: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 04:47:48] [87/667] FWONA
+[2026-07-22 04:47:51] Scanning FWONA...
+[2026-07-22 04:47:52] FWONA: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:47:52] FWONA: Cup & Handle — V-shape detected (slope ratio=0.88)
+[2026-07-22 04:47:52] FWONA: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:47:52] FWONA: Double Bottom — no valid W pattern found
+[2026-07-22 04:47:52] NO ALERT FWONA | close=90.12 | ma150=82.66
+[2026-07-22 04:47:52] [88/667] FIBK
+[2026-07-22 04:47:55] Scanning FIBK...
+[2026-07-22 04:47:56] FIBK: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 04:47:56] [89/667] BOKF
+[2026-07-22 04:47:59] Scanning BOKF...
+[2026-07-22 04:48:00] BOKF: 📅 next earnings: 2026-10-19 (89d away)
+[2026-07-22 04:48:00] BOKF: Cup & Handle — cup bottom at edge (18%) — V shape suspected
+[2026-07-22 04:48:00] BOKF: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:48:00] BOKF: Double Bottom — no valid W pattern found
+[2026-07-22 04:48:00] NO ALERT BOKF | close=139.98 | ma150=130.31
+[2026-07-22 04:48:00] [90/667] TRGP
+[2026-07-22 04:48:03] Scanning TRGP...
+[2026-07-22 04:48:04] TRGP: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:48:04] TRGP: Cup & Handle — cup bottom at edge (1%) — V shape suspected
+[2026-07-22 04:48:04] TRGP: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:48:04] TRGP: Double Bottom — no valid W pattern found
+[2026-07-22 04:48:04] NO ALERT TRGP | close=280.22 | ma150=235.82
+[2026-07-22 04:48:04] [91/667] RRR
+[2026-07-22 04:48:07] Scanning RRR...
+[2026-07-22 04:48:08] RRR: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:48:08] [92/667] TJX
+[2026-07-22 04:48:11] Scanning TJX...
+[2026-07-22 04:48:11] TJX: 📅 next earnings: 2026-08-19 (28d away)
+[2026-07-22 04:48:11] TJX: ❌ EMA28 global filter — price below EMA28 (-0.1%)
+[2026-07-22 04:48:11] [93/667] TFII
+[2026-07-22 04:48:14] Scanning TFII...
+[2026-07-22 04:48:15] TFII: ⏭️ Earnings filter — earnings in 5 days (2026-07-27)
+[2026-07-22 04:48:15] [94/667] DUK
+[2026-07-22 04:48:18] Scanning DUK...
+[2026-07-22 04:48:18] DUK: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:48:18] [95/667] GIL
+[2026-07-22 04:48:21] Scanning GIL...
+[2026-07-22 04:48:22] GIL: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 04:48:22] [96/667] DXC
+[2026-07-22 04:48:25] Scanning DXC...
+[2026-07-22 04:48:25] DXC: market cap too low ($1509M < $1B). Skip.
+[2026-07-22 04:48:25] [97/667] KNX
+[2026-07-22 04:48:28] Scanning KNX...
+[2026-07-22 04:48:29] KNX: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 04:48:29] [98/667] HLNE
+[2026-07-22 04:48:32] Scanning HLNE...
+[2026-07-22 04:48:32] HLNE: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 04:48:32] [99/667] CCZ
+[2026-07-22 04:48:35] Scanning CCZ...
+[2026-07-22 04:48:36] CCZ: Cup & Handle — cup bottom at edge (7%) — V shape suspected
+[2026-07-22 04:48:36] CCZ: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:48:36] CCZ: Double Bottom — no valid W pattern found
+[2026-07-22 04:48:36] NO ALERT CCZ | close=65.99 | ma150=64.09
+[2026-07-22 04:48:36] [100/667] LIFE
+[2026-07-22 04:48:39] Scanning LIFE...
+[2026-07-22 04:48:39] LIFE: market cap too low ($1790M < $1B). Skip.
+[2026-07-22 04:48:39] [101/667] BIO
+[2026-07-22 04:48:42] Scanning BIO...
+[2026-07-22 04:48:42] BIO: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 04:48:42] [102/667] TMHC
+[2026-07-22 04:48:45] Scanning TMHC...
+[2026-07-22 04:48:46] TMHC: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 04:48:46] [103/667] GS
+[2026-07-22 04:48:49] Scanning GS...
+[2026-07-22 04:48:49] GS: 📅 next earnings: 2026-10-13 (83d away)
+[2026-07-22 04:48:50] GS: Cup & Handle — V-shape detected (slope ratio=0.80)
+[2026-07-22 04:48:50] GS: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:48:50] GS: Double Bottom — no valid W pattern found
+[2026-07-22 04:48:50] NO ALERT GS | close=1085.56 | ma150=942.38
+[2026-07-22 04:48:50] [104/667] TOWN
+[2026-07-22 04:48:53] Scanning TOWN...
+[2026-07-22 04:48:54] TOWN: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 04:48:54] [105/667] PCG
+[2026-07-22 04:48:57] Scanning PCG...
+[2026-07-22 04:48:57] PCG: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 04:48:57] [106/667] LCLN
+[2026-07-22 04:49:00] Scanning LCLN...
+[2026-07-22 04:49:01] LCLN: market cap too low ($802M < $1B). Skip.
+[2026-07-22 04:49:01] [107/667] ACA
+[2026-07-22 04:49:04] Scanning ACA...
+[2026-07-22 04:49:04] ACA: 📅 next earnings: 2026-04-30 (-83d away)
+[2026-07-22 04:49:05] ACA: Cup & Handle — overextended (10.1% > 0.5%)
+[2026-07-22 04:49:05] ACA: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:49:05] ACA: Double Bottom — no valid W pattern found
+[2026-07-22 04:49:05] NO ALERT ACA | close=144.65 | ma150=120.62
+[2026-07-22 04:49:05] [108/667] TBBB
+[2026-07-22 04:49:08] Scanning TBBB...
+[2026-07-22 04:49:08] TBBB: 📅 next earnings: 2026-08-12 (21d away)
+[2026-07-22 04:49:09] TBBB: Cup & Handle — overextended (3.4% > 0.5%)
+[2026-07-22 04:49:09] TBBB: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:49:09] TBBB: Double Bottom — no valid W pattern found
+[2026-07-22 04:49:09] NO ALERT TBBB | close=40.89 | ma150=36.76
+[2026-07-22 04:49:09] [109/667] ARLO
+[2026-07-22 04:49:12] Scanning ARLO...
+[2026-07-22 04:49:12] ARLO: market cap too low ($1438M < $1B). Skip.
+[2026-07-22 04:49:12] [110/667] IBOC
+[2026-07-22 04:49:15] Scanning IBOC...
+[2026-07-22 04:49:16] IBOC: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:49:16] IBOC: Cup & Handle — cup bottom at edge (18%) — V shape suspected
+[2026-07-22 04:49:16] IBOC: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:49:16] IBOC: Double Bottom — no valid W pattern found
+[2026-07-22 04:49:16] NO ALERT IBOC | close=75.67 | ma150=71.32
+[2026-07-22 04:49:16] [111/667] AVNT
+[2026-07-22 04:49:19] Scanning AVNT...
+[2026-07-22 04:49:20] AVNT: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:49:20] AVNT: Cup & Handle — cup rims differ 10.9% (max 5%)
+[2026-07-22 04:49:20] AVNT: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:49:20] AVNT: Double Bottom — no valid W pattern found
+[2026-07-22 04:49:20] NO ALERT AVNT | close=36.90 | ma150=36.18
+[2026-07-22 04:49:20] [112/667] TD
+[2026-07-22 04:49:23] Scanning TD...
+[2026-07-22 04:49:24] TD: 📅 next earnings: 2026-08-27 (36d away)
+[2026-07-22 04:49:24] TD: Cup & Handle — cup rims differ 16.3% (max 5%)
+[2026-07-22 04:49:24] TD: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:49:24] TD: Double Bottom — no valid W pattern found
+[2026-07-22 04:49:24] NO ALERT TD | close=120.53 | ma150=103.32
+[2026-07-22 04:49:24] [113/667] MGRC
+[2026-07-22 04:49:27] Scanning MGRC...
+[2026-07-22 04:49:28] MGRC: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:49:28] [114/667] MTCH
+[2026-07-22 04:49:31] Scanning MTCH...
+[2026-07-22 04:49:32] MTCH: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:49:32] [115/667] KAI
+[2026-07-22 04:49:35] Scanning KAI...
+[2026-07-22 04:49:35] KAI: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:49:35] [116/667] BCC
+[2026-07-22 04:49:38] Scanning BCC...
+[2026-07-22 04:49:39] BCC: ⏭️ Earnings filter — earnings in 12 days (2026-08-03)
+[2026-07-22 04:49:39] [117/667] WTRG
+[2026-07-22 04:49:42] Scanning WTRG...
+[2026-07-22 04:49:42] WTRG: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:49:42] [118/667] WIX
+[2026-07-22 04:49:45] Scanning WIX...
+[2026-07-22 04:49:46] WIX: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:49:46] [119/667] IRON
+[2026-07-22 04:49:49] Scanning IRON...
+[2026-07-22 04:49:49] IRON: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:49:50] IRON: Cup & Handle — cup rims differ 23.7% (max 5%)
+[2026-07-22 04:49:50] IRON: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:49:50] IRON: Double Bottom — no valid W pattern found
+[2026-07-22 04:49:50] NO ALERT IRON | close=75.58 | ma150=71.01
+[2026-07-22 04:49:50] [120/667] PRVA
+[2026-07-22 04:49:53] Scanning PRVA...
+[2026-07-22 04:49:53] PRVA: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:49:54] PRVA: Cup & Handle — cup rims differ 5.9% (max 5%)
+[2026-07-22 04:49:54] PRVA: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:49:54] PRVA: Double Bottom — no valid W pattern found
+[2026-07-22 04:49:54] NO ALERT PRVA | close=26.31 | ma150=23.36
+[2026-07-22 04:49:54] [121/667] IBP
+[2026-07-22 04:49:57] Scanning IBP...
+[2026-07-22 04:49:57] IBP: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:49:57] IBP: ❌ EMA28 global filter — price below EMA28 (-0.6%)
+[2026-07-22 04:49:57] [122/667] OTTR
+[2026-07-22 04:50:00] Scanning OTTR...
+[2026-07-22 04:50:01] OTTR: ⏭️ Earnings filter — earnings in 12 days (2026-08-03)
+[2026-07-22 04:50:01] [123/667] SPGI
+[2026-07-22 04:50:04] Scanning SPGI...
+[2026-07-22 04:50:04] SPGI: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 04:50:04] [124/667] BFH
+[2026-07-22 04:50:07] Scanning BFH...
+[2026-07-22 04:50:08] BFH: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 04:50:08] [125/667] AZZ
+[2026-07-22 04:50:11] Scanning AZZ...
+[2026-07-22 04:50:11] AZZ: 📅 next earnings: 2026-10-07 (77d away)
+[2026-07-22 04:50:12] AZZ: Cup & Handle — V-shape detected (slope ratio=1.14)
+[2026-07-22 04:50:12] AZZ: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:50:12] AZZ: Double Bottom — no valid W pattern found
+[2026-07-22 04:50:12] NO ALERT AZZ | close=150.42 | ma150=133.35
+[2026-07-22 04:50:12] [126/667] SSMR
+[2026-07-22 04:50:15] Scanning SSMR...
+[2026-07-22 04:50:16] SSMR: no data. Skip.
+[2026-07-22 04:50:16] [127/667] NWE
+[2026-07-22 04:50:19] Scanning NWE...
+[2026-07-22 04:50:19] NWE: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:50:19] [128/667] PDO
+[2026-07-22 04:50:22] Scanning PDO...
+[2026-07-22 04:50:22] PDO: market cap too low ($1871M < $1B). Skip.
+[2026-07-22 04:50:22] [129/667] SAN
+[2026-07-22 04:50:25] Scanning SAN...
+[2026-07-22 04:50:26] SAN: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 04:50:26] [130/667] IBRX
+[2026-07-22 04:50:29] Scanning IBRX...
+[2026-07-22 04:50:30] IBRX: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:50:30] [131/667] RITM
+[2026-07-22 04:50:33] Scanning RITM...
+[2026-07-22 04:50:33] RITM: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 04:50:33] [132/667] AVA
+[2026-07-22 04:50:36] Scanning AVA...
+[2026-07-22 04:50:37] AVA: ⏭️ Earnings filter — earnings in 12 days (2026-08-03)
+[2026-07-22 04:50:37] [133/667] EXEL
+[2026-07-22 04:50:40] Scanning EXEL...
+[2026-07-22 04:50:40] EXEL: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:50:40] [134/667] PBH
+[2026-07-22 04:50:43] Scanning PBH...
+[2026-07-22 04:50:44] PBH: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:50:45] PBH: Cup & Handle — cup rims differ 29.1% (max 5%)
+[2026-07-22 04:50:45] PBH: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:50:45] PBH: Double Bottom — no valid W pattern found
+[2026-07-22 04:50:45] NO ALERT PBH | close=49.03 | ma150=57.60
+[2026-07-22 04:50:45] [135/667] GEN
+[2026-07-22 04:50:48] Scanning GEN...
+[2026-07-22 04:50:48] GEN: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:50:49] GEN: Cup & Handle — no breakout yet (26.11 < 27.76)
+[2026-07-22 04:50:49] GEN: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:50:49] GEN: Double Bottom — no valid W pattern found
+[2026-07-22 04:50:49] NO ALERT GEN | close=26.11 | ma150=23.50
+[2026-07-22 04:50:49] [136/667] HRL
+[2026-07-22 04:50:52] Scanning HRL...
+[2026-07-22 04:50:52] HRL: 📅 next earnings: 2026-08-27 (36d away)
+[2026-07-22 04:50:53] HRL: Cup & Handle — V-shape detected (slope ratio=1.15)
+[2026-07-22 04:50:53] HRL: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:50:53] HRL: Double Bottom — no valid W pattern found
+[2026-07-22 04:50:53] NO ALERT HRL | close=25.11 | ma150=23.31
+[2026-07-22 04:50:53] [137/667] ANF
+[2026-07-22 04:50:56] Scanning ANF...
+[2026-07-22 04:50:57] ANF: 📅 next earnings: 2026-08-26 (35d away)
+[2026-07-22 04:50:57] ANF: Cup & Handle — V-shape detected (slope ratio=0.83)
+[2026-07-22 04:50:57] ANF: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:50:57] ANF: Double Bottom — no valid W pattern found
+[2026-07-22 04:50:57] NO ALERT ANF | close=92.06 | ma150=93.83
+[2026-07-22 04:50:57] [138/667] RBA
+[2026-07-22 04:51:00] Scanning RBA...
+[2026-07-22 04:51:01] RBA: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:51:01] [139/667] TRMK
+[2026-07-22 04:51:04] Scanning TRMK...
+[2026-07-22 04:51:05] TRMK: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 04:51:05] [140/667] STNE
+[2026-07-22 04:51:08] Scanning STNE...
+[2026-07-22 04:51:08] STNE: 📅 next earnings: 2026-08-13 (22d away)
+[2026-07-22 04:51:09] STNE: Cup & Handle — cup rims differ 39.7% (max 5%)
+[2026-07-22 04:51:09] STNE: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:51:09] STNE: Double Bottom — no valid W pattern found
+[2026-07-22 04:51:09] NO ALERT STNE | close=11.26 | ma150=13.46
+[2026-07-22 04:51:09] [141/667] AVB
+[2026-07-22 04:51:12] Scanning AVB...
+[2026-07-22 04:51:12] AVB: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 04:51:12] [142/667] CVBF
+[2026-07-22 04:51:15] Scanning CVBF...
+[2026-07-22 04:51:16] CVBF: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 04:51:16] [143/667] CM
+[2026-07-22 04:51:19] Scanning CM...
+[2026-07-22 04:51:19] CM: 📅 next earnings: 2026-08-27 (36d away)
+[2026-07-22 04:51:20] CM: Cup & Handle — cup rims differ 14.9% (max 5%)
+[2026-07-22 04:51:20] CM: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:51:20] CM: Double Bottom — no valid W pattern found
+[2026-07-22 04:51:20] NO ALERT CM | close=117.37 | ma150=103.16
+[2026-07-22 04:51:20] [144/667] AGIO
+[2026-07-22 04:51:23] Scanning AGIO...
+[2026-07-22 04:51:23] AGIO: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 04:51:23] [145/667] PSN
+[2026-07-22 04:51:26] Scanning PSN...
+[2026-07-22 04:51:27] PSN: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:51:27] [146/667] TSLX
+[2026-07-22 04:51:30] Scanning TSLX...
+[2026-07-22 04:51:30] TSLX: market cap too low ($1628M < $1B). Skip.
+[2026-07-22 04:51:30] [147/667] LAMR
+[2026-07-22 04:51:33] Scanning LAMR...
+[2026-07-22 04:51:34] LAMR: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:51:34] LAMR: Cup & Handle — cup rims differ 16.6% (max 5%)
+[2026-07-22 04:51:34] LAMR: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:51:34] LAMR: Double Bottom — no valid W pattern found
+[2026-07-22 04:51:34] NO ALERT LAMR | close=160.07 | ma150=138.96
+[2026-07-22 04:51:34] [148/667] USLM
+[2026-07-22 04:51:37] Scanning USLM...
+[2026-07-22 04:51:38] USLM: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:51:38] [149/667] CMCSA
+[2026-07-22 04:51:41] Scanning CMCSA...
+[2026-07-22 04:51:41] CMCSA: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 04:51:41] [150/667] KWR
+[2026-07-22 04:51:44] Scanning KWR...
+[2026-07-22 04:51:45] KWR: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 04:51:45] [151/667] VNT
+[2026-07-22 04:51:48] Scanning VNT...
+[2026-07-22 04:51:48] VNT: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:51:49] VNT: Cup & Handle — cup rims differ 29.5% (max 5%)
+[2026-07-22 04:51:49] VNT: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:51:49] VNT: Double Bottom — no valid W pattern found
+[2026-07-22 04:51:49] NO ALERT VNT | close=30.23 | ma150=34.87
+[2026-07-22 04:51:49] [152/667] CG
+[2026-07-22 04:51:52] Scanning CG...
+[2026-07-22 04:51:52] CG: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:51:52] [153/667] MBIN
+[2026-07-22 04:51:55] Scanning MBIN...
+[2026-07-22 04:51:56] MBIN: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 04:51:56] [154/667] AN
+[2026-07-22 04:51:59] Scanning AN...
+[2026-07-22 04:51:59] AN: ⏭️ Earnings filter — earnings in 9 days (2026-07-31)
+[2026-07-22 04:51:59] [155/667] RNW
+[2026-07-22 04:52:02] Scanning RNW...
+[2026-07-22 04:52:03] RNW: 📅 next earnings: 2026-08-12 (21d away)
+[2026-07-22 04:52:04] RNW: Cup & Handle — V-shape detected (slope ratio=0.75)
+[2026-07-22 04:52:04] RNW: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:52:04] RNW: Double Bottom — no valid W pattern found
+[2026-07-22 04:52:04] NO ALERT RNW | close=6.22 | ma150=5.55
+[2026-07-22 04:52:04] [156/667] GWW
+[2026-07-22 04:52:07] Scanning GWW...
+[2026-07-22 04:52:07] GWW: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:52:07] [157/667] FSV
+[2026-07-22 04:52:10] Scanning FSV...
+[2026-07-22 04:52:11] FSV: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 04:52:11] [158/667] DNLI
+[2026-07-22 04:52:14] Scanning DNLI...
+[2026-07-22 04:52:14] DNLI: 📅 next earnings: 2026-05-11 (-72d away)
+[2026-07-22 04:52:15] DNLI: Cup & Handle — cup rims differ 13.9% (max 5%)
+[2026-07-22 04:52:15] DNLI: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:52:15] DNLI: Double Bottom — no valid W pattern found
+[2026-07-22 04:52:15] NO ALERT DNLI | close=23.83 | ma150=20.38
+[2026-07-22 04:52:15] [159/667] MIY
+[2026-07-22 04:52:18] Scanning MIY...
+[2026-07-22 04:52:18] MIY: market cap too low ($355M < $1B). Skip.
+[2026-07-22 04:52:18] [160/667] TEO
+[2026-07-22 04:52:21] Scanning TEO...
+[2026-07-22 04:52:22] TEO: 📅 next earnings: 2026-08-10 (19d away)
+[2026-07-22 04:52:22] TEO: Cup & Handle — cup bottom at edge (19%) — V shape suspected
+[2026-07-22 04:52:22] TEO: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:52:22] TEO: Double Bottom — no valid W pattern found
+[2026-07-22 04:52:22] NO ALERT TEO | close=13.60 | ma150=12.18
+[2026-07-22 04:52:22] [161/667] CIGI
+[2026-07-22 04:52:25] Scanning CIGI...
+[2026-07-22 04:52:26] CIGI: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 04:52:26] [162/667] RDWR
+[2026-07-22 04:52:29] Scanning RDWR...
+[2026-07-22 04:52:29] RDWR: market cap too low ($1263M < $1B). Skip.
+[2026-07-22 04:52:29] [163/667] BLK
+[2026-07-22 04:52:32] Scanning BLK...
+[2026-07-22 04:52:33] BLK: 📅 next earnings: 2026-10-14 (84d away)
+[2026-07-22 04:52:33] BLK: Cup & Handle — cup rims differ 8.2% (max 5%)
+[2026-07-22 04:52:33] BLK: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:52:33] BLK: Double Bottom — no valid W pattern found
+[2026-07-22 04:52:33] NO ALERT BLK | close=1038.24 | ma150=1045.12
+[2026-07-22 04:52:33] [164/667] SCI
+[2026-07-22 04:52:36] Scanning SCI...
+[2026-07-22 04:52:37] SCI: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:52:37] [165/667] TMO
+[2026-07-22 04:52:40] Scanning TMO...
+[2026-07-22 04:52:40] TMO: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 04:52:40] [166/667] AAT
+[2026-07-22 04:52:43] Scanning AAT...
+[2026-07-22 04:52:44] AAT: market cap too low ($1962M < $1B). Skip.
+[2026-07-22 04:52:44] [167/667] CALY
+[2026-07-22 04:52:47] Scanning CALY...
+[2026-07-22 04:52:47] CALY: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:52:48] CALY: Cup & Handle — cup bottom at edge (13%) — V shape suspected
+[2026-07-22 04:52:48] CALY: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:52:48] CALY: Double Bottom — no valid W pattern found
+[2026-07-22 04:52:48] NO ALERT CALY | close=18.36 | ma150=14.95
+[2026-07-22 04:52:48] [168/667] PFGC
+[2026-07-22 04:52:51] Scanning PFGC...
+[2026-07-22 04:52:51] PFGC: 📅 next earnings: 2026-05-06 (-77d away)
+[2026-07-22 04:52:52] PFGC: Cup & Handle — handle drop too small (2.8%)
+[2026-07-22 04:52:52] PFGC: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:52:52] PFGC: Double Bottom — no valid W pattern found
+[2026-07-22 04:52:52] NO ALERT PFGC | close=110.34 | ma150=95.00
+[2026-07-22 04:52:52] [169/667] RBLX
+[2026-07-22 04:52:55] Scanning RBLX...
+[2026-07-22 04:52:55] RBLX: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 04:52:55] [170/667] CNX
+[2026-07-22 04:52:58] Scanning CNX...
+[2026-07-22 04:52:59] CNX: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 04:52:59] [171/667] TGTX
+[2026-07-22 04:53:02] Scanning TGTX...
+[2026-07-22 04:53:02] TGTX: ⏭️ Earnings filter — earnings in 12 days (2026-08-03)
+[2026-07-22 04:53:02] [172/667] HP
+[2026-07-22 04:53:05] Scanning HP...
+[2026-07-22 04:53:06] HP: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 04:53:06] [173/667] NJR
+[2026-07-22 04:53:09] Scanning NJR...
+[2026-07-22 04:53:09] NJR: ⏭️ Earnings filter — earnings in 12 days (2026-08-03)
+[2026-07-22 04:53:09] [174/667] FIG
+[2026-07-22 04:53:12] Scanning FIG...
+[2026-07-22 04:53:13] FIG: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 04:53:13] [175/667] BMO
+[2026-07-22 04:53:16] Scanning BMO...
+[2026-07-22 04:53:16] BMO: 📅 next earnings: 2026-08-25 (34d away)
+[2026-07-22 04:53:17] BMO: Cup & Handle — V-shape detected (slope ratio=1.00)
+[2026-07-22 04:53:17] BMO: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:53:17] BMO: Double Bottom — no valid W pattern found
+[2026-07-22 04:53:17] NO ALERT BMO | close=178.76 | ma150=149.44
+[2026-07-22 04:53:17] [176/667] WM
+[2026-07-22 04:53:20] Scanning WM...
+[2026-07-22 04:53:21] WM: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 04:53:21] [177/667] ABNB
+[2026-07-22 04:53:24] Scanning ABNB...
+[2026-07-22 04:53:24] ABNB: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:53:25] ABNB: Cup & Handle — cup bottom at edge (16%) — V shape suspected
+[2026-07-22 04:53:25] ABNB: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:53:25] ABNB: Double Bottom — no valid W pattern found
+[2026-07-22 04:53:25] NO ALERT ABNB | close=144.10 | ma150=134.65
+[2026-07-22 04:53:25] [178/667] UGI
+[2026-07-22 04:53:28] Scanning UGI...
+[2026-07-22 04:53:29] UGI: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 04:53:29] [179/667] AWK
+[2026-07-22 04:53:32] Scanning AWK...
+[2026-07-22 04:53:32] AWK: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:53:32] [180/667] BUSE
+[2026-07-22 04:53:35] Scanning BUSE...
+[2026-07-22 04:53:36] BUSE: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 04:53:36] [181/667] SON
+[2026-07-22 04:53:39] Scanning SON...
+[2026-07-22 04:53:39] SON: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 04:53:39] [182/667] HTLD
+[2026-07-22 04:53:42] Scanning HTLD...
+[2026-07-22 04:53:42] HTLD: market cap too low ($1186M < $1B). Skip.
+[2026-07-22 04:53:42] [183/667] LUV
+[2026-07-22 04:53:45] Scanning LUV...
+[2026-07-22 04:53:46] LUV: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 04:53:46] [184/667] FTNT
+[2026-07-22 04:53:49] Scanning FTNT...
+[2026-07-22 04:53:50] FTNT: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:53:50] [185/667] EWBC
+[2026-07-22 04:53:53] Scanning EWBC...
+[2026-07-22 04:53:53] EWBC: 📅 next earnings: 2026-07-21 (-1d away)
+[2026-07-22 04:53:54] EWBC: Cup & Handle — cup bottom at edge (17%) — V shape suspected
+[2026-07-22 04:53:54] EWBC: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:53:54] EWBC: Double Bottom — no valid W pattern found
+[2026-07-22 04:53:54] NO ALERT EWBC | close=133.40 | ma150=118.88
+[2026-07-22 04:53:54] [186/667] LSPD
+[2026-07-22 04:53:57] Scanning LSPD...
+[2026-07-22 04:53:57] LSPD: market cap too low ($1345M < $1B). Skip.
+[2026-07-22 04:53:57] [187/667] CHCO
+[2026-07-22 04:54:00] Scanning CHCO...
+[2026-07-22 04:54:00] CHCO: market cap too low ($1905M < $1B). Skip.
+[2026-07-22 04:54:00] [188/667] CSQ
+[2026-07-22 04:54:03] Scanning CSQ...
+[2026-07-22 04:54:04] CSQ: Cup & Handle — V-shape detected (slope ratio=1.21)
+[2026-07-22 04:54:04] CSQ: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:54:04] CSQ: Double Bottom — no valid W pattern found
+[2026-07-22 04:54:04] NO ALERT CSQ | close=20.49 | ma150=19.36
+[2026-07-22 04:54:04] [189/667] NVS
+[2026-07-22 04:54:07] Scanning NVS...
+[2026-07-22 04:54:07] NVS: 📅 next earnings: 2026-07-21 (-1d away)
+[2026-07-22 04:54:08] NVS: Cup & Handle — cup rims differ 7.9% (max 5%)
+[2026-07-22 04:54:08] NVS: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:54:08] NVS: Double Bottom — no valid W pattern found
+[2026-07-22 04:54:08] NO ALERT NVS | close=153.87 | ma150=150.53
+[2026-07-22 04:54:08] [190/667] HRI
+[2026-07-22 04:54:11] Scanning HRI...
+[2026-07-22 04:54:11] HRI: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 04:54:11] [191/667] GPGI
+[2026-07-22 04:54:14] Scanning GPGI...
+[2026-07-22 04:54:15] GPGI: 📅 next earnings: 2026-05-07 (-76d away)
+[2026-07-22 04:54:16] GPGI: Cup & Handle — V-shape detected (slope ratio=0.85)
+[2026-07-22 04:54:16] GPGI: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:54:16] GPGI: Double Bottom — no valid W pattern found
+[2026-07-22 04:54:16] NO ALERT GPGI | close=14.70 | ma150=17.84
+[2026-07-22 04:54:16] [192/667] TSEM
+[2026-07-22 04:54:19] Scanning TSEM...
+[2026-07-22 04:54:19] TSEM: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:54:19] [193/667] ADSK
+[2026-07-22 04:54:22] Scanning ADSK...
+[2026-07-22 04:54:23] ADSK: 📅 next earnings: 2026-08-27 (36d away)
+[2026-07-22 04:54:23] ADSK: Cup & Handle — cup bottom at edge (90%) — V shape suspected
+[2026-07-22 04:54:23] ADSK: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:54:23] ADSK: Double Bottom — no valid W pattern found
+[2026-07-22 04:54:24] NO ALERT ADSK | close=211.15 | ma150=242.04
+[2026-07-22 04:54:24] [194/667] AIZ
+[2026-07-22 04:54:27] Scanning AIZ...
+[2026-07-22 04:54:28] AIZ: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:54:28] [195/667] JHX
+[2026-07-22 04:54:31] Scanning JHX...
+[2026-07-22 04:54:32] JHX: 📅 next earnings: 2026-08-18 (27d away)
+[2026-07-22 04:54:32] JHX: Cup & Handle — cup rims differ 8.1% (max 5%)
+[2026-07-22 04:54:32] JHX: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:54:32] JHX: Double Bottom — no valid W pattern found
+[2026-07-22 04:54:32] NO ALERT JHX | close=24.90 | ma150=22.39
+[2026-07-22 04:54:32] [196/667] INDB
+[2026-07-22 04:54:35] Scanning INDB...
+[2026-07-22 04:54:36] INDB: 📅 next earnings: 2026-07-16 (-6d away)
+[2026-07-22 04:54:36] INDB: Cup & Handle — cup rims differ 5.5% (max 5%)
+[2026-07-22 04:54:36] INDB: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:54:36] INDB: Double Bottom — no valid W pattern found
+[2026-07-22 04:54:36] NO ALERT INDB | close=85.14 | ma150=79.13
+[2026-07-22 04:54:36] [197/667] VFC
+[2026-07-22 04:54:39] Scanning VFC...
+[2026-07-22 04:54:40] VFC: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:54:40] [198/667] ALGN
+[2026-07-22 04:54:43] Scanning ALGN...
+[2026-07-22 04:54:43] ALGN: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:54:43] [199/667] EXPO
+[2026-07-22 04:54:46] Scanning EXPO...
+[2026-07-22 04:54:47] EXPO: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 04:54:47] [200/667] RDNT
+[2026-07-22 04:54:50] Scanning RDNT...
+[2026-07-22 04:54:50] RDNT: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:54:51] RDNT: Cup & Handle — cup bottom at edge (86%) — V shape suspected
+[2026-07-22 04:54:51] RDNT: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:54:51] RDNT: Double Bottom — no valid W pattern found
+[2026-07-22 04:54:51] NO ALERT RDNT | close=61.87 | ma150=63.33
+[2026-07-22 04:54:51] [201/667] BYD
+[2026-07-22 04:54:54] Scanning BYD...
+[2026-07-22 04:54:55] BYD: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 04:54:55] [202/667] HWM
+[2026-07-22 04:54:58] Scanning HWM...
+[2026-07-22 04:54:58] HWM: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:54:58] HWM: ❌ EMA28 global filter — price too far above EMA28 (3.0% > 3%)
+[2026-07-22 04:54:58] [203/667] ORC
+[2026-07-22 04:55:01] Scanning ORC...
+[2026-07-22 04:55:01] ORC: market cap too low ($1359M < $1B). Skip.
+[2026-07-22 04:55:01] [204/667] RF
+[2026-07-22 04:55:04] Scanning RF...
+[2026-07-22 04:55:05] RF: 📅 next earnings: 2026-10-16 (86d away)
+[2026-07-22 04:55:05] RF: Cup & Handle — cup rims differ 7.7% (max 5%)
+[2026-07-22 04:55:05] RF: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:55:05] RF: Double Bottom — no valid W pattern found
+[2026-07-22 04:55:05] NO ALERT RF | close=30.82 | ma150=28.23
+[2026-07-22 04:55:05] [205/667] NE
+[2026-07-22 04:55:08] Scanning NE...
+[2026-07-22 04:55:09] NE: ⏭️ Earnings filter — earnings in 5 days (2026-07-27)
+[2026-07-22 04:55:09] [206/667] LQDT
+[2026-07-22 04:55:12] Scanning LQDT...
+[2026-07-22 04:55:12] LQDT: market cap too low ($1211M < $1B). Skip.
+[2026-07-22 04:55:12] [207/667] SR
+[2026-07-22 04:55:15] Scanning SR...
+[2026-07-22 04:55:16] SR: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 04:55:16] [208/667] DEI
+[2026-07-22 04:55:19] Scanning DEI...
+[2026-07-22 04:55:19] DEI: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:55:19] [209/667] NBHC
+[2026-07-22 04:55:22] Scanning NBHC...
+[2026-07-22 04:55:23] NBHC: 📅 next earnings: 2026-07-21 (-1d away)
+[2026-07-22 04:55:23] NBHC: Cup & Handle — cup bottom at edge (19%) — V shape suspected
+[2026-07-22 04:55:23] NBHC: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:55:23] NBHC: Double Bottom — no valid W pattern found
+[2026-07-22 04:55:23] NO ALERT NBHC | close=45.67 | ma150=41.37
+[2026-07-22 04:55:23] [210/667] LOB
+[2026-07-22 04:55:26] Scanning LOB...
+[2026-07-22 04:55:26] LOB: market cap too low ($1928M < $1B). Skip.
+[2026-07-22 04:55:26] [211/667] PM
+[2026-07-22 04:55:29] Scanning PM...
+[2026-07-22 04:55:30] PM: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 04:55:30] [212/667] FRME
+[2026-07-22 04:55:33] Scanning FRME...
+[2026-07-22 04:55:33] FRME: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 04:55:33] [213/667] FRMEP
+[2026-07-22 04:55:36] Scanning FRMEP...
+[2026-07-22 04:55:37] FRMEP: Cup & Handle — handle drop too small (1.0%)
+[2026-07-22 04:55:37] FRMEP: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:55:37] FRMEP: Double Bottom — no valid W pattern found
+[2026-07-22 04:55:37] NO ALERT FRMEP | close=25.61 | ma150=25.67
+[2026-07-22 04:55:37] [214/667] KEY
+[2026-07-22 04:55:40] Scanning KEY...
+[2026-07-22 04:55:41] KEY: ❌ EMA28 global filter — price below EMA28 (-0.0%)
+[2026-07-22 04:55:41] [215/667] KSPI
+[2026-07-22 04:55:44] Scanning KSPI...
+[2026-07-22 04:55:44] KSPI: 📅 next earnings: 2026-08-10 (19d away)
+[2026-07-22 04:55:45] KSPI: Cup & Handle — V-shape detected (slope ratio=1.30)
+[2026-07-22 04:55:45] KSPI: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:55:45] KSPI: Double Bottom — no valid W pattern found
+[2026-07-22 04:55:45] NO ALERT KSPI | close=89.08 | ma150=80.80
+[2026-07-22 04:55:45] [216/667] TPG
+[2026-07-22 04:55:48] Scanning TPG...
+[2026-07-22 04:55:48] TPG: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:55:48] [217/667] MLYS
+[2026-07-22 04:55:51] Scanning MLYS...
+[2026-07-22 04:55:52] MLYS: 📅 next earnings: 2026-05-06 (-77d away)
+[2026-07-22 04:55:52] MLYS: Cup & Handle — cup bottom at edge (83%) — V shape suspected
+[2026-07-22 04:55:52] MLYS: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:55:52] MLYS: Double Bottom — no valid W pattern found
+[2026-07-22 04:55:52] NO ALERT MLYS | close=27.52 | ma150=29.07
+[2026-07-22 04:55:52] [218/667] FIGR
+[2026-07-22 04:55:55] Scanning FIGR...
+[2026-07-22 04:55:56] FIGR: 📅 next earnings: 2026-08-13 (22d away)
+[2026-07-22 04:55:57] FIGR: Cup & Handle — cup rims differ 41.4% (max 5%)
+[2026-07-22 04:55:57] FIGR: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:55:57] FIGR: Double Bottom — no valid W pattern found
+[2026-07-22 04:55:57] NO ALERT FIGR | close=31.49 | ma150=37.89
+[2026-07-22 04:55:57] [219/667] GRDN
+[2026-07-22 04:56:00] Scanning GRDN...
+[2026-07-22 04:56:00] GRDN: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:56:01] GRDN: Cup & Handle — cup bottom at edge (16%) — V shape suspected
+[2026-07-22 04:56:01] GRDN: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:56:01] GRDN: Double Bottom — no valid W pattern found
+[2026-07-22 04:56:01] NO ALERT GRDN | close=40.91 | ma150=35.75
+[2026-07-22 04:56:01] [220/667] PSMT
+[2026-07-22 04:56:04] Scanning PSMT...
+[2026-07-22 04:56:04] PSMT: 📅 next earnings: 2026-07-08 (-14d away)
+[2026-07-22 04:56:05] PSMT: Cup & Handle — V-shape detected (slope ratio=1.08)
+[2026-07-22 04:56:05] PSMT: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:56:05] PSMT: Double Bottom — no valid W pattern found
+[2026-07-22 04:56:05] NO ALERT PSMT | close=186.49 | ma150=156.96
+[2026-07-22 04:56:05] [221/667] T
+[2026-07-22 04:56:08] Scanning T...
+[2026-07-22 04:56:09] T: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 04:56:09] [222/667] ZIM
+[2026-07-22 04:56:12] Scanning ZIM...
+[2026-07-22 04:56:12] ZIM: 📅 next earnings: 2026-08-20 (29d away)
+[2026-07-22 04:56:13] ZIM: Cup & Handle — cup rims differ 10.4% (max 5%)
+[2026-07-22 04:56:13] ZIM: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:56:13] ZIM: Double Bottom — no valid W pattern found
+[2026-07-22 04:56:14] NO ALERT ZIM | close=24.92 | ma150=24.83
+[2026-07-22 04:56:14] [223/667] ERO
+[2026-07-22 04:56:17] Scanning ERO...
+[2026-07-22 04:56:17] ERO: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 04:56:17] [224/667] EWTX
+[2026-07-22 04:56:20] Scanning EWTX...
+[2026-07-22 04:56:21] EWTX: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:56:21] EWTX: Cup & Handle — cup bottom at edge (15%) — V shape suspected
+[2026-07-22 04:56:21] EWTX: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:56:21] EWTX: Double Bottom — no valid W pattern found
+[2026-07-22 04:56:21] NO ALERT EWTX | close=39.58 | ma150=31.91
+[2026-07-22 04:56:21] [225/667] SPH
+[2026-07-22 04:56:24] Scanning SPH...
+[2026-07-22 04:56:25] SPH: market cap too low ($1216M < $1B). Skip.
+[2026-07-22 04:56:25] [226/667] ECVT
+[2026-07-22 04:56:28] Scanning ECVT...
+[2026-07-22 04:56:28] ECVT: market cap too low ($1383M < $1B). Skip.
+[2026-07-22 04:56:28] [227/667] FDS
+[2026-07-22 04:56:31] Scanning FDS...
+[2026-07-22 04:56:31] FDS: 📅 next earnings: 2026-09-17 (57d away)
+[2026-07-22 04:56:32] FDS: Cup & Handle — cup bottom at edge (18%) — V shape suspected
+[2026-07-22 04:56:32] FDS: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:56:32] FDS: Double Bottom — no valid W pattern found
+[2026-07-22 04:56:32] NO ALERT FDS | close=246.95 | ma150=238.55
+[2026-07-22 04:56:32] [228/667] AES
+[2026-07-22 04:56:35] Scanning AES...
+[2026-07-22 04:56:36] AES: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 04:56:36] [229/667] QURE
+[2026-07-22 04:56:39] Scanning QURE...
+[2026-07-22 04:56:39] QURE: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:56:39] [230/667] DD
+[2026-07-22 04:56:42] Scanning DD...
+[2026-07-22 04:56:43] DD: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:56:43] [231/667] AME
+[2026-07-22 04:56:46] Scanning AME...
+[2026-07-22 04:56:46] AME: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:56:46] [232/667] FLR
+[2026-07-22 04:56:49] Scanning FLR...
+[2026-07-22 04:56:50] FLR: 📅 next earnings: 2026-08-07 (16d away)
+[2026-07-22 04:56:50] FLR: Cup & Handle — V-shape detected (slope ratio=1.18)
+[2026-07-22 04:56:50] FLR: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:56:50] FLR: Double Bottom — no valid W pattern found
+[2026-07-22 04:56:50] NO ALERT FLR | close=51.39 | ma150=47.43
+[2026-07-22 04:56:50] [233/667] TER
+[2026-07-22 04:56:53] Scanning TER...
+[2026-07-22 04:56:54] TER: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 04:56:54] [234/667] BKNG
+[2026-07-22 04:56:57] Scanning BKNG...
+[2026-07-22 04:56:57] BKNG: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:56:57] [235/667] AMGN
+[2026-07-22 04:57:00] Scanning AMGN...
+[2026-07-22 04:57:01] AMGN: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:57:01] [236/667] AFL
+[2026-07-22 04:57:04] Scanning AFL...
+[2026-07-22 04:57:04] AFL: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:57:05] AFL: Cup & Handle — overextended (4.1% > 0.5%)
+[2026-07-22 04:57:05] AFL: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:57:05] AFL: Double Bottom — no valid W pattern found
+[2026-07-22 04:57:05] NO ALERT AFL | close=123.59 | ma150=113.61
+[2026-07-22 04:57:05] [237/667] OPCH
+[2026-07-22 04:57:08] Scanning OPCH...
+[2026-07-22 04:57:09] OPCH: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:57:09] [238/667] CDRE
+[2026-07-22 04:57:12] Scanning CDRE...
+[2026-07-22 04:57:12] CDRE: market cap too low ($1248M < $1B). Skip.
+[2026-07-22 04:57:12] [239/667] ARCC
+[2026-07-22 04:57:15] Scanning ARCC...
+[2026-07-22 04:57:15] ARCC: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:57:15] [240/667] MCB
+[2026-07-22 04:57:18] Scanning MCB...
+[2026-07-22 04:57:18] MCB: market cap too low ($1228M < $1B). Skip.
+[2026-07-22 04:57:18] [241/667] FTDR
+[2026-07-22 04:57:21] Scanning FTDR...
+[2026-07-22 04:57:22] FTDR: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:57:23] FTDR: Cup & Handle — cup bottom at edge (7%) — V shape suspected
+[2026-07-22 04:57:23] FTDR: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:57:23] FTDR: Double Bottom — no valid W pattern found
+[2026-07-22 04:57:23] NO ALERT FTDR | close=73.22 | ma150=62.74
+[2026-07-22 04:57:23] [242/667] MOS
+[2026-07-22 04:57:26] Scanning MOS...
+[2026-07-22 04:57:26] MOS: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:57:26] [243/667] TTE
+[2026-07-22 04:57:29] Scanning TTE...
+[2026-07-22 04:57:30] TTE: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 04:57:30] [244/667] RQI
+[2026-07-22 04:57:33] Scanning RQI...
+[2026-07-22 04:57:33] RQI: market cap too low ($1686M < $1B). Skip.
+[2026-07-22 04:57:33] [245/667] OMC
+[2026-07-22 04:57:36] Scanning OMC...
+[2026-07-22 04:57:37] OMC: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 04:57:37] [246/667] CLH
+[2026-07-22 04:57:40] Scanning CLH...
+[2026-07-22 04:57:40] CLH: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:57:40] [247/667] SHOO
+[2026-07-22 04:57:43] Scanning SHOO...
+[2026-07-22 04:57:44] SHOO: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 04:57:44] [248/667] TPR
+[2026-07-22 04:57:47] Scanning TPR...
+[2026-07-22 04:57:47] TPR: 📅 next earnings: 2026-05-07 (-76d away)
+[2026-07-22 04:57:47] TPR: ❌ EMA28 global filter — price below EMA28 (-0.2%)
+[2026-07-22 04:57:47] [249/667] HCI
+[2026-07-22 04:57:50] Scanning HCI...
+[2026-07-22 04:57:51] HCI: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:57:51] HCI: Cup & Handle — cup rims differ 15.2% (max 5%)
+[2026-07-22 04:57:51] HCI: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:57:51] HCI: Double Bottom — no valid W pattern found
+[2026-07-22 04:57:51] NO ALERT HCI | close=178.96 | ma150=165.02
+[2026-07-22 04:57:51] [250/667] AMH
+[2026-07-22 04:57:54] Scanning AMH...
+[2026-07-22 04:57:55] AMH: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 04:57:55] [251/667] ARMK
+[2026-07-22 04:57:58] Scanning ARMK...
+[2026-07-22 04:57:58] ARMK: 📅 next earnings: 2026-08-11 (20d away)
+[2026-07-22 04:57:59] ARMK: Cup & Handle — cup bottom at edge (2%) — V shape suspected
+[2026-07-22 04:57:59] ARMK: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:57:59] ARMK: Double Bottom — no valid W pattern found
+[2026-07-22 04:57:59] NO ALERT ARMK | close=56.11 | ma150=45.10
+[2026-07-22 04:57:59] [252/667] DELL
+[2026-07-22 04:58:02] Scanning DELL...
+[2026-07-22 04:58:03] DELL: 📅 next earnings: 2026-09-03 (43d away)
+[2026-07-22 04:58:03] DELL: Cup & Handle — cup rims differ 58.0% (max 5%)
+[2026-07-22 04:58:03] DELL: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:58:03] DELL: Double Bottom — no valid W pattern found
+[2026-07-22 04:58:03] NO ALERT DELL | close=404.15 | ma150=223.74
+[2026-07-22 04:58:03] [253/667] REG
+[2026-07-22 04:58:06] Scanning REG...
+[2026-07-22 04:58:07] REG: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:58:07] [254/667] QDEL
+[2026-07-22 04:58:10] Scanning QDEL...
+[2026-07-22 04:58:10] QDEL: market cap too low ($1120M < $1B). Skip.
+[2026-07-22 04:58:10] [255/667] TAP
+[2026-07-22 04:58:13] Scanning TAP...
+[2026-07-22 04:58:14] TAP: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:58:14] TAP: Cup & Handle — cup rims differ 23.5% (max 5%)
+[2026-07-22 04:58:14] TAP: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:58:14] TAP: Double Bottom — no valid W pattern found
+[2026-07-22 04:58:14] NO ALERT TAP | close=40.86 | ma150=44.37
+[2026-07-22 04:58:14] [256/667] SNY
+[2026-07-22 04:58:17] Scanning SNY...
+[2026-07-22 04:58:18] SNY: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 04:58:18] [257/667] TNC
+[2026-07-22 04:58:21] Scanning TNC...
+[2026-07-22 04:58:21] TNC: market cap too low ($1475M < $1B). Skip.
+[2026-07-22 04:58:21] [258/667] FOX
+[2026-07-22 04:58:24] Scanning FOX...
+[2026-07-22 04:58:25] FOX: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:58:25] FOX: Cup & Handle — cup bottom at edge (87%) — V shape suspected
+[2026-07-22 04:58:25] FOX: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:58:25] FOX: Double Bottom — no valid W pattern found
+[2026-07-22 04:58:25] NO ALERT FOX | close=51.47 | ma150=56.66
+[2026-07-22 04:58:25] [259/667] TRP
+[2026-07-22 04:58:28] Scanning TRP...
+[2026-07-22 04:58:29] TRP: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 04:58:29] [260/667] HPE
+[2026-07-22 04:58:32] Scanning HPE...
+[2026-07-22 04:58:32] HPE: 📅 next earnings: 2026-06-01 (-51d away)
+[2026-07-22 04:58:33] HPE: Cup & Handle — cup rims differ 79.0% (max 5%)
+[2026-07-22 04:58:33] HPE: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:58:33] HPE: Double Bottom — no valid W pattern found
+[2026-07-22 04:58:33] NO ALERT HPE | close=46.72 | ma150=30.31
+[2026-07-22 04:58:33] [261/667] KNSL
+[2026-07-22 04:58:36] Scanning KNSL...
+[2026-07-22 04:58:37] KNSL: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 04:58:37] [262/667] VISN
+[2026-07-22 04:58:40] Scanning VISN...
+[2026-07-22 04:58:40] VISN: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:58:41] VISN: Cup & Handle — cup rims differ 34.2% (max 5%)
+[2026-07-22 04:58:41] VISN: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:58:41] VISN: Double Bottom — no valid W pattern found
+[2026-07-22 04:58:41] NO ALERT VISN | close=12.48 | ma150=15.74
+[2026-07-22 04:58:41] [263/667] CMC
+[2026-07-22 04:58:44] Scanning CMC...
+[2026-07-22 04:58:44] CMC: 📅 next earnings: 2026-06-25 (-27d away)
+[2026-07-22 04:58:45] CMC: Cup & Handle — cup rims differ 7.5% (max 5%)
+[2026-07-22 04:58:45] CMC: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:58:45] CMC: Double Bottom — no valid W pattern found
+[2026-07-22 04:58:46] NO ALERT CMC | close=67.70 | ma150=70.50
+[2026-07-22 04:58:46] [264/667] THO
+[2026-07-22 04:58:49] Scanning THO...
+[2026-07-22 04:58:49] THO: 📅 next earnings: 2026-06-03 (-49d away)
+[2026-07-22 04:58:49] THO: ❌ EMA28 global filter — price below EMA28 (-0.0%)
+[2026-07-22 04:58:49] [265/667] BXP
+[2026-07-22 04:58:52] Scanning BXP...
+[2026-07-22 04:58:53] BXP: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 04:58:53] [266/667] D
+[2026-07-22 04:58:56] Scanning D...
+[2026-07-22 04:58:57] D: ⏭️ Earnings filter — earnings in 9 days (2026-07-31)
+[2026-07-22 04:58:57] [267/667] CENTA
+[2026-07-22 04:59:00] Scanning CENTA...
+[2026-07-22 04:59:00] CENTA: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 04:59:00] [268/667] BRZE
+[2026-07-22 04:59:03] Scanning BRZE...
+[2026-07-22 04:59:04] BRZE: 📅 next earnings: 2026-05-27 (-56d away)
+[2026-07-22 04:59:04] BRZE: Cup & Handle — cup rims differ 29.2% (max 5%)
+[2026-07-22 04:59:04] BRZE: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:59:04] BRZE: Double Bottom — no valid W pattern found
+[2026-07-22 04:59:04] NO ALERT BRZE | close=24.28 | ma150=23.36
+[2026-07-22 04:59:04] [269/667] BOBS
+[2026-07-22 04:59:07] Scanning BOBS...
+[2026-07-22 04:59:08] BOBS: 📅 next earnings: 2026-05-07 (-76d away)
+[2026-07-22 04:59:08] BOBS: Cup & Handle — cup rims differ 36.1% (max 5%)
+[2026-07-22 04:59:08] BOBS: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:59:08] BOBS: Double Bottom — no valid W pattern found
+[2026-07-22 04:59:08] NO ALERT BOBS | close=15.52 | ma150=14.39
+[2026-07-22 04:59:08] [270/667] TXNM
+[2026-07-22 04:59:11] Scanning TXNM...
+[2026-07-22 04:59:12] TXNM: ⏭️ Earnings filter — earnings in 9 days (2026-07-31)
+[2026-07-22 04:59:12] [271/667] PFSI
+[2026-07-22 04:59:15] Scanning PFSI...
+[2026-07-22 04:59:16] PFSI: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:59:16] [272/667] CBT
+[2026-07-22 04:59:19] Scanning CBT...
+[2026-07-22 04:59:20] CBT: ⏭️ Earnings filter — earnings in 12 days (2026-08-03)
+[2026-07-22 04:59:20] [273/667] DDOG
+[2026-07-22 04:59:23] Scanning DDOG...
+[2026-07-22 04:59:23] DDOG: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 04:59:24] DDOG: Cup & Handle — V-shape detected (slope ratio=1.34)
+[2026-07-22 04:59:24] DDOG: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:59:24] DDOG: Double Bottom — no valid W pattern found
+[2026-07-22 04:59:24] NO ALERT DDOG | close=254.79 | ma150=163.54
+[2026-07-22 04:59:24] [274/667] PHVS
+[2026-07-22 04:59:27] Scanning PHVS...
+[2026-07-22 04:59:28] PHVS: 📅 next earnings: 2026-08-12 (21d away)
+[2026-07-22 04:59:28] PHVS: Cup & Handle — cup bottom at edge (3%) — V shape suspected
+[2026-07-22 04:59:28] PHVS: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:59:28] PHVS: Double Bottom — no valid W pattern found
+[2026-07-22 04:59:28] NO ALERT PHVS | close=34.45 | ma150=28.80
+[2026-07-22 04:59:28] [275/667] SWK
+[2026-07-22 04:59:31] Scanning SWK...
+[2026-07-22 04:59:32] SWK: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:59:32] [276/667] VLY
+[2026-07-22 04:59:35] Scanning VLY...
+[2026-07-22 04:59:35] VLY: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 04:59:35] [277/667] BFST
+[2026-07-22 04:59:38] Scanning BFST...
+[2026-07-22 04:59:38] BFST: market cap too low ($1008M < $1B). Skip.
+[2026-07-22 04:59:38] [278/667] ABCB
+[2026-07-22 04:59:41] Scanning ABCB...
+[2026-07-22 04:59:42] ABCB: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 04:59:42] [279/667] BIIB
+[2026-07-22 04:59:45] Scanning BIIB...
+[2026-07-22 04:59:45] BIIB: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 04:59:45] [280/667] DBRG
+[2026-07-22 04:59:48] Scanning DBRG...
+[2026-07-22 04:59:49] DBRG: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 04:59:49] [281/667] GEV
+[2026-07-22 04:59:52] Scanning GEV...
+[2026-07-22 04:59:52] GEV: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 04:59:52] [282/667] URBN
+[2026-07-22 04:59:55] Scanning URBN...
+[2026-07-22 04:59:56] URBN: 📅 next earnings: 2026-05-20 (-63d away)
+[2026-07-22 04:59:57] URBN: Cup & Handle — cup rims differ 7.9% (max 5%)
+[2026-07-22 04:59:57] URBN: Bullish Triangle — no valid ascending triangle
+[2026-07-22 04:59:57] URBN: Double Bottom — no valid W pattern found
+[2026-07-22 04:59:57] NO ALERT URBN | close=73.74 | ma150=70.88
+[2026-07-22 04:59:57] [283/667] NGVT
+[2026-07-22 05:00:00] Scanning NGVT...
+[2026-07-22 05:00:01] NGVT: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:00:01] [284/667] ARW
+[2026-07-22 05:00:04] Scanning ARW...
+[2026-07-22 05:00:07] ARW: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:00:07] [285/667] CUBE
+[2026-07-22 05:00:10] Scanning CUBE...
+[2026-07-22 05:00:11] CUBE: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:00:11] [286/667] PPC
+[2026-07-22 05:00:14] Scanning PPC...
+[2026-07-22 05:00:16] PPC: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:00:16] [287/667] OPLN
+[2026-07-22 05:00:19] Scanning OPLN...
+[2026-07-22 05:00:20] OPLN: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:00:20] [288/667] PBLS
+[2026-07-22 05:00:23] Scanning PBLS...
+[2026-07-22 05:00:23] PBLS: no data. Skip.
+[2026-07-22 05:00:23] [289/667] BUD
+[2026-07-22 05:00:26] Scanning BUD...
+[2026-07-22 05:00:27] BUD: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:00:27] [290/667] IBKR
+[2026-07-22 05:00:30] Scanning IBKR...
+[2026-07-22 05:00:32] IBKR: 📅 next earnings: 2026-07-21 (-1d away)
+[2026-07-22 05:00:32] IBKR: Cup & Handle — cup rims differ 13.3% (max 5%)
+[2026-07-22 05:00:32] IBKR: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:00:32] IBKR: Double Bottom — no valid W pattern found
+[2026-07-22 05:00:32] NO ALERT IBKR | close=94.42 | ma150=77.77
+[2026-07-22 05:00:32] [291/667] SHLS
+[2026-07-22 05:00:35] Scanning SHLS...
+[2026-07-22 05:00:36] SHLS: market cap too low ($1741M < $1B). Skip.
+[2026-07-22 05:00:36] [292/667] CENT
+[2026-07-22 05:00:39] Scanning CENT...
+[2026-07-22 05:00:39] CENT: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:00:39] [293/667] RRX
+[2026-07-22 05:00:42] Scanning RRX...
+[2026-07-22 05:00:43] RRX: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:00:43] [294/667] CUBI
+[2026-07-22 05:00:46] Scanning CUBI...
+[2026-07-22 05:00:47] CUBI: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 05:00:47] [295/667] CGAU
+[2026-07-22 05:00:50] Scanning CGAU...
+[2026-07-22 05:00:51] CGAU: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 05:00:51] [296/667] NXST
+[2026-07-22 05:00:54] Scanning NXST...
+[2026-07-22 05:00:55] NXST: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:00:56] NXST: Cup & Handle — cup bottom at edge (85%) — V shape suspected
+[2026-07-22 05:00:56] NXST: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:00:56] NXST: Double Bottom — no valid W pattern found
+[2026-07-22 05:00:56] NO ALERT NXST | close=183.49 | ma150=203.02
+[2026-07-22 05:00:56] [297/667] WSM
+[2026-07-22 05:00:59] Scanning WSM...
+[2026-07-22 05:00:59] WSM: 📅 next earnings: 2026-05-21 (-62d away)
+[2026-07-22 05:01:00] WSM: Cup & Handle — cup rims differ 8.8% (max 5%)
+[2026-07-22 05:01:00] WSM: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:01:00] WSM: Double Bottom — no valid W pattern found
+[2026-07-22 05:01:00] NO ALERT WSM | close=221.13 | ma150=200.13
+[2026-07-22 05:01:00] [298/667] HUT
+[2026-07-22 05:01:03] Scanning HUT...
+[2026-07-22 05:01:04] HUT: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:01:04] [299/667] LCII
+[2026-07-22 05:01:07] Scanning LCII...
+[2026-07-22 05:01:08] LCII: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:01:08] [300/667] BDX
+[2026-07-22 05:01:11] Scanning BDX...
+[2026-07-22 05:01:12] BDX: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:01:13] BDX: Cup & Handle — cup bottom at edge (81%) — V shape suspected
+[2026-07-22 05:01:13] BDX: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:01:13] BDX: Double Bottom — no valid W pattern found
+[2026-07-22 05:01:13] NO ALERT BDX | close=153.84 | ma150=156.70
+[2026-07-22 05:01:13] [301/667] PVH
+[2026-07-22 05:01:16] Scanning PVH...
+[2026-07-22 05:01:17] PVH: 📅 next earnings: 2026-08-25 (34d away)
+[2026-07-22 05:01:17] PVH: Cup & Handle — cup rims differ 12.9% (max 5%)
+[2026-07-22 05:01:17] PVH: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:01:17] PVH: Double Bottom — no valid W pattern found
+[2026-07-22 05:01:17] NO ALERT PVH | close=78.65 | ma150=75.41
+[2026-07-22 05:01:17] [302/667] CBRE
+[2026-07-22 05:01:20] Scanning CBRE...
+[2026-07-22 05:01:21] CBRE: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:01:21] [303/667] NYT
+[2026-07-22 05:01:24] Scanning NYT...
+[2026-07-22 05:01:25] NYT: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:01:25] [304/667] FLG
+[2026-07-22 05:01:28] Scanning FLG...
+[2026-07-22 05:01:29] FLG: ⏭️ Earnings filter — earnings in 2 days (2026-07-24)
+[2026-07-22 05:01:29] [305/667] KKR
+[2026-07-22 05:01:32] Scanning KKR...
+[2026-07-22 05:01:33] KKR: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:01:33] [306/667] GBCI
+[2026-07-22 05:01:36] Scanning GBCI...
+[2026-07-22 05:01:38] GBCI: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 05:01:38] [307/667] EPD
+[2026-07-22 05:01:41] Scanning EPD...
+[2026-07-22 05:01:42] EPD: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:01:42] [308/667] OBDC
+[2026-07-22 05:01:45] Scanning OBDC...
+[2026-07-22 05:01:45] OBDC: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:01:45] [309/667] NWSA
+[2026-07-22 05:01:48] Scanning NWSA...
+[2026-07-22 05:01:49] NWSA: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:01:49] [310/667] GAM
+[2026-07-22 05:01:52] Scanning GAM...
+[2026-07-22 05:01:52] GAM: market cap too low ($1549M < $1B). Skip.
+[2026-07-22 05:01:52] [311/667] CCEC
+[2026-07-22 05:01:55] Scanning CCEC...
+[2026-07-22 05:01:55] CCEC: market cap too low ($1353M < $1B). Skip.
+[2026-07-22 05:01:55] [312/667] BIPC
+[2026-07-22 05:01:58] Scanning BIPC...
+[2026-07-22 05:01:59] BIPC: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:01:59] [313/667] TEL
+[2026-07-22 05:02:02] Scanning TEL...
+[2026-07-22 05:02:03] TEL: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 05:02:03] [314/667] ENJ
+[2026-07-22 05:02:06] Scanning ENJ...
+[2026-07-22 05:02:06] ENJ: market cap too low ($170M < $1B). Skip.
+[2026-07-22 05:02:06] [315/667] BL
+[2026-07-22 05:02:09] Scanning BL...
+[2026-07-22 05:02:09] BL: market cap too low ($1722M < $1B). Skip.
+[2026-07-22 05:02:09] [316/667] ESE
+[2026-07-22 05:02:12] Scanning ESE...
+[2026-07-22 05:02:13] ESE: 📅 next earnings: 2026-05-07 (-76d away)
+[2026-07-22 05:02:13] ESE: Cup & Handle — cup bottom at edge (9%) — V shape suspected
+[2026-07-22 05:02:13] ESE: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:02:13] ESE: Double Bottom — no valid W pattern found
+[2026-07-22 05:02:13] NO ALERT ESE | close=332.16 | ma150=279.93
+[2026-07-22 05:02:13] [317/667] OTEX
+[2026-07-22 05:02:16] Scanning OTEX...
+[2026-07-22 05:02:17] OTEX: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:02:18] OTEX: Cup & Handle — cup bottom at edge (89%) — V shape suspected
+[2026-07-22 05:02:18] OTEX: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:02:18] OTEX: Double Bottom — no valid W pattern found
+[2026-07-22 05:02:18] NO ALERT OTEX | close=22.77 | ma150=24.97
+[2026-07-22 05:02:18] [318/667] AROC
+[2026-07-22 05:02:21] Scanning AROC...
+[2026-07-22 05:02:21] AROC: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:02:21] [319/667] HSIC
+[2026-07-22 05:02:24] Scanning HSIC...
+[2026-07-22 05:02:25] HSIC: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:02:25] [320/667] WSE
+[2026-07-22 05:02:28] Scanning WSE...
+[2026-07-22 05:02:28] WSE: 📅 next earnings: 2026-06-25 (-27d away)
+[2026-07-22 05:02:28] WSE: ❌ EMA28 global filter — price too far above EMA28 (4.1% > 3%)
+[2026-07-22 05:02:28] [321/667] GATX
+[2026-07-22 05:02:31] Scanning GATX...
+[2026-07-22 05:02:32] GATX: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:02:32] [322/667] BROS
+[2026-07-22 05:02:35] Scanning BROS...
+[2026-07-22 05:02:36] BROS: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:02:36] [323/667] IQV
+[2026-07-22 05:02:39] Scanning IQV...
+[2026-07-22 05:02:39] IQV: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 05:02:39] [324/667] ASML
+[2026-07-22 05:02:42] Scanning ASML...
+[2026-07-22 05:02:43] ASML: 📅 next earnings: 2026-10-14 (84d away)
+[2026-07-22 05:02:44] ASML: Cup & Handle — cup rims differ 24.4% (max 5%)
+[2026-07-22 05:02:44] ASML: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:02:44] ASML: Double Bottom — no valid W pattern found
+[2026-07-22 05:02:44] NO ALERT ASML | close=1801.51 | ma150=1473.61
+[2026-07-22 05:02:44] [325/667] F
+[2026-07-22 05:02:47] Scanning F...
+[2026-07-22 05:02:47] F: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 05:02:47] [326/667] MT
+[2026-07-22 05:02:50] Scanning MT...
+[2026-07-22 05:02:51] MT: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:02:51] [327/667] FOXA
+[2026-07-22 05:02:54] Scanning FOXA...
+[2026-07-22 05:02:55] FOXA: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:02:55] FOXA: ❌ Reverse Scanner — ⚠️ Reverse Scan: 2 סימני מכירה מוסדית — הימנע!
+[2026-07-22 05:02:55] [328/667] J
+[2026-07-22 05:02:58] Scanning J...
+[2026-07-22 05:02:59] J: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:02:59] [329/667] BV
+[2026-07-22 05:03:02] Scanning BV...
+[2026-07-22 05:03:02] BV: market cap too low ($1311M < $1B). Skip.
+[2026-07-22 05:03:02] [330/667] RNST
+[2026-07-22 05:03:05] Scanning RNST...
+[2026-07-22 05:03:06] RNST: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 05:03:06] [331/667] ALKT
+[2026-07-22 05:03:09] Scanning ALKT...
+[2026-07-22 05:03:09] ALKT: market cap too low ($1862M < $1B). Skip.
+[2026-07-22 05:03:09] [332/667] A
+[2026-07-22 05:03:12] Scanning A...
+[2026-07-22 05:03:12] A: 📅 next earnings: 2026-08-26 (35d away)
+[2026-07-22 05:03:13] A: Cup & Handle — cup rims differ 12.0% (max 5%)
+[2026-07-22 05:03:13] A: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:03:13] A: Double Bottom — no valid W pattern found
+[2026-07-22 05:03:13] NO ALERT A | close=132.86 | ma150=126.31
+[2026-07-22 05:03:13] [333/667] MRX
+[2026-07-22 05:03:16] Scanning MRX...
+[2026-07-22 05:03:17] MRX: 📅 next earnings: 2026-05-06 (-77d away)
+[2026-07-22 05:03:17] MRX: Cup & Handle — cup bottom at edge (12%) — V shape suspected
+[2026-07-22 05:03:17] MRX: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:03:17] MRX: Double Bottom — no valid W pattern found
+[2026-07-22 05:03:17] NO ALERT MRX | close=64.64 | ma150=48.27
+[2026-07-22 05:03:17] [334/667] SHC
+[2026-07-22 05:03:20] Scanning SHC...
+[2026-07-22 05:03:21] SHC: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:03:21] SHC: Cup & Handle — cup rims differ 14.6% (max 5%)
+[2026-07-22 05:03:21] SHC: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:03:21] SHC: Double Bottom — no valid W pattern found
+[2026-07-22 05:03:21] NO ALERT SHC | close=17.40 | ma150=16.43
+[2026-07-22 05:03:21] [335/667] ENSG
+[2026-07-22 05:03:24] Scanning ENSG...
+[2026-07-22 05:03:25] ENSG: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 05:03:25] [336/667] OBK
+[2026-07-22 05:03:28] Scanning OBK...
+[2026-07-22 05:03:28] OBK: market cap too low ($1601M < $1B). Skip.
+[2026-07-22 05:03:28] [337/667] VSAT
+[2026-07-22 05:03:31] Scanning VSAT...
+[2026-07-22 05:03:32] VSAT: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:03:32] [338/667] L
+[2026-07-22 05:03:35] Scanning L...
+[2026-07-22 05:03:36] L: ⏭️ Earnings filter — earnings in 12 days (2026-08-03)
+[2026-07-22 05:03:36] [339/667] REX
+[2026-07-22 05:03:39] Scanning REX...
+[2026-07-22 05:03:39] REX: market cap too low ($1547M < $1B). Skip.
+[2026-07-22 05:03:39] [340/667] INVX
+[2026-07-22 05:03:42] Scanning INVX...
+[2026-07-22 05:03:42] INVX: market cap too low ($1843M < $1B). Skip.
+[2026-07-22 05:03:42] [341/667] MC
+[2026-07-22 05:03:45] Scanning MC...
+[2026-07-22 05:03:46] MC: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:03:46] [342/667] EFSC
+[2026-07-22 05:03:49] Scanning EFSC...
+[2026-07-22 05:03:49] EFSC: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 05:03:49] [343/667] LKFN
+[2026-07-22 05:03:52] Scanning LKFN...
+[2026-07-22 05:03:53] LKFN: market cap too low ($1547M < $1B). Skip.
+[2026-07-22 05:03:53] [344/667] TRUP
+[2026-07-22 05:03:56] Scanning TRUP...
+[2026-07-22 05:03:56] TRUP: market cap too low ($1128M < $1B). Skip.
+[2026-07-22 05:03:56] [345/667] NWN
+[2026-07-22 05:03:59] Scanning NWN...
+[2026-07-22 05:04:00] NWN: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:04:00] [346/667] VIK
+[2026-07-22 05:04:03] Scanning VIK...
+[2026-07-22 05:04:04] VIK: 📅 next earnings: 2026-05-14 (-69d away)
+[2026-07-22 05:04:04] VIK: Cup & Handle — cup bottom at edge (12%) — V shape suspected
+[2026-07-22 05:04:04] VIK: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:04:04] VIK: Double Bottom — no valid W pattern found
+[2026-07-22 05:04:04] NO ALERT VIK | close=99.27 | ma150=80.94
+[2026-07-22 05:04:04] [347/667] GNK
+[2026-07-22 05:04:07] Scanning GNK...
+[2026-07-22 05:04:08] GNK: market cap too low ($1105M < $1B). Skip.
+[2026-07-22 05:04:08] [348/667] VNOM
+[2026-07-22 05:04:11] Scanning VNOM...
+[2026-07-22 05:04:11] VNOM: ⏭️ Earnings filter — earnings in 12 days (2026-08-03)
+[2026-07-22 05:04:11] [349/667] NEU
+[2026-07-22 05:04:14] Scanning NEU...
+[2026-07-22 05:04:15] NEU: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:04:15] [350/667] MCO
+[2026-07-22 05:04:18] Scanning MCO...
+[2026-07-22 05:04:18] MCO: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 05:04:18] [351/667] MKL
+[2026-07-22 05:04:21] Scanning MKL...
+[2026-07-22 05:04:22] MKL: 📅 next earnings: 2026-04-28 (-85d away)
+[2026-07-22 05:04:22] MKL: Cup & Handle — V-shape detected (slope ratio=0.79)
+[2026-07-22 05:04:22] MKL: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:04:22] MKL: Double Bottom — no valid W pattern found
+[2026-07-22 05:04:22] NO ALERT MKL | close=1962.93 | ma150=1967.84
+[2026-07-22 05:04:22] [352/667] APH
+[2026-07-22 05:04:25] Scanning APH...
+[2026-07-22 05:04:26] APH: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:04:26] [353/667] VZ
+[2026-07-22 05:04:29] Scanning VZ...
+[2026-07-22 05:04:29] VZ: ⏭️ Earnings filter — earnings in 2 days (2026-07-24)
+[2026-07-22 05:04:29] [354/667] SOLV
+[2026-07-22 05:04:32] Scanning SOLV...
+[2026-07-22 05:04:33] SOLV: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:04:33] [355/667] TAC
+[2026-07-22 05:04:36] Scanning TAC...
+[2026-07-22 05:04:36] TAC: ⏭️ Earnings filter — earnings in 9 days (2026-07-31)
+[2026-07-22 05:04:36] [356/667] EDU
+[2026-07-22 05:04:39] Scanning EDU...
+[2026-07-22 05:04:40] EDU: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:04:40] [357/667] CR
+[2026-07-22 05:04:43] Scanning CR...
+[2026-07-22 05:04:43] CR: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 05:04:43] [358/667] MLI
+[2026-07-22 05:04:46] Scanning MLI...
+[2026-07-22 05:04:47] MLI: 📅 next earnings: 2026-07-21 (-1d away)
+[2026-07-22 05:04:47] MLI: ❌ EMA28 global filter — price below EMA28 (-21.9%)
+[2026-07-22 05:04:47] [359/667] CNO
+[2026-07-22 05:04:50] Scanning CNO...
+[2026-07-22 05:04:50] CNO: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:04:50] [360/667] NSIT
+[2026-07-22 05:04:53] Scanning NSIT...
+[2026-07-22 05:04:54] NSIT: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:04:54] NSIT: Cup & Handle — cup rims differ 6.9% (max 5%)
+[2026-07-22 05:04:54] NSIT: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:04:54] NSIT: Double Bottom — no valid W pattern found
+[2026-07-22 05:04:54] NO ALERT NSIT | close=116.14 | ma150=88.80
+[2026-07-22 05:04:54] [361/667] ONB
+[2026-07-22 05:04:57] Scanning ONB...
+[2026-07-22 05:04:58] ONB: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 05:04:58] [362/667] GH
+[2026-07-22 05:05:01] Scanning GH...
+[2026-07-22 05:05:02] GH: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:05:02] [363/667] RYTM
+[2026-07-22 05:05:05] Scanning RYTM...
+[2026-07-22 05:05:06] RYTM: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:05:06] [364/667] CPB
+[2026-07-22 05:05:09] Scanning CPB...
+[2026-07-22 05:05:09] CPB: 📅 next earnings: 2026-09-09 (49d away)
+[2026-07-22 05:05:10] CPB: Cup & Handle — V-shape detected (slope ratio=0.89)
+[2026-07-22 05:05:10] CPB: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:05:10] CPB: Double Bottom — no valid W pattern found
+[2026-07-22 05:05:10] NO ALERT CPB | close=22.34 | ma150=23.70
+[2026-07-22 05:05:10] [365/667] KVUE
+[2026-07-22 05:05:13] Scanning KVUE...
+[2026-07-22 05:05:14] KVUE: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:05:15] KVUE: Cup & Handle — handle drop too small (1.6%)
+[2026-07-22 05:05:15] KVUE: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:05:15] KVUE: Double Bottom — no valid W pattern found
+[2026-07-22 05:05:15] NO ALERT KVUE | close=19.01 | ma150=17.81
+[2026-07-22 05:05:15] [366/667] CEG
+[2026-07-22 05:05:18] Scanning CEG...
+[2026-07-22 05:05:18] CEG: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:05:19] CEG: ❌ Reverse Scanner — ⚠️ Reverse Scan: 2 סימני מכירה מוסדית — הימנע!
+[2026-07-22 05:05:19] [367/667] CRWD
+[2026-07-22 05:05:22] Scanning CRWD...
+[2026-07-22 05:05:23] CRWD: 📅 next earnings: 2026-09-01 (41d away)
+[2026-07-22 05:05:24] CRWD: Cup & Handle — cup rims differ 31.1% (max 5%)
+[2026-07-22 05:05:24] CRWD: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:05:24] CRWD: Double Bottom — no valid W pattern found
+[2026-07-22 05:05:24] NO ALERT CRWD | close=191.15 | ma150=130.63
+[2026-07-22 05:05:24] [368/667] BVN
+[2026-07-22 05:05:27] Scanning BVN...
+[2026-07-22 05:05:27] BVN: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:05:27] [369/667] DOO
+[2026-07-22 05:05:30] Scanning DOO...
+[2026-07-22 05:05:31] DOO: 📅 next earnings: 2026-08-28 (37d away)
+[2026-07-22 05:05:31] DOO: ❌ EMA28 global filter — price below EMA28 (-0.1%)
+[2026-07-22 05:05:31] [370/667] SKY
+[2026-07-22 05:05:34] Scanning SKY...
+[2026-07-22 05:05:34] SKY: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:05:34] [371/667] DGX
+[2026-07-22 05:05:37] Scanning DGX...
+[2026-07-22 05:05:38] DGX: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 05:05:38] [372/667] HTGC
+[2026-07-22 05:05:41] Scanning HTGC...
+[2026-07-22 05:05:42] HTGC: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:05:42] [373/667] CAH
+[2026-07-22 05:05:45] Scanning CAH...
+[2026-07-22 05:05:45] CAH: 📅 next earnings: 2026-08-11 (20d away)
+[2026-07-22 05:05:46] CAH: Cup & Handle — no breakout yet (227.09 < 237.92)
+[2026-07-22 05:05:46] CAH: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:05:46] CAH: Double Bottom — no valid W pattern found
+[2026-07-22 05:05:46] NO ALERT CAH | close=227.09 | ma150=212.83
+[2026-07-22 05:05:46] [374/667] OC
+[2026-07-22 05:05:49] Scanning OC...
+[2026-07-22 05:05:49] OC: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:05:49] [375/667] ALNT
+[2026-07-22 05:05:52] Scanning ALNT...
+[2026-07-22 05:05:53] ALNT: market cap too low ($1529M < $1B). Skip.
+[2026-07-22 05:05:53] [376/667] WRB
+[2026-07-22 05:05:56] Scanning WRB...
+[2026-07-22 05:05:57] WRB: 📅 next earnings: 2026-10-19 (89d away)
+[2026-07-22 05:05:57] WRB: Cup & Handle — cup bottom at edge (82%) — V shape suspected
+[2026-07-22 05:05:57] WRB: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:05:57] WRB: Double Bottom — no valid W pattern found
+[2026-07-22 05:05:57] NO ALERT WRB | close=72.16 | ma150=68.45
+[2026-07-22 05:05:57] [377/667] CNR
+[2026-07-22 05:06:00] Scanning CNR...
+[2026-07-22 05:06:01] CNR: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:06:01] [378/667] PFE
+[2026-07-22 05:06:04] Scanning PFE...
+[2026-07-22 05:06:05] PFE: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:06:05] [379/667] MIRM
+[2026-07-22 05:06:08] Scanning MIRM...
+[2026-07-22 05:06:08] MIRM: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:06:08] [380/667] ICE
+[2026-07-22 05:06:11] Scanning ICE...
+[2026-07-22 05:06:12] ICE: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:06:12] [381/667] GIB
+[2026-07-22 05:06:15] Scanning GIB...
+[2026-07-22 05:06:15] GIB: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:06:15] [382/667] ACGL
+[2026-07-22 05:06:18] Scanning ACGL...
+[2026-07-22 05:06:19] ACGL: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 05:06:19] [383/667] EBAY
+[2026-07-22 05:06:22] Scanning EBAY...
+[2026-07-22 05:06:22] EBAY: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:06:22] [384/667] GJS
+[2026-07-22 05:06:25] Scanning GJS...
+[2026-07-22 05:06:26] GJS: Cup & Handle — V-shape detected (slope ratio=0.88)
+[2026-07-22 05:06:26] GJS: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:06:26] GJS: Double Bottom — no valid W pattern found
+[2026-07-22 05:06:26] NO ALERT GJS | close=23.66 | ma150=23.48
+[2026-07-22 05:06:26] [385/667] PAX
+[2026-07-22 05:06:29] Scanning PAX...
+[2026-07-22 05:06:29] PAX: market cap too low ($1777M < $1B). Skip.
+[2026-07-22 05:06:29] [386/667] TYRA
+[2026-07-22 05:06:32] Scanning TYRA...
+[2026-07-22 05:06:32] TYRA: market cap too low ($1894M < $1B). Skip.
+[2026-07-22 05:06:32] [387/667] JNJ
+[2026-07-22 05:06:35] Scanning JNJ...
+[2026-07-22 05:06:36] JNJ: 📅 next earnings: 2026-10-13 (83d away)
+[2026-07-22 05:06:37] JNJ: Cup & Handle — V-shape detected (slope ratio=1.33)
+[2026-07-22 05:06:37] JNJ: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:06:37] JNJ: Double Bottom — no valid W pattern found
+[2026-07-22 05:06:37] NO ALERT JNJ | close=250.61 | ma150=233.01
+[2026-07-22 05:06:37] [388/667] GABC
+[2026-07-22 05:06:40] Scanning GABC...
+[2026-07-22 05:06:40] GABC: market cap too low ($1803M < $1B). Skip.
+[2026-07-22 05:06:40] [389/667] ITRI
+[2026-07-22 05:06:43] Scanning ITRI...
+[2026-07-22 05:06:44] ITRI: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 05:06:44] [390/667] LOGI
+[2026-07-22 05:06:47] Scanning LOGI...
+[2026-07-22 05:06:48] LOGI: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 05:06:48] [391/667] GD
+[2026-07-22 05:06:51] Scanning GD...
+[2026-07-22 05:06:51] GD: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:06:51] [392/667] RY
+[2026-07-22 05:06:54] Scanning RY...
+[2026-07-22 05:06:55] RY: 📅 next earnings: 2026-08-27 (36d away)
+[2026-07-22 05:06:55] RY: Cup & Handle — cup rims differ 13.6% (max 5%)
+[2026-07-22 05:06:55] RY: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:06:55] RY: Double Bottom — no valid W pattern found
+[2026-07-22 05:06:55] NO ALERT RY | close=210.88 | ma150=179.04
+[2026-07-22 05:06:55] [393/667] HE
+[2026-07-22 05:06:58] Scanning HE...
+[2026-07-22 05:06:59] HE: 📅 next earnings: 2026-08-07 (16d away)
+[2026-07-22 05:06:59] HE: ❌ EMA28 global filter — price below EMA28 (-0.1%)
+[2026-07-22 05:06:59] [394/667] SWX
+[2026-07-22 05:07:02] Scanning SWX...
+[2026-07-22 05:07:02] SWX: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:07:02] [395/667] GMAB
+[2026-07-22 05:07:05] Scanning GMAB...
+[2026-07-22 05:07:06] GMAB: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:07:07] GMAB: Cup & Handle — V-shape detected (slope ratio=1.21)
+[2026-07-22 05:07:07] GMAB: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:07:07] GMAB: Double Bottom — no valid W pattern found
+[2026-07-22 05:07:07] NO ALERT GMAB | close=28.36 | ma150=28.64
+[2026-07-22 05:07:07] [396/667] CVCO
+[2026-07-22 05:07:10] Scanning CVCO...
+[2026-07-22 05:07:10] CVCO: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:07:10] [397/667] FIS
+[2026-07-22 05:07:13] Scanning FIS...
+[2026-07-22 05:07:14] FIS: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:07:14] [398/667] AYA
+[2026-07-22 05:07:17] Scanning AYA...
+[2026-07-22 05:07:17] AYA: 📅 next earnings: 2026-08-13 (22d away)
+[2026-07-22 05:07:18] AYA: Cup & Handle — V-shape detected (slope ratio=1.06)
+[2026-07-22 05:07:18] AYA: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:07:18] AYA: Double Bottom — no valid W pattern found
+[2026-07-22 05:07:18] NO ALERT AYA | close=19.26 | ma150=17.47
+[2026-07-22 05:07:18] [399/667] SBUX
+[2026-07-22 05:07:21] Scanning SBUX...
+[2026-07-22 05:07:21] SBUX: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:07:21] [400/667] VLTO
+[2026-07-22 05:07:24] Scanning VLTO...
+[2026-07-22 05:07:25] VLTO: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 05:07:25] [401/667] FBNC
+[2026-07-22 05:07:28] Scanning FBNC...
+[2026-07-22 05:07:28] FBNC: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 05:07:28] [402/667] INGR
+[2026-07-22 05:07:31] Scanning INGR...
+[2026-07-22 05:07:32] INGR: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:07:32] [403/667] IOT
+[2026-07-22 05:07:35] Scanning IOT...
+[2026-07-22 05:07:35] IOT: 📅 next earnings: 2026-09-03 (43d away)
+[2026-07-22 05:07:36] IOT: Cup & Handle — cup rims differ 21.8% (max 5%)
+[2026-07-22 05:07:36] IOT: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:07:36] IOT: Double Bottom — no valid W pattern found
+[2026-07-22 05:07:36] NO ALERT IOT | close=36.07 | ma150=31.92
+[2026-07-22 05:07:36] [404/667] SIRI
+[2026-07-22 05:07:39] Scanning SIRI...
+[2026-07-22 05:07:40] SIRI: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:07:40] [405/667] HLMN
+[2026-07-22 05:07:43] Scanning HLMN...
+[2026-07-22 05:07:43] HLMN: market cap too low ($1554M < $1B). Skip.
+[2026-07-22 05:07:43] [406/667] LOMA
+[2026-07-22 05:07:46] Scanning LOMA...
+[2026-07-22 05:07:46] LOMA: market cap too low ($1344M < $1B). Skip.
+[2026-07-22 05:07:46] [407/667] ATMU
+[2026-07-22 05:07:49] Scanning ATMU...
+[2026-07-22 05:07:49] ATMU: 📅 next earnings: 2026-05-01 (-82d away)
+[2026-07-22 05:07:50] ATMU: Cup & Handle — cup rims differ 16.8% (max 5%)
+[2026-07-22 05:07:50] ATMU: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:07:50] ATMU: Double Bottom — no valid W pattern found
+[2026-07-22 05:07:51] NO ALERT ATMU | close=51.14 | ma150=55.83
+[2026-07-22 05:07:51] [408/667] BMA
+[2026-07-22 05:07:54] Scanning BMA...
+[2026-07-22 05:07:54] BMA: 📅 next earnings: 2026-08-26 (35d away)
+[2026-07-22 05:07:55] BMA: Cup & Handle — cup rims differ 12.5% (max 5%)
+[2026-07-22 05:07:55] BMA: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:07:55] BMA: Double Bottom — no valid W pattern found
+[2026-07-22 05:07:55] NO ALERT BMA | close=92.77 | ma150=84.81
+[2026-07-22 05:07:55] [409/667] COCO
+[2026-07-22 05:07:58] Scanning COCO...
+[2026-07-22 05:07:58] COCO: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 05:07:58] [410/667] CZR
+[2026-07-22 05:08:01] Scanning CZR...
+[2026-07-22 05:08:02] CZR: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 05:08:02] [411/667] APD
+[2026-07-22 05:08:05] Scanning APD...
+[2026-07-22 05:08:06] APD: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:08:06] [412/667] ROP
+[2026-07-22 05:08:09] Scanning ROP...
+[2026-07-22 05:08:09] ROP: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 05:08:09] [413/667] UBSI
+[2026-07-22 05:08:12] Scanning UBSI...
+[2026-07-22 05:08:13] UBSI: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 05:08:13] [414/667] SSNC
+[2026-07-22 05:08:16] Scanning SSNC...
+[2026-07-22 05:08:16] SSNC: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 05:08:16] [415/667] FNB
+[2026-07-22 05:08:19] Scanning FNB...
+[2026-07-22 05:08:20] FNB: 📅 next earnings: 2026-10-15 (85d away)
+[2026-07-22 05:08:21] FNB: Cup & Handle — overextended (4.9% > 0.5%)
+[2026-07-22 05:08:21] FNB: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:08:21] FNB: Double Bottom — no valid W pattern found
+[2026-07-22 05:08:21] NO ALERT FNB | close=19.09 | ma150=17.68
+[2026-07-22 05:08:21] [416/667] NTCT
+[2026-07-22 05:08:24] Scanning NTCT...
+[2026-07-22 05:08:24] NTCT: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:08:25] NTCT: Cup & Handle — cup bottom at edge (10%) — V shape suspected
+[2026-07-22 05:08:25] NTCT: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:08:25] NTCT: Double Bottom — no valid W pattern found
+[2026-07-22 05:08:25] NO ALERT NTCT | close=41.75 | ma150=33.71
+[2026-07-22 05:08:25] [417/667] TKC
+[2026-07-22 05:08:28] Scanning TKC...
+[2026-07-22 05:08:28] TKC: 📅 next earnings: 2026-05-11 (-72d away)
+[2026-07-22 05:08:29] TKC: ❌ Reverse Scanner — ⚠️ Reverse Scan: 2 סימני מכירה מוסדית — הימנע!
+[2026-07-22 05:08:29] [418/667] FLYW
+[2026-07-22 05:08:32] Scanning FLYW...
+[2026-07-22 05:08:33] FLYW: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:08:33] [419/667] ASB
+[2026-07-22 05:08:36] Scanning ASB...
+[2026-07-22 05:08:36] ASB: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 05:08:36] [420/667] NTR
+[2026-07-22 05:08:39] Scanning NTR...
+[2026-07-22 05:08:40] NTR: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:08:40] [421/667] SPNT
+[2026-07-22 05:08:43] Scanning SPNT...
+[2026-07-22 05:08:43] SPNT: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:08:43] [422/667] POR
+[2026-07-22 05:08:46] Scanning POR...
+[2026-07-22 05:08:47] POR: ⏭️ Earnings filter — earnings in 9 days (2026-07-31)
+[2026-07-22 05:08:47] [423/667] ARE
+[2026-07-22 05:08:50] Scanning ARE...
+[2026-07-22 05:08:50] ARE: ⏭️ Earnings filter — earnings in 12 days (2026-08-03)
+[2026-07-22 05:08:50] [424/667] ALLE
+[2026-07-22 05:08:53] Scanning ALLE...
+[2026-07-22 05:08:54] ALLE: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 05:08:54] [425/667] DXCM
+[2026-07-22 05:08:57] Scanning DXCM...
+[2026-07-22 05:08:57] DXCM: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:08:57] [426/667] EPAM
+[2026-07-22 05:09:00] Scanning EPAM...
+[2026-07-22 05:09:01] EPAM: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:09:02] EPAM: ❌ Reverse Scanner — ⚠️ Reverse Scan: 2 סימני מכירה מוסדית — הימנע!
+[2026-07-22 05:09:02] [427/667] ARX
+[2026-07-22 05:09:05] Scanning ARX...
+[2026-07-22 05:09:05] ARX: 📅 next earnings: 2026-08-12 (21d away)
+[2026-07-22 05:09:06] ARX: Cup & Handle — no breakout yet (13.52 < 17.25)
+[2026-07-22 05:09:06] ARX: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:09:06] ARX: Double Bottom — no valid W pattern found
+[2026-07-22 05:09:06] NO ALERT ARX | close=13.52 | ma150=13.58
+[2026-07-22 05:09:06] [428/667] ITW
+[2026-07-22 05:09:09] Scanning ITW...
+[2026-07-22 05:09:09] ITW: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 05:09:09] [429/667] CMRE
+[2026-07-22 05:09:12] Scanning CMRE...
+[2026-07-22 05:09:13] CMRE: market cap too low ($1847M < $1B). Skip.
+[2026-07-22 05:09:13] [430/667] WTM
+[2026-07-22 05:09:16] Scanning WTM...
+[2026-07-22 05:09:16] WTM: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:09:16] WTM: Cup & Handle — overextended (0.9% > 0.5%)
+[2026-07-22 05:09:16] WTM: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:09:16] WTM: Double Bottom — no valid W pattern found
+[2026-07-22 05:09:16] NO ALERT WTM | close=2193.26 | ma150=2137.01
+[2026-07-22 05:09:16] [431/667] MRTN
+[2026-07-22 05:09:19] Scanning MRTN...
+[2026-07-22 05:09:19] MRTN: market cap too low ($1438M < $1B). Skip.
+[2026-07-22 05:09:19] [432/667] UVV
+[2026-07-22 05:09:22] Scanning UVV...
+[2026-07-22 05:09:23] UVV: market cap too low ($1315M < $1B). Skip.
+[2026-07-22 05:09:23] [433/667] ES
+[2026-07-22 05:09:26] Scanning ES...
+[2026-07-22 05:09:26] ES: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:09:26] [434/667] LEVI
+[2026-07-22 05:09:29] Scanning LEVI...
+[2026-07-22 05:09:30] LEVI: 📅 next earnings: 2026-09-30 (70d away)
+[2026-07-22 05:09:30] LEVI: Cup & Handle — V-shape detected (slope ratio=1.33)
+[2026-07-22 05:09:30] LEVI: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:09:30] LEVI: Double Bottom — no valid W pattern found
+[2026-07-22 05:09:30] NO ALERT LEVI | close=24.56 | ma150=21.78
+[2026-07-22 05:09:30] [435/667] STWD
+[2026-07-22 05:09:33] Scanning STWD...
+[2026-07-22 05:09:34] STWD: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:09:34] STWD: ❌ EMA28 global filter — price below EMA28 (-1.0%)
+[2026-07-22 05:09:34] [436/667] CX
+[2026-07-22 05:09:37] Scanning CX...
+[2026-07-22 05:09:38] CX: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 05:09:38] [437/667] AMZN
+[2026-07-22 05:09:41] Scanning AMZN...
+[2026-07-22 05:09:41] AMZN: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:09:41] [438/667] KD
+[2026-07-22 05:09:44] Scanning KD...
+[2026-07-22 05:09:45] KD: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:09:45] [439/667] BVC
+[2026-07-22 05:09:48] Scanning BVC...
+[2026-07-22 05:09:48] BVC: market cap too low ($1793M < $1B). Skip.
+[2026-07-22 05:09:48] [440/667] LAZ
+[2026-07-22 05:09:51] Scanning LAZ...
+[2026-07-22 05:09:52] LAZ: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 05:09:52] [441/667] ADT
+[2026-07-22 05:09:55] Scanning ADT...
+[2026-07-22 05:09:55] ADT: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:09:55] [442/667] ITGR
+[2026-07-22 05:09:58] Scanning ITGR...
+[2026-07-22 05:09:59] ITGR: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:09:59] ITGR: ❌ EMA28 global filter — price too far above EMA28 (3.1% > 3%)
+[2026-07-22 05:09:59] [443/667] SVRA
+[2026-07-22 05:10:02] Scanning SVRA...
+[2026-07-22 05:10:02] SVRA: market cap too low ($1197M < $1B). Skip.
+[2026-07-22 05:10:02] [444/667] STDN
+[2026-07-22 05:10:05] Scanning STDN...
+[2026-07-22 05:10:05] STDN: market cap too low ($1432M < $1B). Skip.
+[2026-07-22 05:10:05] [445/667] FTS
+[2026-07-22 05:10:08] Scanning FTS...
+[2026-07-22 05:10:09] FTS: ⏭️ Earnings filter — earnings in 9 days (2026-07-31)
+[2026-07-22 05:10:09] [446/667] VEON
+[2026-07-22 05:10:12] Scanning VEON...
+[2026-07-22 05:10:13] VEON: ⏭️ Earnings filter — earnings in 9 days (2026-07-31)
+[2026-07-22 05:10:13] [447/667] M
+[2026-07-22 05:10:16] Scanning M...
+[2026-07-22 05:10:17] M: 📅 next earnings: 2026-09-02 (42d away)
+[2026-07-22 05:10:18] M: Cup & Handle — V-shape detected (slope ratio=0.97)
+[2026-07-22 05:10:18] M: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:10:18] M: Double Bottom — no valid W pattern found
+[2026-07-22 05:10:18] NO ALERT M | close=23.80 | ma150=21.05
+[2026-07-22 05:10:18] [448/667] RDDT
+[2026-07-22 05:10:21] Scanning RDDT...
+[2026-07-22 05:10:21] RDDT: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:10:21] [449/667] SCHW
+[2026-07-22 05:10:24] Scanning SCHW...
+[2026-07-22 05:10:25] SCHW: 📅 next earnings: 2026-07-21 (-1d away)
+[2026-07-22 05:10:26] SCHW: Cup & Handle — cup rims differ 10.7% (max 5%)
+[2026-07-22 05:10:26] SCHW: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:10:26] SCHW: Double Bottom — no valid W pattern found
+[2026-07-22 05:10:26] NO ALERT SCHW | close=99.96 | ma150=95.60
+[2026-07-22 05:10:26] [450/667] OZK
+[2026-07-22 05:10:29] Scanning OZK...
+[2026-07-22 05:10:29] OZK: 📅 next earnings: 2026-07-21 (-1d away)
+[2026-07-22 05:10:30] OZK: Cup & Handle — cup bottom at edge (15%) — V shape suspected
+[2026-07-22 05:10:30] OZK: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:10:30] OZK: Double Bottom — no valid W pattern found
+[2026-07-22 05:10:30] NO ALERT OZK | close=50.78 | ma150=48.15
+[2026-07-22 05:10:30] [451/667] TGLS
+[2026-07-22 05:10:33] Scanning TGLS...
+[2026-07-22 05:10:33] TGLS: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:10:34] TGLS: Cup & Handle — V-shape detected (slope ratio=0.88)
+[2026-07-22 05:10:34] TGLS: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:10:34] TGLS: Double Bottom — no valid W pattern found
+[2026-07-22 05:10:34] NO ALERT TGLS | close=45.15 | ma150=46.16
+[2026-07-22 05:10:34] [452/667] GNL
+[2026-07-22 05:10:37] Scanning GNL...
+[2026-07-22 05:10:37] GNL: market cap too low ($1940M < $1B). Skip.
+[2026-07-22 05:10:37] [453/667] BMRN
+[2026-07-22 05:10:40] Scanning BMRN...
+[2026-07-22 05:10:41] BMRN: ⏭️ Earnings filter — earnings in 12 days (2026-08-03)
+[2026-07-22 05:10:41] [454/667] VET
+[2026-07-22 05:10:44] Scanning VET...
+[2026-07-22 05:10:44] VET: market cap too low ($1563M < $1B). Skip.
+[2026-07-22 05:10:44] [455/667] HGTY
+[2026-07-22 05:10:47] Scanning HGTY...
+[2026-07-22 05:10:48] HGTY: ⏭️ Earnings filter — earnings in 12 days (2026-08-03)
+[2026-07-22 05:10:48] [456/667] COKE
+[2026-07-22 05:10:51] Scanning COKE...
+[2026-07-22 05:10:51] COKE: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:10:51] [457/667] CNK
+[2026-07-22 05:10:54] Scanning CNK...
+[2026-07-22 05:10:55] CNK: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:10:55] [458/667] GLBE
+[2026-07-22 05:10:58] Scanning GLBE...
+[2026-07-22 05:10:58] GLBE: 📅 next earnings: 2026-08-12 (21d away)
+[2026-07-22 05:10:59] GLBE: Cup & Handle — V-shape detected (slope ratio=1.12)
+[2026-07-22 05:10:59] GLBE: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:10:59] GLBE: Double Bottom — no valid W pattern found
+[2026-07-22 05:10:59] NO ALERT GLBE | close=35.76 | ma150=34.31
+[2026-07-22 05:10:59] [459/667] FELE
+[2026-07-22 05:11:02] Scanning FELE...
+[2026-07-22 05:11:03] FELE: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 05:11:03] [460/667] TKR
+[2026-07-22 05:11:06] Scanning TKR...
+[2026-07-22 05:11:06] TKR: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:11:06] [461/667] NCLH
+[2026-07-22 05:11:09] Scanning NCLH...
+[2026-07-22 05:11:10] NCLH: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:11:10] [462/667] PDS
+[2026-07-22 05:11:13] Scanning PDS...
+[2026-07-22 05:11:13] PDS: market cap too low ($1096M < $1B). Skip.
+[2026-07-22 05:11:13] [463/667] MCBS
+[2026-07-22 05:11:16] Scanning MCBS...
+[2026-07-22 05:11:16] MCBS: market cap too low ($1041M < $1B). Skip.
+[2026-07-22 05:11:16] [464/667] CCEP
+[2026-07-22 05:11:19] Scanning CCEP...
+[2026-07-22 05:11:20] CCEP: Cup & Handle — no breakout yet (105.19 < 106.61)
+[2026-07-22 05:11:20] CCEP: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:11:20] CCEP: Double Bottom — no valid W pattern found
+[2026-07-22 05:11:20] NO ALERT CCEP | close=105.19 | ma150=96.28
+[2026-07-22 05:11:20] [465/667] UVSP
+[2026-07-22 05:11:23] Scanning UVSP...
+[2026-07-22 05:11:24] UVSP: market cap too low ($1237M < $1B). Skip.
+[2026-07-22 05:11:24] [466/667] NWPX
+[2026-07-22 05:11:27] Scanning NWPX...
+[2026-07-22 05:11:27] NWPX: market cap too low ($1305M < $1B). Skip.
+[2026-07-22 05:11:27] [467/667] SAIC
+[2026-07-22 05:11:30] Scanning SAIC...
+[2026-07-22 05:11:30] SAIC: 📅 next earnings: 2026-06-01 (-51d away)
+[2026-07-22 05:11:31] SAIC: Cup & Handle — cup bottom at edge (16%) — V shape suspected
+[2026-07-22 05:11:31] SAIC: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:11:31] SAIC: Double Bottom — no valid W pattern found
+[2026-07-22 05:11:31] NO ALERT SAIC | close=111.82 | ma150=101.05
+[2026-07-22 05:11:31] [468/667] E
+[2026-07-22 05:11:34] Scanning E...
+[2026-07-22 05:11:34] E: 📅 next earnings: 2026-04-24 (-89d away)
+[2026-07-22 05:11:35] E: ❌ Reverse Scanner — ⚠️ Reverse Scan: 2 סימני מכירה מוסדית — הימנע!
+[2026-07-22 05:11:35] [469/667] NLY
+[2026-07-22 05:11:38] Scanning NLY...
+[2026-07-22 05:11:39] NLY: 📅 next earnings: 2026-07-21 (-1d away)
+[2026-07-22 05:11:40] NLY: Cup & Handle — cup rims differ 6.1% (max 5%)
+[2026-07-22 05:11:40] NLY: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:11:40] NLY: Double Bottom — no valid W pattern found
+[2026-07-22 05:11:40] NO ALERT NLY | close=22.65 | ma150=22.48
+[2026-07-22 05:11:40] [470/667] EMA
+[2026-07-22 05:11:43] Scanning EMA...
+[2026-07-22 05:11:43] EMA: 📅 next earnings: 2026-08-07 (16d away)
+[2026-07-22 05:11:44] EMA: Cup & Handle — cup bottom at edge (4%) — V shape suspected
+[2026-07-22 05:11:44] EMA: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:11:44] EMA: Double Bottom — no valid W pattern found
+[2026-07-22 05:11:44] NO ALERT EMA | close=53.58 | ma150=51.51
+[2026-07-22 05:11:44] [471/667] TMDX
+[2026-07-22 05:11:47] Scanning TMDX...
+[2026-07-22 05:11:47] TMDX: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:11:47] [472/667] CP
+[2026-07-22 05:11:50] Scanning CP...
+[2026-07-22 05:11:51] CP: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:11:51] [473/667] RNR
+[2026-07-22 05:11:54] Scanning RNR...
+[2026-07-22 05:11:54] RNR: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 05:11:54] [474/667] DBX
+[2026-07-22 05:11:57] Scanning DBX...
+[2026-07-22 05:11:58] DBX: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:11:58] DBX: ❌ EMA28 global filter — price too far above EMA28 (3.0% > 3%)
+[2026-07-22 05:11:58] [475/667] ICFI
+[2026-07-22 05:12:01] Scanning ICFI...
+[2026-07-22 05:12:01] ICFI: market cap too low ($1358M < $1B). Skip.
+[2026-07-22 05:12:01] [476/667] CSWC
+[2026-07-22 05:12:04] Scanning CSWC...
+[2026-07-22 05:12:04] CSWC: market cap too low ($1495M < $1B). Skip.
+[2026-07-22 05:12:04] [477/667] LINE
+[2026-07-22 05:12:07] Scanning LINE...
+[2026-07-22 05:12:08] LINE: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:12:08] [478/667] NWS
+[2026-07-22 05:12:11] Scanning NWS...
+[2026-07-22 05:12:11] NWS: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:12:11] [479/667] QCRH
+[2026-07-22 05:12:14] Scanning QCRH...
+[2026-07-22 05:12:15] QCRH: market cap too low ($1609M < $1B). Skip.
+[2026-07-22 05:12:15] [480/667] ALG
+[2026-07-22 05:12:18] Scanning ALG...
+[2026-07-22 05:12:18] ALG: market cap too low ($1961M < $1B). Skip.
+[2026-07-22 05:12:18] [481/667] BELFB
+[2026-07-22 05:12:21] Scanning BELFB...
+[2026-07-22 05:12:21] BELFB: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:12:21] [482/667] LYFT
+[2026-07-22 05:12:24] Scanning LYFT...
+[2026-07-22 05:12:25] LYFT: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:12:26] LYFT: Cup & Handle — cup rims differ 39.2% (max 5%)
+[2026-07-22 05:12:26] LYFT: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:12:26] LYFT: Double Bottom — no valid W pattern found
+[2026-07-22 05:12:26] NO ALERT LYFT | close=15.19 | ma150=15.22
+[2026-07-22 05:12:26] [483/667] RAMP
+[2026-07-22 05:12:29] Scanning RAMP...
+[2026-07-22 05:12:29] RAMP: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:12:29] [484/667] DEA
+[2026-07-22 05:12:32] Scanning DEA...
+[2026-07-22 05:12:32] DEA: market cap too low ($1217M < $1B). Skip.
+[2026-07-22 05:12:32] [485/667] ASO
+[2026-07-22 05:12:35] Scanning ASO...
+[2026-07-22 05:12:36] ASO: 📅 next earnings: 2026-09-08 (48d away)
+[2026-07-22 05:12:36] ASO: ❌ EMA28 global filter — price below EMA28 (-0.3%)
+[2026-07-22 05:12:36] [486/667] CNOB
+[2026-07-22 05:12:39] Scanning CNOB...
+[2026-07-22 05:12:39] CNOB: market cap too low ($1680M < $1B). Skip.
+[2026-07-22 05:12:39] [487/667] BGC
+[2026-07-22 05:12:42] Scanning BGC...
+[2026-07-22 05:12:43] BGC: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:12:43] [488/667] INTU
+[2026-07-22 05:12:46] Scanning INTU...
+[2026-07-22 05:12:46] INTU: 📅 next earnings: 2026-08-20 (29d away)
+[2026-07-22 05:12:47] INTU: Cup & Handle — cup bottom at edge (89%) — V shape suspected
+[2026-07-22 05:12:47] INTU: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:12:47] INTU: Double Bottom — no valid W pattern found
+[2026-07-22 05:12:47] NO ALERT INTU | close=289.92 | ma150=422.23
+[2026-07-22 05:12:47] [489/667] TM
+[2026-07-22 05:12:50] Scanning TM...
+[2026-07-22 05:12:51] TM: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:12:51] [490/667] HMN
+[2026-07-22 05:12:54] Scanning HMN...
+[2026-07-22 05:12:54] HMN: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:12:54] [491/667] LH
+[2026-07-22 05:12:57] Scanning LH...
+[2026-07-22 05:12:58] LH: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:12:58] [492/667] TY
+[2026-07-22 05:13:01] Scanning TY...
+[2026-07-22 05:13:01] TY: market cap too low ($1872M < $1B). Skip.
+[2026-07-22 05:13:01] [493/667] HON
+[2026-07-22 05:13:04] Scanning HON...
+[2026-07-22 05:13:05] HON: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 05:13:05] [494/667] NNI
+[2026-07-22 05:13:08] Scanning NNI...
+[2026-07-22 05:13:08] NNI: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:13:09] NNI: Cup & Handle — V-shape detected (slope ratio=1.14)
+[2026-07-22 05:13:09] NNI: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:13:09] NNI: Double Bottom — no valid W pattern found
+[2026-07-22 05:13:09] NO ALERT NNI | close=133.17 | ma150=132.43
+[2026-07-22 05:13:09] [495/667] FRA
+[2026-07-22 05:13:12] Scanning FRA...
+[2026-07-22 05:13:12] FRA: market cap too low ($382M < $1B). Skip.
+[2026-07-22 05:13:12] [496/667] BOW
+[2026-07-22 05:13:15] Scanning BOW...
+[2026-07-22 05:13:16] BOW: market cap too low ($1000M < $1B). Skip.
+[2026-07-22 05:13:16] [497/667] REYN
+[2026-07-22 05:13:19] Scanning REYN...
+[2026-07-22 05:13:19] REYN: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:13:19] [498/667] INVH
+[2026-07-22 05:13:22] Scanning INVH...
+[2026-07-22 05:13:23] INVH: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:13:23] [499/667] AVLN
+[2026-07-22 05:13:26] Scanning AVLN...
+[2026-07-22 05:13:26] AVLN: market cap too low ($1287M < $1B). Skip.
+[2026-07-22 05:13:26] [500/667] DORM
+[2026-07-22 05:13:29] Scanning DORM...
+[2026-07-22 05:13:29] DORM: ⏭️ Earnings filter — earnings in 12 days (2026-08-03)
+[2026-07-22 05:13:29] [501/667] OGS
+[2026-07-22 05:13:32] Scanning OGS...
+[2026-07-22 05:13:33] OGS: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:13:33] [502/667] VVX
+[2026-07-22 05:13:36] Scanning VVX...
+[2026-07-22 05:13:37] VVX: ⏭️ Earnings filter — earnings in 12 days (2026-08-03)
+[2026-07-22 05:13:37] [503/667] OPY
+[2026-07-22 05:13:40] Scanning OPY...
+[2026-07-22 05:13:40] OPY: market cap too low ($1184M < $1B). Skip.
+[2026-07-22 05:13:40] [504/667] TNGX
+[2026-07-22 05:13:43] Scanning TNGX...
+[2026-07-22 05:13:43] TNGX: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:13:43] [505/667] BJ
+[2026-07-22 05:13:46] Scanning BJ...
+[2026-07-22 05:13:47] BJ: 📅 next earnings: 2026-08-20 (29d away)
+[2026-07-22 05:13:47] BJ: Cup & Handle — cup bottom at edge (81%) — V shape suspected
+[2026-07-22 05:13:47] BJ: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:13:47] BJ: Double Bottom — no valid W pattern found
+[2026-07-22 05:13:47] NO ALERT BJ | close=92.34 | ma150=93.49
+[2026-07-22 05:13:48] [506/667] CINF
+[2026-07-22 05:13:51] Scanning CINF...
+[2026-07-22 05:13:51] CINF: ⏭️ Earnings filter — earnings in 5 days (2026-07-27)
+[2026-07-22 05:13:51] [507/667] ETW
+[2026-07-22 05:13:54] Scanning ETW...
+[2026-07-22 05:13:54] ETW: market cap too low ($1032M < $1B). Skip.
+[2026-07-22 05:13:54] [508/667] EFC
+[2026-07-22 05:13:57] Scanning EFC...
+[2026-07-22 05:13:57] EFC: market cap too low ($1719M < $1B). Skip.
+[2026-07-22 05:13:57] [509/667] U
+[2026-07-22 05:14:00] Scanning U...
+[2026-07-22 05:14:01] U: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:14:02] U: Cup & Handle — cup rims differ 38.4% (max 5%)
+[2026-07-22 05:14:02] U: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:14:02] U: Double Bottom — no valid W pattern found
+[2026-07-22 05:14:02] NO ALERT U | close=29.87 | ma150=29.01
+[2026-07-22 05:14:02] [510/667] DCOM
+[2026-07-22 05:14:05] Scanning DCOM...
+[2026-07-22 05:14:05] DCOM: market cap too low ($1772M < $1B). Skip.
+[2026-07-22 05:14:05] [511/667] CMPR
+[2026-07-22 05:14:08] Scanning CMPR...
+[2026-07-22 05:14:09] CMPR: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:14:09] [512/667] ESLT
+[2026-07-22 05:14:12] Scanning ESLT...
+[2026-07-22 05:14:12] ESLT: 📅 next earnings: 2026-08-11 (20d away)
+[2026-07-22 05:14:13] ESLT: ❌ Reverse Scanner — ⚠️ Reverse Scan: 3 סימני מכירה מוסדית — הימנע!
+[2026-07-22 05:14:13] [513/667] TR
+[2026-07-22 05:14:16] Scanning TR...
+[2026-07-22 05:14:17] TR: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 05:14:17] [514/667] MU
+[2026-07-22 05:14:20] Scanning MU...
+[2026-07-22 05:14:20] MU: 📅 next earnings: 2026-09-23 (63d away)
+[2026-07-22 05:14:21] MU: Cup & Handle — cup rims differ 146.6% (max 5%)
+[2026-07-22 05:14:21] MU: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:14:21] MU: Double Bottom — no valid W pattern found
+[2026-07-22 05:14:21] NO ALERT MU | close=970.82 | ma150=580.33
+[2026-07-22 05:14:21] [515/667] IDYA
+[2026-07-22 05:14:24] Scanning IDYA...
+[2026-07-22 05:14:25] IDYA: 📅 next earnings: 2026-05-05 (-78d away)
+[2026-07-22 05:14:25] IDYA: Cup & Handle — cup rims differ 7.0% (max 5%)
+[2026-07-22 05:14:25] IDYA: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:14:25] IDYA: Double Bottom — no valid W pattern found
+[2026-07-22 05:14:25] NO ALERT IDYA | close=35.99 | ma150=32.74
+[2026-07-22 05:14:25] [516/667] ENLT
+[2026-07-22 05:14:28] Scanning ENLT...
+[2026-07-22 05:14:29] ENLT: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:14:29] [517/667] ICL
+[2026-07-22 05:14:32] Scanning ICL...
+[2026-07-22 05:14:32] ICL: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:14:32] [518/667] UNFI
+[2026-07-22 05:14:35] Scanning UNFI...
+[2026-07-22 05:14:36] UNFI: 📅 next earnings: 2026-06-09 (-43d away)
+[2026-07-22 05:14:36] UNFI: Cup & Handle — V-shape detected (slope ratio=0.81)
+[2026-07-22 05:14:36] UNFI: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:14:36] UNFI: Double Bottom — no valid W pattern found
+[2026-07-22 05:14:36] NO ALERT UNFI | close=49.92 | ma150=43.44
+[2026-07-22 05:14:36] [519/667] HQH
+[2026-07-22 05:14:39] Scanning HQH...
+[2026-07-22 05:14:40] HQH: market cap too low ($1216M < $1B). Skip.
+[2026-07-22 05:14:40] [520/667] GBTG
+[2026-07-22 05:14:43] Scanning GBTG...
+[2026-07-22 05:14:43] GBTG: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:14:43] [521/667] BANF
+[2026-07-22 05:14:46] Scanning BANF...
+[2026-07-22 05:14:47] BANF: ⏭️ Earnings filter — earnings in 2 days (2026-07-24)
+[2026-07-22 05:14:47] [522/667] CASH
+[2026-07-22 05:14:50] Scanning CASH...
+[2026-07-22 05:14:50] CASH: market cap too low ($1870M < $1B). Skip.
+[2026-07-22 05:14:50] [523/667] SFNC
+[2026-07-22 05:14:53] Scanning SFNC...
+[2026-07-22 05:14:54] SFNC: 📅 next earnings: 2026-10-15 (85d away)
+[2026-07-22 05:14:55] SFNC: Cup & Handle — V-shape detected (slope ratio=0.84)
+[2026-07-22 05:14:55] SFNC: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:14:55] SFNC: Double Bottom — no valid W pattern found
+[2026-07-22 05:14:55] NO ALERT SFNC | close=22.84 | ma150=20.74
+[2026-07-22 05:14:55] [524/667] CRVS
+[2026-07-22 05:14:58] Scanning CRVS...
+[2026-07-22 05:14:58] CRVS: market cap too low ($1217M < $1B). Skip.
+[2026-07-22 05:14:58] [525/667] RACE
+[2026-07-22 05:15:01] Scanning RACE...
+[2026-07-22 05:15:02] RACE: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:15:02] [526/667] MSA
+[2026-07-22 05:15:05] Scanning MSA...
+[2026-07-22 05:15:06] MSA: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:15:06] [527/667] GM
+[2026-07-22 05:15:09] Scanning GM...
+[2026-07-22 05:15:10] GM: 📅 next earnings: 2026-07-21 (-1d away)
+[2026-07-22 05:15:11] GM: Cup & Handle — V-shape detected (slope ratio=1.06)
+[2026-07-22 05:15:11] GM: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:15:11] GM: Double Bottom — no valid W pattern found
+[2026-07-22 05:15:11] NO ALERT GM | close=79.52 | ma150=79.09
+[2026-07-22 05:15:11] [528/667] HLI
+[2026-07-22 05:15:14] Scanning HLI...
+[2026-07-22 05:15:15] HLI: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:15:15] [529/667] MDT
+[2026-07-22 05:15:18] Scanning MDT...
+[2026-07-22 05:15:19] MDT: 📅 next earnings: 2026-09-01 (41d away)
+[2026-07-22 05:15:20] MDT: Cup & Handle — V-shape detected (slope ratio=1.09)
+[2026-07-22 05:15:20] MDT: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:15:20] MDT: Double Bottom — no valid W pattern found
+[2026-07-22 05:15:20] NO ALERT MDT | close=82.35 | ma150=88.45
+[2026-07-22 05:15:20] [530/667] CHEF
+[2026-07-22 05:15:23] Scanning CHEF...
+[2026-07-22 05:15:23] CHEF: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:15:23] [531/667] FWONK
+[2026-07-22 05:15:26] Scanning FWONK...
+[2026-07-22 05:15:27] FWONK: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:15:27] FWONK: Cup & Handle — V-shape detected (slope ratio=0.96)
+[2026-07-22 05:15:27] FWONK: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:15:27] FWONK: Double Bottom — no valid W pattern found
+[2026-07-22 05:15:27] NO ALERT FWONK | close=97.92 | ma150=90.10
+[2026-07-22 05:15:27] [532/667] VYX
+[2026-07-22 05:15:30] Scanning VYX...
+[2026-07-22 05:15:31] VYX: market cap too low ($1094M < $1B). Skip.
+[2026-07-22 05:15:31] [533/667] BX
+[2026-07-22 05:15:34] Scanning BX...
+[2026-07-22 05:15:34] BX: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 05:15:34] [534/667] MSGE
+[2026-07-22 05:15:37] Scanning MSGE...
+[2026-07-22 05:15:38] MSGE: 📅 next earnings: 2026-05-07 (-76d away)
+[2026-07-22 05:15:39] MSGE: Cup & Handle — V-shape detected (slope ratio=1.26)
+[2026-07-22 05:15:39] MSGE: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:15:39] MSGE: Double Bottom — no valid W pattern found
+[2026-07-22 05:15:39] NO ALERT MSGE | close=76.46 | ma150=63.91
+[2026-07-22 05:15:39] [535/667] DB
+[2026-07-22 05:15:42] Scanning DB...
+[2026-07-22 05:15:42] DB: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:15:42] [536/667] SNA
+[2026-07-22 05:15:45] Scanning SNA...
+[2026-07-22 05:15:46] SNA: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 05:15:46] [537/667] HAPN
+[2026-07-22 05:15:49] Scanning HAPN...
+[2026-07-22 05:15:49] HAPN: ⏭️ Earnings filter — earnings in 5 days (2026-07-27)
+[2026-07-22 05:15:49] [538/667] MTRN
+[2026-07-22 05:15:52] Scanning MTRN...
+[2026-07-22 05:15:53] MTRN: 📅 next earnings: 2026-04-29 (-84d away)
+[2026-07-22 05:15:54] MTRN: Cup & Handle — cup bottom at edge (17%) — V shape suspected
+[2026-07-22 05:15:54] MTRN: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:15:54] MTRN: Double Bottom — no valid W pattern found
+[2026-07-22 05:15:54] NO ALERT MTRN | close=254.83 | ma150=180.38
+[2026-07-22 05:15:54] [539/667] COF
+[2026-07-22 05:15:57] Scanning COF...
+[2026-07-22 05:15:57] COF: 📅 next earnings: 2026-07-21 (-1d away)
+[2026-07-22 05:15:58] COF: Cup & Handle — cup bottom at edge (81%) — V shape suspected
+[2026-07-22 05:15:58] COF: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:15:58] COF: Double Bottom — no valid W pattern found
+[2026-07-22 05:15:58] NO ALERT COF | close=206.22 | ma150=204.35
+[2026-07-22 05:15:58] [540/667] HAFN
+[2026-07-22 05:16:01] Scanning HAFN...
+[2026-07-22 05:16:03] HAFN: 📅 next earnings: 2026-05-27 (-56d away)
+[2026-07-22 05:16:03] HAFN: ❌ Reverse Scanner — ⚠️ Reverse Scan: 2 סימני מכירה מוסדית — הימנע!
+[2026-07-22 05:16:03] [541/667] KMI
+[2026-07-22 05:16:06] Scanning KMI...
+[2026-07-22 05:16:07] KMI: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 05:16:07] [542/667] CLDX
+[2026-07-22 05:16:10] Scanning CLDX...
+[2026-07-22 05:16:10] CLDX: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:16:11] CLDX: Cup & Handle — cup bottom at edge (0%) — V shape suspected
+[2026-07-22 05:16:11] CLDX: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:16:11] CLDX: Double Bottom — no valid W pattern found
+[2026-07-22 05:16:11] NO ALERT CLDX | close=35.66 | ma150=30.25
+[2026-07-22 05:16:11] [543/667] UE
+[2026-07-22 05:16:14] Scanning UE...
+[2026-07-22 05:16:15] UE: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:16:15] UE: Cup & Handle — cup rims differ 13.7% (max 5%)
+[2026-07-22 05:16:15] UE: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:16:15] UE: Double Bottom — no valid W pattern found
+[2026-07-22 05:16:15] NO ALERT UE | close=23.60 | ma150=21.12
+[2026-07-22 05:16:15] [544/667] CSX
+[2026-07-22 05:16:18] Scanning CSX...
+[2026-07-22 05:16:18] CSX: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 05:16:18] [545/667] ZETA
+[2026-07-22 05:16:21] Scanning ZETA...
+[2026-07-22 05:16:22] ZETA: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:16:22] [546/667] AM
+[2026-07-22 05:16:25] Scanning AM...
+[2026-07-22 05:16:26] AM: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:16:26] [547/667] OWL
+[2026-07-22 05:16:29] Scanning OWL...
+[2026-07-22 05:16:29] OWL: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:16:29] [548/667] BIOA
+[2026-07-22 05:16:32] Scanning BIOA...
+[2026-07-22 05:16:32] BIOA: market cap too low ($1007M < $1B). Skip.
+[2026-07-22 05:16:32] [549/667] LSTR
+[2026-07-22 05:16:35] Scanning LSTR...
+[2026-07-22 05:16:36] LSTR: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 05:16:36] [550/667] CBRS
+[2026-07-22 05:16:39] Scanning CBRS...
+[2026-07-22 05:16:39] CBRS: no data. Skip.
+[2026-07-22 05:16:39] [551/667] TDY
+[2026-07-22 05:16:42] Scanning TDY...
+[2026-07-22 05:16:43] TDY: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 05:16:43] [552/667] AVNS
+[2026-07-22 05:16:46] Scanning AVNS...
+[2026-07-22 05:16:46] AVNS: market cap too low ($1170M < $1B). Skip.
+[2026-07-22 05:16:46] [553/667] ASIC
+[2026-07-22 05:16:49] Scanning ASIC...
+[2026-07-22 05:16:49] ASIC: market cap too low ($1125M < $1B). Skip.
+[2026-07-22 05:16:49] [554/667] PRM
+[2026-07-22 05:16:52] Scanning PRM...
+[2026-07-22 05:16:53] PRM: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:16:54] PRM: Cup & Handle — V-shape detected (slope ratio=1.29)
+[2026-07-22 05:16:54] PRM: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:16:54] PRM: Double Bottom — no valid W pattern found
+[2026-07-22 05:16:54] NO ALERT PRM | close=34.79 | ma150=28.90
+[2026-07-22 05:16:54] [555/667] WDFC
+[2026-07-22 05:16:57] Scanning WDFC...
+[2026-07-22 05:16:58] WDFC: 📅 next earnings: 2026-07-09 (-13d away)
+[2026-07-22 05:16:58] WDFC: ❌ EMA28 global filter — price below EMA28 (-0.4%)
+[2026-07-22 05:16:58] [556/667] IEX
+[2026-07-22 05:17:01] Scanning IEX...
+[2026-07-22 05:17:01] IEX: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:17:01] [557/667] PRSU
+[2026-07-22 05:17:04] Scanning PRSU...
+[2026-07-22 05:17:05] PRSU: market cap too low ($1438M < $1B). Skip.
+[2026-07-22 05:17:05] [558/667] NFG
+[2026-07-22 05:17:08] Scanning NFG...
+[2026-07-22 05:17:08] NFG: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:17:08] [559/667] UDR
+[2026-07-22 05:17:11] Scanning UDR...
+[2026-07-22 05:17:12] UDR: ⏭️ Earnings filter — earnings in 5 days (2026-07-27)
+[2026-07-22 05:17:12] [560/667] THC
+[2026-07-22 05:17:15] Scanning THC...
+[2026-07-22 05:17:15] THC: ⏭️ Earnings filter — earnings in 2 days (2026-07-24)
+[2026-07-22 05:17:15] [561/667] ASTH
+[2026-07-22 05:17:18] Scanning ASTH...
+[2026-07-22 05:17:19] ASTH: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:17:19] ASTH: ❌ EMA28 global filter — price too far above EMA28 (3.0% > 3%)
+[2026-07-22 05:17:19] [562/667] CHT
+[2026-07-22 05:17:22] Scanning CHT...
+[2026-07-22 05:17:23] CHT: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:17:23] [563/667] XP
+[2026-07-22 05:17:26] Scanning XP...
+[2026-07-22 05:17:26] XP: 📅 next earnings: 2026-08-17 (26d away)
+[2026-07-22 05:17:27] XP: Cup & Handle — cup rims differ 28.5% (max 5%)
+[2026-07-22 05:17:27] XP: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:17:27] XP: Double Bottom — no valid W pattern found
+[2026-07-22 05:17:27] NO ALERT XP | close=16.85 | ma150=18.19
+[2026-07-22 05:17:27] [564/667] WAB
+[2026-07-22 05:17:30] Scanning WAB...
+[2026-07-22 05:17:31] WAB: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 05:17:31] [565/667] SBSI
+[2026-07-22 05:17:34] Scanning SBSI...
+[2026-07-22 05:17:34] SBSI: market cap too low ($1032M < $1B). Skip.
+[2026-07-22 05:17:34] [566/667] PSO
+[2026-07-22 05:17:37] Scanning PSO...
+[2026-07-22 05:17:38] PSO: ⏭️ Earnings filter — earnings in 9 days (2026-07-31)
+[2026-07-22 05:17:38] [567/667] NBN
+[2026-07-22 05:17:41] Scanning NBN...
+[2026-07-22 05:17:41] NBN: market cap too low ($1128M < $1B). Skip.
+[2026-07-22 05:17:41] [568/667] GTES
+[2026-07-22 05:17:44] Scanning GTES...
+[2026-07-22 05:17:44] GTES: ⏭️ Earnings filter — earnings in 9 days (2026-07-31)
+[2026-07-22 05:17:44] [569/667] THG
+[2026-07-22 05:17:47] Scanning THG...
+[2026-07-22 05:17:48] THG: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 05:17:48] [570/667] NVGS
+[2026-07-22 05:17:51] Scanning NVGS...
+[2026-07-22 05:17:51] NVGS: market cap too low ($1325M < $1B). Skip.
+[2026-07-22 05:17:51] [571/667] MUC
+[2026-07-22 05:17:54] Scanning MUC...
+[2026-07-22 05:17:55] MUC: market cap too low ($1022M < $1B). Skip.
+[2026-07-22 05:17:55] [572/667] O
+[2026-07-22 05:17:58] Scanning O...
+[2026-07-22 05:17:58] O: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:17:58] [573/667] UMH
+[2026-07-22 05:18:01] Scanning UMH...
+[2026-07-22 05:18:01] UMH: market cap too low ($1319M < $1B). Skip.
+[2026-07-22 05:18:01] [574/667] AVO
+[2026-07-22 05:18:04] Scanning AVO...
+[2026-07-22 05:18:04] AVO: market cap too low ($1116M < $1B). Skip.
+[2026-07-22 05:18:04] [575/667] CRM
+[2026-07-22 05:18:07] Scanning CRM...
+[2026-07-22 05:18:08] CRM: 📅 next earnings: 2026-09-02 (42d away)
+[2026-07-22 05:18:09] CRM: Cup & Handle — cup bottom at edge (86%) — V shape suspected
+[2026-07-22 05:18:09] CRM: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:18:09] CRM: Double Bottom — no valid W pattern found
+[2026-07-22 05:18:09] NO ALERT CRM | close=170.06 | ma150=195.30
+[2026-07-22 05:18:09] [576/667] ALMR
+[2026-07-22 05:18:12] Scanning ALMR...
+[2026-07-22 05:18:12] ALMR: market cap too low ($1743M < $1B). Skip.
+[2026-07-22 05:18:12] [577/667] CBU
+[2026-07-22 05:18:15] Scanning CBU...
+[2026-07-22 05:18:15] CBU: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 05:18:15] [578/667] STVN
+[2026-07-22 05:18:18] Scanning STVN...
+[2026-07-22 05:18:19] STVN: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:18:19] [579/667] GFL
+[2026-07-22 05:18:22] Scanning GFL...
+[2026-07-22 05:18:22] GFL: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:18:22] [580/667] BKU
+[2026-07-22 05:18:25] Scanning BKU...
+[2026-07-22 05:18:26] BKU: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 05:18:26] [581/667] NTB
+[2026-07-22 05:18:29] Scanning NTB...
+[2026-07-22 05:18:29] NTB: ⏭️ Earnings filter — earnings in 5 days (2026-07-27)
+[2026-07-22 05:18:29] [582/667] BKH
+[2026-07-22 05:18:32] Scanning BKH...
+[2026-07-22 05:18:33] BKH: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:18:33] [583/667] OCSL
+[2026-07-22 05:18:36] Scanning OCSL...
+[2026-07-22 05:18:36] OCSL: market cap too low ($1055M < $1B). Skip.
+[2026-07-22 05:18:36] [584/667] ETV
+[2026-07-22 05:18:39] Scanning ETV...
+[2026-07-22 05:18:39] ETV: market cap too low ($1748M < $1B). Skip.
+[2026-07-22 05:18:39] [585/667] ECPG
+[2026-07-22 05:18:42] Scanning ECPG...
+[2026-07-22 05:18:43] ECPG: market cap too low ($1912M < $1B). Skip.
+[2026-07-22 05:18:43] [586/667] PB
+[2026-07-22 05:18:46] Scanning PB...
+[2026-07-22 05:18:46] PB: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:18:46] [587/667] PCOR
+[2026-07-22 05:18:49] Scanning PCOR...
+[2026-07-22 05:18:50] PCOR: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:18:50] [588/667] HESM
+[2026-07-22 05:18:53] Scanning HESM...
+[2026-07-22 05:18:53] HESM: ⏭️ Earnings filter — earnings in 12 days (2026-08-03)
+[2026-07-22 05:18:53] [589/667] SOBO
+[2026-07-22 05:18:56] Scanning SOBO...
+[2026-07-22 05:18:57] SOBO: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:18:57] [590/667] RVTY
+[2026-07-22 05:19:00] Scanning RVTY...
+[2026-07-22 05:19:00] RVTY: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:19:00] [591/667] TFC
+[2026-07-22 05:19:03] Scanning TFC...
+[2026-07-22 05:19:04] TFC: 📅 next earnings: 2026-10-16 (86d away)
+[2026-07-22 05:19:05] TFC: Cup & Handle — cup rims differ 7.7% (max 5%)
+[2026-07-22 05:19:05] TFC: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:19:05] TFC: Double Bottom — no valid W pattern found
+[2026-07-22 05:19:05] NO ALERT TFC | close=51.38 | ma150=49.58
+[2026-07-22 05:19:05] [592/667] MGNI
+[2026-07-22 05:19:08] Scanning MGNI...
+[2026-07-22 05:19:08] MGNI: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:19:08] [593/667] FFIV
+[2026-07-22 05:19:11] Scanning FFIV...
+[2026-07-22 05:19:12] FFIV: ⏭️ Earnings filter — earnings in 5 days (2026-07-27)
+[2026-07-22 05:19:12] [594/667] VAC
+[2026-07-22 05:19:15] Scanning VAC...
+[2026-07-22 05:19:15] VAC: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:19:16] VAC: Cup & Handle — cup bottom at edge (10%) — V shape suspected
+[2026-07-22 05:19:16] VAC: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:19:16] VAC: Double Bottom — no valid W pattern found
+[2026-07-22 05:19:16] NO ALERT VAC | close=97.98 | ma150=72.54
+[2026-07-22 05:19:16] [595/667] NPO
+[2026-07-22 05:19:19] Scanning NPO...
+[2026-07-22 05:19:19] NPO: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:19:19] [596/667] NSC
+[2026-07-22 05:19:22] Scanning NSC...
+[2026-07-22 05:19:23] NSC: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 05:19:23] [597/667] GDS
+[2026-07-22 05:19:26] Scanning GDS...
+[2026-07-22 05:19:26] GDS: 📅 next earnings: 2026-08-19 (28d away)
+[2026-07-22 05:19:27] GDS: Cup & Handle — cup bottom at edge (88%) — V shape suspected
+[2026-07-22 05:19:27] GDS: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:19:27] GDS: Double Bottom — no valid W pattern found
+[2026-07-22 05:19:27] NO ALERT GDS | close=32.78 | ma150=39.42
+[2026-07-22 05:19:27] [598/667] TFX
+[2026-07-22 05:19:30] Scanning TFX...
+[2026-07-22 05:19:31] TFX: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:19:31] [599/667] MAT
+[2026-07-22 05:19:34] Scanning MAT...
+[2026-07-22 05:19:34] MAT: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:19:34] [600/667] UBS
+[2026-07-22 05:19:37] Scanning UBS...
+[2026-07-22 05:19:38] UBS: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:19:38] [601/667] SLG
+[2026-07-22 05:19:41] Scanning SLG...
+[2026-07-22 05:19:41] SLG: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 05:19:41] [602/667] KMB
+[2026-07-22 05:19:44] Scanning KMB...
+[2026-07-22 05:19:45] KMB: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:19:45] [603/667] FCX
+[2026-07-22 05:19:48] Scanning FCX...
+[2026-07-22 05:19:48] FCX: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 05:19:48] [604/667] BKV
+[2026-07-22 05:19:51] Scanning BKV...
+[2026-07-22 05:19:52] BKV: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:19:53] BKV: Cup & Handle — V-shape detected (slope ratio=1.25)
+[2026-07-22 05:19:53] BKV: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:19:53] BKV: Double Bottom — no valid W pattern found
+[2026-07-22 05:19:53] NO ALERT BKV | close=26.20 | ma150=27.95
+[2026-07-22 05:19:53] [605/667] ESS
+[2026-07-22 05:19:56] Scanning ESS...
+[2026-07-22 05:19:56] ESS: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:19:56] [606/667] GOLF
+[2026-07-22 05:19:59] Scanning GOLF...
+[2026-07-22 05:20:00] GOLF: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:20:00] GOLF: Cup & Handle — cup rims differ 14.3% (max 5%)
+[2026-07-22 05:20:00] GOLF: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:20:00] GOLF: Double Bottom — no valid W pattern found
+[2026-07-22 05:20:00] NO ALERT GOLF | close=109.40 | ma150=96.01
+[2026-07-22 05:20:00] [607/667] ASND
+[2026-07-22 05:20:03] Scanning ASND...
+[2026-07-22 05:20:04] ASND: 📅 next earnings: 2026-04-30 (-83d away)
+[2026-07-22 05:20:04] ASND: Cup & Handle — cup rims differ 14.9% (max 5%)
+[2026-07-22 05:20:04] ASND: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:20:04] ASND: Double Bottom — no valid W pattern found
+[2026-07-22 05:20:04] NO ALERT ASND | close=255.20 | ma150=230.72
+[2026-07-22 05:20:04] [608/667] STC
+[2026-07-22 05:20:07] Scanning STC...
+[2026-07-22 05:20:08] STC: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 05:20:08] [609/667] GRND
+[2026-07-22 05:20:11] Scanning GRND...
+[2026-07-22 05:20:11] GRND: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:20:12] GRND: ❌ Reverse Scanner — ⚠️ Reverse Scan: 2 סימני מכירה מוסדית — הימנע!
+[2026-07-22 05:20:12] [610/667] MSEX
+[2026-07-22 05:20:15] Scanning MSEX...
+[2026-07-22 05:20:15] MSEX: market cap too low ($1043M < $1B). Skip.
+[2026-07-22 05:20:15] [611/667] VRTX
+[2026-07-22 05:20:18] Scanning VRTX...
+[2026-07-22 05:20:19] VRTX: ⏭️ Earnings filter — earnings in 12 days (2026-08-03)
+[2026-07-22 05:20:19] [612/667] GPC
+[2026-07-22 05:20:22] Scanning GPC...
+[2026-07-22 05:20:22] GPC: 📅 next earnings: 2026-07-21 (-1d away)
+[2026-07-22 05:20:23] GPC: Cup & Handle — V-shape detected (slope ratio=0.80)
+[2026-07-22 05:20:23] GPC: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:20:23] GPC: Double Bottom — no valid W pattern found
+[2026-07-22 05:20:23] NO ALERT GPC | close=119.12 | ma150=116.05
+[2026-07-22 05:20:23] [613/667] V
+[2026-07-22 05:20:26] Scanning V...
+[2026-07-22 05:20:27] V: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 05:20:27] [614/667] FRT
+[2026-07-22 05:20:30] Scanning FRT...
+[2026-07-22 05:20:30] FRT: ⏭️ Earnings filter — earnings in 9 days (2026-07-31)
+[2026-07-22 05:20:30] [615/667] DVN
+[2026-07-22 05:20:33] Scanning DVN...
+[2026-07-22 05:20:34] DVN: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:20:34] [616/667] SBLK
+[2026-07-22 05:20:37] Scanning SBLK...
+[2026-07-22 05:20:37] SBLK: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:20:37] [617/667] DEO
+[2026-07-22 05:20:40] Scanning DEO...
+[2026-07-22 05:20:41] DEO: ❌ Reverse Scanner — ⚠️ Reverse Scan: 2 סימני מכירה מוסדית — הימנע!
+[2026-07-22 05:20:41] [618/667] ACT
+[2026-07-22 05:20:44] Scanning ACT...
+[2026-07-22 05:20:45] ACT: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:20:45] [619/667] DPC
+[2026-07-22 05:20:48] Scanning DPC...
+[2026-07-22 05:20:48] DPC: no data. Skip.
+[2026-07-22 05:20:48] [620/667] AMCR
+[2026-07-22 05:20:51] Scanning AMCR...
+[2026-07-22 05:20:52] AMCR: 📅 next earnings: 2026-05-06 (-77d away)
+[2026-07-22 05:20:52] AMCR: Cup & Handle — cup rims differ 14.3% (max 5%)
+[2026-07-22 05:20:52] AMCR: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:20:52] AMCR: Double Bottom — no valid W pattern found
+[2026-07-22 05:20:52] NO ALERT AMCR | close=43.44 | ma150=42.06
+[2026-07-22 05:20:52] [621/667] G
+[2026-07-22 05:20:55] Scanning G...
+[2026-07-22 05:20:56] G: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:20:57] G: Cup & Handle — cup bottom at edge (90%) — V shape suspected
+[2026-07-22 05:20:57] G: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:20:57] G: Double Bottom — no valid W pattern found
+[2026-07-22 05:20:57] NO ALERT G | close=30.18 | ma150=37.26
+[2026-07-22 05:20:57] [622/667] SYY
+[2026-07-22 05:21:00] Scanning SYY...
+[2026-07-22 05:21:00] SYY: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:21:00] [623/667] CMP
+[2026-07-22 05:21:03] Scanning CMP...
+[2026-07-22 05:21:03] CMP: market cap too low ($1255M < $1B). Skip.
+[2026-07-22 05:21:03] [624/667] LYV
+[2026-07-22 05:21:06] Scanning LYV...
+[2026-07-22 05:21:07] LYV: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:21:07] [625/667] WWD
+[2026-07-22 05:21:10] Scanning WWD...
+[2026-07-22 05:21:10] WWD: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:21:10] [626/667] ATO
+[2026-07-22 05:21:13] Scanning ATO...
+[2026-07-22 05:21:14] ATO: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:21:14] [627/667] PLTR
+[2026-07-22 05:21:17] Scanning PLTR...
+[2026-07-22 05:21:18] PLTR: ⏭️ Earnings filter — earnings in 12 days (2026-08-03)
+[2026-07-22 05:21:18] [628/667] LLY
+[2026-07-22 05:21:21] Scanning LLY...
+[2026-07-22 05:21:21] LLY: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:21:21] [629/667] CBSH
+[2026-07-22 05:21:24] Scanning CBSH...
+[2026-07-22 05:21:25] CBSH: 📅 next earnings: 2026-10-15 (85d away)
+[2026-07-22 05:21:25] CBSH: Cup & Handle — cup rims differ 5.7% (max 5%)
+[2026-07-22 05:21:25] CBSH: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:21:25] CBSH: Double Bottom — no valid W pattern found
+[2026-07-22 05:21:25] NO ALERT CBSH | close=58.37 | ma150=52.86
+[2026-07-22 05:21:25] [630/667] DCI
+[2026-07-22 05:21:28] Scanning DCI...
+[2026-07-22 05:21:29] DCI: 📅 next earnings: 2026-08-27 (36d away)
+[2026-07-22 05:21:30] DCI: Cup & Handle — V-shape detected (slope ratio=0.75)
+[2026-07-22 05:21:30] DCI: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:21:30] DCI: Double Bottom — no valid W pattern found
+[2026-07-22 05:21:30] NO ALERT DCI | close=90.18 | ma150=91.10
+[2026-07-22 05:21:30] [631/667] MGEE
+[2026-07-22 05:21:33] Scanning MGEE...
+[2026-07-22 05:21:33] MGEE: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:21:33] [632/667] BNS
+[2026-07-22 05:21:36] Scanning BNS...
+[2026-07-22 05:21:37] BNS: 📅 next earnings: 2026-08-25 (34d away)
+[2026-07-22 05:21:38] BNS: Cup & Handle — V-shape detected (slope ratio=0.93)
+[2026-07-22 05:21:38] BNS: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:21:38] BNS: Double Bottom — no valid W pattern found
+[2026-07-22 05:21:38] NO ALERT BNS | close=87.37 | ma150=76.88
+[2026-07-22 05:21:38] [633/667] JLL
+[2026-07-22 05:21:41] Scanning JLL...
+[2026-07-22 05:21:41] JLL: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:21:41] [634/667] CI
+[2026-07-22 05:21:44] Scanning CI...
+[2026-07-22 05:21:45] CI: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:21:45] [635/667] MRK
+[2026-07-22 05:21:48] Scanning MRK...
+[2026-07-22 05:21:48] MRK: ⏭️ Earnings filter — earnings in 13 days (2026-08-04)
+[2026-07-22 05:21:48] [636/667] BBT
+[2026-07-22 05:21:51] Scanning BBT...
+[2026-07-22 05:21:52] BBT: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:21:52] [637/667] ACMR
+[2026-07-22 05:21:55] Scanning ACMR...
+[2026-07-22 05:21:55] ACMR: 📅 next earnings: 2026-08-07 (16d away)
+[2026-07-22 05:21:56] ACMR: Cup & Handle — V-shape detected (slope ratio=0.78)
+[2026-07-22 05:21:56] ACMR: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:21:56] ACMR: Double Bottom — no valid W pattern found
+[2026-07-22 05:21:56] NO ALERT ACMR | close=95.27 | ma150=63.19
+[2026-07-22 05:21:56] [638/667] WCN
+[2026-07-22 05:21:59] Scanning WCN...
+[2026-07-22 05:22:00] WCN: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 05:22:00] [639/667] COO
+[2026-07-22 05:22:03] Scanning COO...
+[2026-07-22 05:22:03] COO: 📅 next earnings: 2026-09-03 (43d away)
+[2026-07-22 05:22:04] COO: Cup & Handle — V-shape detected (slope ratio=0.88)
+[2026-07-22 05:22:04] COO: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:22:04] COO: Double Bottom — no valid W pattern found
+[2026-07-22 05:22:04] NO ALERT COO | close=71.01 | ma150=73.00
+[2026-07-22 05:22:04] [640/667] AAPG
+[2026-07-22 05:22:07] Scanning AAPG...
+[2026-07-22 05:22:07] AAPG: market cap too low ($1783M < $1B). Skip.
+[2026-07-22 05:22:07] [641/667] TGS
+[2026-07-22 05:22:10] Scanning TGS...
+[2026-07-22 05:22:11] TGS: ⏭️ Earnings filter — earnings in 12 days (2026-08-03)
+[2026-07-22 05:22:11] [642/667] TCBI
+[2026-07-22 05:22:14] Scanning TCBI...
+[2026-07-22 05:22:15] TCBI: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 05:22:15] [643/667] LZB
+[2026-07-22 05:22:18] Scanning LZB...
+[2026-07-22 05:22:18] LZB: market cap too low ($1569M < $1B). Skip.
+[2026-07-22 05:22:18] [644/667] PIPR
+[2026-07-22 05:22:21] Scanning PIPR...
+[2026-07-22 05:22:21] PIPR: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:22:21] [645/667] CATY
+[2026-07-22 05:22:24] Scanning CATY...
+[2026-07-22 05:22:25] CATY: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 05:22:25] [646/667] KARD
+[2026-07-22 05:22:28] Scanning KARD...
+[2026-07-22 05:22:28] KARD: no data. Skip.
+[2026-07-22 05:22:28] [647/667] JJSF
+[2026-07-22 05:22:31] Scanning JJSF...
+[2026-07-22 05:22:32] JJSF: market cap too low ($1436M < $1B). Skip.
+[2026-07-22 05:22:32] [648/667] UCTT
+[2026-07-22 05:22:35] Scanning UCTT...
+[2026-07-22 05:22:35] UCTT: ⏭️ Earnings filter — earnings in 12 days (2026-08-03)
+[2026-07-22 05:22:35] [649/667] SONO
+[2026-07-22 05:22:38] Scanning SONO...
+[2026-07-22 05:22:38] SONO: market cap too low ($1762M < $1B). Skip.
+[2026-07-22 05:22:38] [650/667] DRVN
+[2026-07-22 05:22:41] Scanning DRVN...
+[2026-07-22 05:22:42] DRVN: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:22:42] [651/667] NVO
+[2026-07-22 05:22:45] Scanning NVO...
+[2026-07-22 05:22:46] NVO: ⏭️ Earnings filter — earnings in 14 days (2026-08-05)
+[2026-07-22 05:22:46] [652/667] OGN
+[2026-07-22 05:22:49] Scanning OGN...
+[2026-07-22 05:22:49] OGN: 📅 next earnings: 2026-04-30 (-83d away)
+[2026-07-22 05:22:50] OGN: Cup & Handle — cup rims differ 22.3% (max 5%)
+[2026-07-22 05:22:50] OGN: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:22:50] OGN: Double Bottom — no valid W pattern found
+[2026-07-22 05:22:50] NO ALERT OGN | close=13.51 | ma150=9.87
+[2026-07-22 05:22:50] [653/667] KMPR
+[2026-07-22 05:22:53] Scanning KMPR...
+[2026-07-22 05:22:53] KMPR: market cap too low ($1656M < $1B). Skip.
+[2026-07-22 05:22:53] [654/667] ACI
+[2026-07-22 05:22:56] Scanning ACI...
+[2026-07-22 05:22:57] ACI: ⏭️ Earnings filter — earnings in 1 days (2026-07-23)
+[2026-07-22 05:22:57] [655/667] FE
+[2026-07-22 05:23:00] Scanning FE...
+[2026-07-22 05:23:00] FE: ⏭️ Earnings filter — earnings in 6 days (2026-07-28)
+[2026-07-22 05:23:00] [656/667] MOH
+[2026-07-22 05:23:03] Scanning MOH...
+[2026-07-22 05:23:04] MOH: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 05:23:04] [657/667] EQR
+[2026-07-22 05:23:07] Scanning EQR...
+[2026-07-22 05:23:07] EQR: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 05:23:07] [658/667] PH
+[2026-07-22 05:23:10] Scanning PH...
+[2026-07-22 05:23:11] PH: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:23:12] PH: Cup & Handle — no breakout yet (959.58 < 989.91)
+[2026-07-22 05:23:12] PH: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:23:12] PH: Double Bottom — no valid W pattern found
+[2026-07-22 05:23:12] NO ALERT PH | close=959.58 | ma150=929.22
+[2026-07-22 05:23:12] [659/667] ZION
+[2026-07-22 05:23:15] Scanning ZION...
+[2026-07-22 05:23:15] ZION: 📅 next earnings: 2026-10-19 (89d away)
+[2026-07-22 05:23:16] ZION: Cup & Handle — V-shape detected (slope ratio=0.78)
+[2026-07-22 05:23:16] ZION: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:23:16] ZION: Double Bottom — no valid W pattern found
+[2026-07-22 05:23:16] NO ALERT ZION | close=69.05 | ma150=61.76
+[2026-07-22 05:23:16] [660/667] ELS
+[2026-07-22 05:23:19] Scanning ELS...
+[2026-07-22 05:23:19] ELS: ⏭️ Earnings filter — earnings in 0 days (2026-07-22)
+[2026-07-22 05:23:19] [661/667] MO
+[2026-07-22 05:23:22] Scanning MO...
+[2026-07-22 05:23:23] MO: ⏭️ Earnings filter — earnings in 8 days (2026-07-30)
+[2026-07-22 05:23:23] [662/667] STBA
+[2026-07-22 05:23:26] Scanning STBA...
+[2026-07-22 05:23:26] STBA: market cap too low ($1794M < $1B). Skip.
+[2026-07-22 05:23:26] [663/667] ORLY
+[2026-07-22 05:23:29] Scanning ORLY...
+[2026-07-22 05:23:29] ORLY: ⏭️ Earnings filter — earnings in 7 days (2026-07-29)
+[2026-07-22 05:23:29] [664/667] TEAM
+[2026-07-22 05:23:32] Scanning TEAM...
+[2026-07-22 05:23:33] TEAM: 📅 next earnings: 2026-08-06 (15d away)
+[2026-07-22 05:23:34] TEAM: Cup & Handle — cup rims differ 34.1% (max 5%)
+[2026-07-22 05:23:34] TEAM: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:23:34] TEAM: Double Bottom — no valid W pattern found
+[2026-07-22 05:23:34] NO ALERT TEAM | close=90.60 | ma150=96.31
+[2026-07-22 05:23:34] [665/667] WBS
+[2026-07-22 05:23:37] Scanning WBS...
+[2026-07-22 05:23:38] WBS: 📅 next earnings: 2026-07-21 (-1d away)
+[2026-07-22 05:23:38] WBS: Cup & Handle — cup bottom at edge (7%) — V shape suspected
+[2026-07-22 05:23:38] WBS: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:23:38] WBS: Double Bottom — no valid W pattern found
+[2026-07-22 05:23:38] NO ALERT WBS | close=76.07 | ma150=70.58
+[2026-07-22 05:23:38] [666/667] UCB
+[2026-07-22 05:23:41] Scanning UCB...
+[2026-07-22 05:23:42] UCB: 📅 next earnings: 2026-07-21 (-1d away)
+[2026-07-22 05:23:43] UCB: Cup & Handle — cup bottom at edge (18%) — V shape suspected
+[2026-07-22 05:23:43] UCB: Bullish Triangle — no valid ascending triangle
+[2026-07-22 05:23:43] UCB: Double Bottom — no valid W pattern found
+[2026-07-22 05:23:43] NO ALERT UCB | close=35.35 | ma150=33.32
+[2026-07-22 05:23:43] [667/667] NWL
+[2026-07-22 05:23:46] Scanning NWL...
+[2026-07-22 05:23:46] NWL: ⏭️ Earnings filter — earnings in 9 days (2026-07-31)
+[2026-07-22 05:23:46] No valid setups found today.
+[2026-07-22 05:23:47] Daily summary email sent to 5 recipients.
+[2026-07-22 05:23:47] STATS: {'scanned': 667, 'skipped_bl': 0, 'no_alert': 667, 'found': 0, 'errors': 0, 'sent': 0}
+[2026-07-22 05:23:47] ============================================================
+[2026-07-22 05:23:47] 📊 FILTER BREAKDOWN:
+[2026-07-22 05:23:47]    מניות נסרקו                     667
+[2026-07-22 05:23:47]    ❌ Market Cap / No Data          116  (17%)
+[2026-07-22 05:23:47]    ⏭️  דוחות קרובים                360  (54%)
+[2026-07-22 05:23:47]    ❌ EMA28 (מרחק > 3%)           1,749  (262%)
+[2026-07-22 05:23:47]    ❌ MA150 רחוק (> 5%)               0  (0%)
+[2026-07-22 05:23:47]    ❌ MA לא קרוב ל-neckline           0  (0%)
+[2026-07-22 05:23:47]    ❌ לא נמצאה תבנית                163  (24%)
+[2026-07-22 05:23:47]    ✅ עברו הכל ונשלחו                 0
+[2026-07-22 05:23:47] ============================================================
+[2026-07-22 05:23:47] 🧠 Self-learning scheduled for Saturday (3 days away)
+[2026-07-22 05:23:47] 💾 Market scan date saved: 2026-07-21
+[2026-07-22 05:23:47] Stock Scanner Unified — DONE
+[2026-07-22 05:23:47] ============================================================
