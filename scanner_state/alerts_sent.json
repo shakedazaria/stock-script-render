@@ -12393,5 +12393,32 @@
   },
   "MHK_Double Bottom_66": "2026-07-08T04:41:43.986758",
   "SRE_Falling Wedge_66": "2026-07-14T18:02:42.390852",
-  "URBN_Falling Wedge_66": "2026-07-16T04:45:25.556101"
+  "URBN_Falling Wedge_66": "2026-07-16T04:45:25.556101",
+  "ALK": {
+    "time": 1785210740.413501,
+    "patterns": [
+      {
+        "name": "Double Bottom",
+        "level": 47.3,
+        "time": 1785210740.409336
+      },
+      {
+        "name": "Double Bottom",
+        "level": 47.3,
+        "time": 1785210740.413501
+      }
+    ]
+  },
+  "ALK_Double Bottom_66": "2026-07-28T03:52:20.413503",
+  "HIG": {
+    "time": 1785211379.073352,
+    "patterns": [
+      {
+        "name": "Cup & Handle",
+        "level": 139.64,
+        "time": 1785211379.073352
+      }
+    ]
+  },
+  "HIG_Cup & Handle_66": "2026-07-28T04:02:59.073355"
 }

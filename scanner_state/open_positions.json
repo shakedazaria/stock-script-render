@@ -2218,5 +2218,35 @@
     "close_price": 72.9800033569336,
     "close_date": "2026-07-20",
     "pnl_pct": 0.28
+  },
+  {
+    "ticker": "ALK",
+    "pattern": "Double Bottom",
+    "entry": 47.3,
+    "stop_initial": 43.86464242857143,
+    "stop_current": 43.86464242857143,
+    "target": 60.21,
+    "date_open": "2026-07-28",
+    "highest_price": 47.3,
+    "closed": false,
+    "close_reason": null,
+    "close_price": null,
+    "close_date": null,
+    "pnl_pct": null
+  },
+  {
+    "ticker": "HIG",
+    "pattern": "Cup & Handle",
+    "entry": 139.64,
+    "stop_initial": 135.2939299642857,
+    "stop_current": 135.2939299642857,
+    "target": 154.18999999999997,
+    "date_open": "2026-07-28",
+    "highest_price": 139.64,
+    "closed": false,
+    "close_reason": null,
+    "close_price": null,
+    "close_date": null,
+    "pnl_pct": null
   }
 ]
