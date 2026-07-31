@@ -221,3 +221,6 @@ date_sent,ticker,pattern,entry,stop,target,score,rr,price_5d,price_10d,price_20d
 2026-07-28,ALK,Double Bottom,47.3,43.86,60.21,47.5,3.5,,,,,,,False
 2026-07-28,HIG,Cup & Handle,139.64,135.29,154.19,48.0,2.9,,,,,,,False
 2026-07-29,ZM,Falling Wedge,91.41,86.68,107.68,45.5,3.38,,,,,,,False
+2026-07-31,ELS,Double Bottom,65.22,63.07,68.37,51.5,1.15,,,,,,,False
+2026-07-31,ECL,Double Bottom,279.0,269.56,308.35,47.5,2.97,,,,,,,False
+2026-07-31,ECL,Double Bottom,279.0,269.56,308.35,50.5,2.97,,,,,,,False
