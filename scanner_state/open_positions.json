@@ -2254,15 +2254,15 @@
     "pattern": "Falling Wedge",
     "entry": 91.40822222222222,
     "stop_initial": 86.6845,
-    "stop_current": 91.2,
+    "stop_current": 91.24,
     "target": 107.68,
     "date_open": "2026-07-29",
     "highest_price": 96.06999969482422,
-    "closed": false,
-    "close_reason": null,
-    "close_price": null,
-    "close_date": null,
-    "pnl_pct": null
+    "closed": true,
+    "close_reason": "\u26a0\ufe0f \u05d9\u05e8\u05d3 \u05de\u05ea\u05d7\u05ea \u05dc-EMA28 (nan)",
+    "close_price": NaN,
+    "close_date": "2026-08-04",
+    "pnl_pct": NaN
   },
   {
     "ticker": "ELS",
@@ -2273,11 +2273,11 @@
     "target": 68.37,
     "date_open": "2026-07-31",
     "highest_price": 65.22,
-    "closed": false,
-    "close_reason": null,
-    "close_price": null,
-    "close_date": null,
-    "pnl_pct": null
+    "closed": true,
+    "close_reason": "\u26a0\ufe0f \u05d9\u05e8\u05d3 \u05de\u05ea\u05d7\u05ea \u05dc-EMA28 (nan)",
+    "close_price": NaN,
+    "close_date": "2026-08-04",
+    "pnl_pct": NaN
   },
   {
     "ticker": "ECL",
@@ -2288,10 +2288,10 @@
     "target": 308.35001,
     "date_open": "2026-07-31",
     "highest_price": 279.0,
-    "closed": false,
-    "close_reason": null,
-    "close_price": null,
-    "close_date": null,
-    "pnl_pct": null
+    "closed": true,
+    "close_reason": "\u26a0\ufe0f \u05d9\u05e8\u05d3 \u05de\u05ea\u05d7\u05ea \u05dc-EMA28 (nan)",
+    "close_price": NaN,
+    "close_date": "2026-08-04",
+    "pnl_pct": NaN
   }
 ]
