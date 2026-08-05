@@ -2293,5 +2293,20 @@
     "close_price": NaN,
     "close_date": "2026-08-04",
     "pnl_pct": NaN
+  },
+  {
+    "ticker": "PCG",
+    "pattern": "Double Bottom",
+    "entry": 17.44,
+    "stop_initial": 16.72517857142857,
+    "stop_current": 16.72517857142857,
+    "target": 19.11,
+    "date_open": "2026-08-05",
+    "highest_price": 17.44,
+    "closed": false,
+    "close_reason": null,
+    "close_price": null,
+    "close_date": null,
+    "pnl_pct": null
   }
 ]
