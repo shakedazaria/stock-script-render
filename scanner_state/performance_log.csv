@@ -220,11 +220,12 @@ date_sent,ticker,pattern,entry,stop,target,score,rr,price_5d,price_10d,price_20d
 2026-07-28,ALK,Double Bottom,47.3,43.86,60.21,46.5,3.5,50.21,49.96,,OPEN (+6.2%),OPEN (+5.6%),,False
 2026-07-28,ALK,Double Bottom,47.3,43.86,60.21,47.5,3.5,50.21,49.96,,OPEN (+6.2%),OPEN (+5.6%),,False
 2026-07-28,HIG,Cup & Handle,139.64,135.29,154.19,48.0,2.9,142.9,143.28,,OPEN (+2.3%),OPEN (+2.6%),,False
-2026-07-29,ZM,Falling Wedge,91.41,86.68,107.68,45.5,3.38,98.25,,,OPEN (+7.5%),,,False
-2026-07-31,ELS,Double Bottom,65.22,63.07,68.37,51.5,1.15,65.0,,,OPEN (-0.3%),,,False
-2026-07-31,ECL,Double Bottom,279.0,269.56,308.35,47.5,2.97,285.47,,,OPEN (+2.3%),,,False
-2026-07-31,ECL,Double Bottom,279.0,269.56,308.35,50.5,2.97,285.47,,,OPEN (+2.3%),,,False
-2026-08-05,PCG,Double Bottom,17.44,16.73,19.11,58.0,2.29,,,,,,,False
+2026-07-29,ZM,Falling Wedge,91.41,86.68,107.68,45.5,3.38,98.25,107.2,,OPEN (+7.5%),OPEN (+17.3%),,False
+2026-07-31,ELS,Double Bottom,65.22,63.07,68.37,51.5,1.15,65.0,64.58,,OPEN (-0.3%),OPEN (-1.0%),,False
+2026-07-31,ECL,Double Bottom,279.0,269.56,308.35,47.5,2.97,285.47,284.4,,OPEN (+2.3%),OPEN (+1.9%),,False
+2026-07-31,ECL,Double Bottom,279.0,269.56,308.35,50.5,2.97,285.47,284.4,,OPEN (+2.3%),OPEN (+1.9%),,False
+2026-08-05,PCG,Double Bottom,17.44,16.73,19.11,58.0,2.29,17.04,,,OPEN (-2.3%),,,False
 2026-08-07,TTE,Falling Wedge,86.18,83.42,94.46,46.5,2.87,,,,,,,False
 2026-08-10,CIEN,Falling Wedge,411.96,367.3,632.56,50.0,4.88,,,,,,,False
 2026-08-10,MAA,Falling Wedge,134.94,131.17,147.78,45.0,3.38,,,,,,,False
+2026-08-11,ORLY,Falling Wedge,92.11,88.37,104.69,45.0,3.23,,,,,,,False
