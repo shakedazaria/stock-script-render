@@ -229,3 +229,4 @@ date_sent,ticker,pattern,entry,stop,target,score,rr,price_5d,price_10d,price_20d
 2026-08-10,CIEN,Falling Wedge,411.96,367.3,632.56,50.0,4.88,,,,,,,False
 2026-08-10,MAA,Falling Wedge,134.94,131.17,147.78,45.0,3.38,,,,,,,False
 2026-08-11,ORLY,Falling Wedge,92.11,88.37,104.69,45.0,3.23,,,,,,,False
+2026-08-12,MTH,Falling Wedge,73.81,69.34,86.67,48.0,2.87,,,,,,,False
