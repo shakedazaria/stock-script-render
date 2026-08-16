@@ -93654,3 +93654,8 @@ requests.exceptions.ConnectionError: ('Connection aborted.', RemoteDisconnected(
 [2026-08-15 02:49:19] ============================================================
 [2026-08-15 02:49:19] 🗓️ Market Day Guard: שבת/ראשון לפי שעון ישראל — מדלג כדי לא לסרוק ביום בלי מסחר
 [2026-08-15 02:49:19] ⏸️ No new market session — exiting before scan to prevent duplicate alerts.
+[2026-08-16 02:08:03] ============================================================
+[2026-08-16 02:08:03] Stock Scanner Unified — START
+[2026-08-16 02:08:03] ============================================================
+[2026-08-16 02:08:03] 🗓️ Market Day Guard: שבת/ראשון לפי שעון ישראל — מדלג כדי לא לסרוק ביום בלי מסחר
+[2026-08-16 02:08:03] ⏸️ No new market session — exiting before scan to prevent duplicate alerts.
