@@ -3033,7 +3033,7 @@
     ]
   },
   "ECL": {
-    "time": 1785472275.885342,
+    "time": 1787108758.538084,
     "patterns": [
       {
         "name": "Double Bottom",
@@ -3044,6 +3044,16 @@
         "name": "Double Bottom",
         "level": 279.0,
         "time": 1785472275.885342
+      },
+      {
+        "name": "Double Bottom",
+        "level": 279.0,
+        "time": 1787108758.533198
+      },
+      {
+        "name": "Double Bottom",
+        "level": 279.0,
+        "time": 1787108758.538084
       }
     ]
   },
@@ -12398,7 +12408,7 @@
     ]
   },
   "ELS_Double Bottom_66": "2026-07-31T04:01:21.312962",
-  "ECL_Double Bottom_66": "2026-07-31T04:31:15.885344",
+  "ECL_Double Bottom_66": "2026-08-19T03:05:58.538086",
   "PCG_Double Bottom_66": "2026-08-05T04:35:50.006862",
   "TTE_Falling Wedge_66": "2026-08-07T04:27:49.901482",
   "CIEN": {
@@ -12434,5 +12444,16 @@
       }
     ]
   },
-  "HAFN_Falling Wedge_66": "2026-08-13T02:58:23.029251"
+  "HAFN_Falling Wedge_66": "2026-08-13T02:58:23.029251",
+  "BKU": {
+    "time": 1787108587.912443,
+    "patterns": [
+      {
+        "name": "Falling Wedge",
+        "level": 47.55107142857143,
+        "time": 1787108587.912443
+      }
+    ]
+  },
+  "BKU_Falling Wedge_66": "2026-08-19T03:03:07.912447"
 }
