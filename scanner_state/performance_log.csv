@@ -234,3 +234,4 @@ date_sent,ticker,pattern,entry,stop,target,score,rr,price_5d,price_10d,price_20d
 2026-08-19,BKU,Falling Wedge,47.55,46.41,51.34,47.5,2.59,,,,,,,False
 2026-08-19,ECL,Double Bottom,279.0,271.51,308.35,55.5,3.34,,,,,,,False
 2026-08-19,ECL,Double Bottom,279.0,271.51,308.35,58.5,3.34,,,,,,,False
+2026-08-20,FCFS,Falling Wedge,211.14,202.16,238.06,49.0,2.65,,,,,,,False
