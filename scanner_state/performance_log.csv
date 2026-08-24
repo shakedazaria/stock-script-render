@@ -228,7 +228,7 @@ date_sent,ticker,pattern,entry,stop,target,score,rr,price_5d,price_10d,price_20d
 2026-08-07,TTE,Falling Wedge,86.18,83.42,94.46,46.5,2.87,87.7,88.63,,OPEN (+1.8%),OPEN (+2.8%),,False
 2026-08-10,CIEN,Falling Wedge,411.96,367.3,632.56,50.0,4.88,445.18,392.48,,OPEN (+8.1%),OPEN (-4.7%),,False
 2026-08-10,MAA,Falling Wedge,134.94,131.17,147.78,45.0,3.38,131.12,132.06,,LOSS (-2.8%),OPEN (-2.1%),,False
-2026-08-11,ORLY,Falling Wedge,92.11,88.37,104.69,45.0,3.23,90.23,,,OPEN (-2.0%),,,False
+2026-08-11,ORLY,Falling Wedge,92.11,88.37,104.69,45.0,3.23,90.23,89.11,,OPEN (-2.0%),OPEN (-3.3%),,False
 2026-08-12,MTH,Falling Wedge,73.81,69.34,86.67,48.0,2.87,72.23,,,OPEN (-2.1%),,,False
 2026-08-13,HAFN,Falling Wedge,7.46,7.17,8.98,46.5,4.63,7.78,,,OPEN (+4.3%),,,False
 2026-08-19,BKU,Falling Wedge,47.55,46.41,51.34,47.5,2.59,,,,,,,False
