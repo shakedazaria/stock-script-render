@@ -22,9 +22,18 @@ stock_scanner_unified.py
 """
 
 # ============================================================
+# RESET VERIFIED FIX FILE — 2026-08-27
+# This marker proves this is the rebuilt fixed file, not an old download copy.
+# ============================================================
+CODE_VERSION = "2026-08-27-RESET-verified-marketcap-tracker-security-v5"
+RESET_VERIFIED_FIX_FILE = True
+
+
+# ============================================================
 #  Imports
 # ============================================================
 import os
+import re
 import json
 import time
 import random
@@ -481,7 +490,7 @@ MIN_AVG_VOLUME        = int(os.getenv("MIN_AVG_VOLUME",       "150000"))
 VOLUME_AVG_LOOKBACK   = int(os.getenv("VOLUME_AVG_LOOKBACK",  "20"))
 
 # --- כללי ---
-MIN_MARKET_CAP_USD    = float(os.getenv("MIN_MARKET_CAP_USD",  "2e9"))   # $2B
+MIN_MARKET_CAP_USD    = 1_000_000_000.0   # FIXED: $1B, no env override
 SCAN_DELAY_SECONDS    = int(os.getenv("SCAN_DELAY_SECONDS",    "10"))
 # --- מניעת כפילויות התראות ---
 # ברירת מחדל: לא לשלוח אותו סטאפ שוב במשך 7 ימים.
@@ -559,7 +568,7 @@ else:
 #  UNIVERSE — טוען את כל מניות NYSE + NASDAQ ומסנן מעל $1B
 # ============================================================
 UNIVERSE_CACHE_FILE = _state_path(os.getenv("UNIVERSE_CACHE_FILE", "universe_cache.json"))
-UNIVERSE_MIN_CAP    = float(os.getenv("UNIVERSE_MIN_CAP", "1e9"))   # $1B מינימום
+UNIVERSE_MIN_CAP    = 1_000_000_000.0   # FIXED: $1B, no env override
 UNIVERSE_MIN_PRICE  = float(os.getenv("UNIVERSE_MIN_PRICE", "5.0")) # לא פני-סטוק
 UNIVERSE_MIN_VOL    = int(os.getenv("UNIVERSE_MIN_VOL", "100000"))  # volume מינימלי
 
@@ -567,7 +576,7 @@ UNIVERSE_MIN_VOL    = int(os.getenv("UNIVERSE_MIN_VOL", "100000"))  # volume מ�
 # ברירת המחדל החדשה: בכל ריצה מנסים לבנות Universe חדש מהאינטרנט.
 # universe_cache.json הוא גיבוי בלבד, ומשמש רק אם הבנייה החדשה נכשלה או יצאה קטנה מדי.
 UNIVERSE_ALWAYS_REFRESH      = os.getenv("UNIVERSE_ALWAYS_REFRESH", "True").lower() in ("1", "true", "yes")
-UNIVERSE_REQUIRE_MARKET_CAP  = os.getenv("UNIVERSE_REQUIRE_MARKET_CAP", "True").lower() in ("1", "true", "yes")
+UNIVERSE_REQUIRE_MARKET_CAP  = False  # FIXED: unknown market cap is allowed to pass to full scan
 UNIVERSE_MIN_RAW_ROWS        = int(os.getenv("UNIVERSE_MIN_RAW_ROWS", "4000"))
 UNIVERSE_MIN_FRESH_TICKERS   = int(os.getenv("UNIVERSE_MIN_FRESH_TICKERS", "1200"))
 UNIVERSE_MIN_CACHE_TICKERS   = int(os.getenv("UNIVERSE_MIN_CACHE_TICKERS", "500"))
@@ -757,7 +766,8 @@ def _build_fresh_universe_from_screener() -> tuple[list[str], dict]:
         "filtered_price": 0,
         "filtered_not_common_stock": 0,
         "filtered_bad_symbol": 0,
-        "unknown_market_cap_rejected": 0,
+        "unknown_market_cap_rejected": 0,  # kept for log compatibility; should remain 0
+        "unknown_market_cap_passed": 0,
         "unknown_price_passed": 0,
     }
 
@@ -803,13 +813,11 @@ def _build_fresh_universe_from_screener() -> tuple[list[str], dict]:
                 or row.get("previousClose")
             )
 
-            # עכשיו ברירת המחדל קשוחה יותר: אם אין Market Cap — לא מכניסים לרשימה.
-            # אם NASDAQ לא מחזיר Market Cap למספיק מניות, הרשימה תיחשב לא תקינה ונשתמש בקאש.
-            if mc is None and UNIVERSE_REQUIRE_MARKET_CAP:
-                meta["unknown_market_cap_rejected"] += 1
-                meta["failed"] += 1
-                continue
-            if mc is not None and mc < UNIVERSE_MIN_CAP:
+            # FIXED: אם אין Market Cap — לא זורקים. מעבירים לסריקה מלאה.
+            # הסיבה: NASDAQ/Yahoo לפעמים לא מחזירים Market Cap, וזה גרם ל-unknown_mc_rejected.
+            if mc is None:
+                meta["unknown_market_cap_passed"] += 1
+            elif mc < UNIVERSE_MIN_CAP:
                 meta["filtered_market_cap"] += 1
                 meta["failed"] += 1
                 continue
@@ -878,6 +886,7 @@ def build_universe(force_refresh: bool = False) -> list[str]:
         f"raw={fresh_meta.get('total_rows', 0)}, "
         f"passed={len(fresh_tickers)}, "
         f"market_cap_rejected={fresh_meta.get('filtered_market_cap', 0)}, "
+        f"unknown_mc_passed={fresh_meta.get('unknown_market_cap_passed', 0)}, "
         f"unknown_mc_rejected={fresh_meta.get('unknown_market_cap_rejected', 0)}, "
         f"not_common_stock={fresh_meta.get('filtered_not_common_stock', 0)}, "
         f"bad_symbol={fresh_meta.get('filtered_bad_symbol', 0)}, "
@@ -926,6 +935,12 @@ HTTP_SESSION.headers.update({"User-Agent": "Mozilla/5.0"})
 #  LOGGING
 # ============================================================
 def log(msg: str) -> None:
+    # FIXED: never expose TwelveData API keys in GitHub logs.
+    try:
+        msg = re.sub(r"(apikey=)[^&\s)]+", r"\1***", str(msg))
+        msg = re.sub(r"(apikey%3D)[^&\s)]+", r"\1***", str(msg), flags=re.IGNORECASE)
+    except Exception:
+        msg = str(msg)
     line = f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {msg}"
 
     # מציג את ההודעה ב-Render Logs
@@ -1312,7 +1327,9 @@ def _maybe_block_symbol(symbol: str, message: str) -> bool:
 #  DATA FETCHING
 # ============================================================
 def fetch_data_twelvedata(ticker: str, outputsize: int = 500) -> pd.DataFrame | None:
-    """מביא OHLCV מ-TwelveData ומחזיר DataFrame עם עמודות lowercase."""
+    """מביא OHLCV מ-TwelveData ומחזיר DataFrame עם עמודות lowercase.
+    FIXED: משתמש ב-params ולא מדפיס URL עם apikey בלוג.
+    """
     symbol = ticker.strip().upper().replace("$", "")
     if not symbol:
         return None
@@ -1321,9 +1338,16 @@ def fetch_data_twelvedata(ticker: str, outputsize: int = 500) -> pd.DataFrame | 
     if not key:
         log("No available API key.")
         return None
-    url = f"{BASE_URL}?symbol={symbol}&interval=1day&outputsize={outputsize}&apikey={key}"
+
+    params = {
+        "symbol": symbol,
+        "interval": "1day",
+        "outputsize": outputsize,
+        "apikey": key,
+    }
+
     try:
-        r = HTTP_SESSION.get(url, timeout=15)
+        r = HTTP_SESSION.get(BASE_URL, params=params, timeout=20)
         if r.status_code == 429:
             api_usage[key]["blocked_until"] = datetime.now() + RESET_TIME
             log(f"TwelveData 429 for {symbol}. Key blocked.")
@@ -1332,17 +1356,22 @@ def fetch_data_twelvedata(ticker: str, outputsize: int = 500) -> pd.DataFrame | 
             api_usage[key]["blocked_until"] = datetime.now() + timedelta(hours=12)
             log(f"TwelveData auth error {r.status_code} for {symbol}.")
             return None
-        r.raise_for_status()
+        if r.status_code >= 400:
+            log(f"TwelveData HTTPError {symbol}: status={r.status_code}")
+            return None
+
         data = r.json() if r.content else {}
         if data.get("status") == "error" or "values" not in data:
             msg = str(data.get("message") or data.get("code") or "no data")
             log(f"TwelveData error for {symbol}: {msg}")
             _maybe_block_symbol(symbol, msg)
             return None
+
         values = data.get("values") or []
         if not values:
             _maybe_block_symbol(symbol, "empty values")
             return None
+
         update_api_usage(key)
         df = pd.DataFrame(values)
         df = df.rename(columns={"datetime":"Date","open":"Open","high":"High",
@@ -1361,12 +1390,15 @@ def fetch_data_twelvedata(ticker: str, outputsize: int = 500) -> pd.DataFrame | 
         df = df.iloc[::-1]   # oldest → newest
         df.columns = df.columns.str.lower()
         return df.copy()
-    except requests.HTTPError as e:
-        log(f"TwelveData HTTPError {symbol}: {e}")
+
+    except requests.RequestException as e:
+        # לא להדפיס traceback/URL מלא כדי שלא יודפס apikey.
+        log(f"TwelveData request error {symbol}: {type(e).__name__}")
         return None
-    except Exception:
-        log(f"TwelveData general error {symbol}:\n{traceback.format_exc()}")
+    except Exception as e:
+        log(f"TwelveData general error {symbol}: {type(e).__name__}: {e}")
         return None
+
 
 def _ticker_exists_yahoo(ticker: str, timeout: int = 6) -> bool:
     url = f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{ticker}?modules=price"
@@ -2139,48 +2171,82 @@ def atr_stop_and_position(break_level: float, df: pd.DataFrame,
                            pattern_meta: dict | None = None,
                            capital: float = 100_000.0,
                            risk_pct: float = 0.01,
-                           atr_mult: float = 1.5) -> tuple:
-    """מחזיר (stop, target, size_shares, atr, rr_ratio)."""
+                           atr_mult: float | None = None) -> tuple:
+    """מחזיר (stop, target, size_shares, atr, rr_ratio).
+    FIXED: סטופ חכם לפי ATR + שפל אחרון + תמיכת תבנית, עם מרחק 4.5%-12%.
+    """
     try:
         if df is None or df.empty:
             raise ValueError("empty df")
-        if "atr14" not in df.columns:
+        if "atr14" not in df.columns or "ema28" not in df.columns:
             add_technical_indicators(df)
-        entry   = max(float(break_level or 0), float(df["close"].iloc[-1]))
-        atr     = float(df["atr14"].iloc[-1]) if "atr14" in df.columns else 0.0
 
+        entry = max(float(break_level or 0), float(df["close"].iloc[-1]))
+        atr = float(df["atr14"].iloc[-1]) if "atr14" in df.columns and not pd.isna(df["atr14"].iloc[-1]) else entry * 0.025
         if atr <= 0 or np.isnan(atr):
-            stop = entry * 0.95
-        else:
-            stop = entry - atr_mult * atr
-            stop = max(stop, entry * (1.0 - 0.25))   # max 25% stop
+            atr = entry * 0.025
 
-        # ── סטופ מינימלי: לפחות 1.5% מתחת לכניסה ──────────
-        min_stop = entry * (1.0 - 0.015)
-        stop = min(stop, min_stop)   # הסטופ לא יכול להיות קרוב יותר מ-1.5%
+        meta = pattern_meta or {}
+        pattern_name = str(meta.get("pattern_type") or meta.get("pattern") or meta.get("name") or "").lower()
+        atr_mult_eff = float(atr_mult if atr_mult is not None else 2.2)
+        if "falling" in pattern_name or "wedge" in pattern_name:
+            atr_mult_eff = max(atr_mult_eff, 2.8)
+        elif "double" in pattern_name:
+            atr_mult_eff = max(atr_mult_eff, 2.4)
 
-        # ── וודא שהסטופ תמיד מתחת לכניסה ───────────────────
-        stop = min(stop, entry - (entry * 0.015))
+        stop_candidates = []
+        stop_candidates.append(entry - atr_mult_eff * atr)  # ATR stop
+        try:
+            recent_low = float(df["low"].tail(5).min())
+            stop_candidates.append(recent_low - 0.35 * atr)
+        except Exception:
+            pass
+        try:
+            swing_low = float(df["low"].tail(20).min())
+            stop_candidates.append(swing_low - 0.20 * atr)
+        except Exception:
+            pass
+        try:
+            ema28 = float(df["ema28"].iloc[-1])
+            if ema28 and not np.isnan(ema28):
+                stop_candidates.append(ema28 - 0.50 * atr)
+        except Exception:
+            pass
+        for key in ("handle_low", "cup_bottom", "bottom2", "bottom1", "support", "support_level"):
+            try:
+                val = float(meta.get(key) or 0)
+                if val > 0:
+                    stop_candidates.append(val - 0.20 * atr)
+            except Exception:
+                pass
 
-        risk   = max(entry - stop, 1e-9)
-        size   = int(capital * risk_pct / risk)
+        stop_candidates = [float(x) for x in stop_candidates if x and not np.isnan(x) and x < entry]
+        raw_stop = max(stop_candidates) if stop_candidates else entry - 2.2 * atr
 
-        # Double Bottom: target = start_price (תחילת התבנית)
-        target_price = float((pattern_meta or {}).get("target_price") or 0.0)
-        height       = float((pattern_meta or {}).get("pattern_height") or 0.0)
+        min_risk_pct = 0.045
+        max_risk_pct = 0.12
+        stop = min(raw_stop, entry * (1.0 - min_risk_pct))
+        stop = max(stop, entry * (1.0 - max_risk_pct))
+        stop = round(float(stop), 2)
+
+        risk = max(entry - stop, 1e-9)
+        size = int(capital * risk_pct / risk)
+
+        target_price = float(meta.get("target_price") or 0.0)
+        height = float(meta.get("pattern_height") or 0.0)
         if target_price > entry:
-            target = target_price   # Double Bottom — יעד = start_price
+            target = target_price
         elif height > 0:
             target = entry + height
         else:
-            target = entry + risk * 1.5
+            target = entry + risk * 1.8
 
-        rr     = (target - entry) / risk
+        rr = (target - entry) / risk
         return float(stop), float(target), int(size), float(atr), round(float(rr), 2)
     except Exception as e:
         log(f"atr_stop_and_position error: {e}")
         entry = float(break_level or 0)
-        return entry * 0.95, entry * 1.10, 0, 0.0, 0.0
+        return entry * 0.955, entry * 1.10, 0, 0.0, 0.0
 
 # ============================================================
 #  GLOBAL FILTER — EMA28 proximity check
@@ -2996,8 +3062,8 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
     # --- Market Cap ---
     mc = fetch_market_cap(symbol)
     if mc is not None and mc < MIN_MARKET_CAP_USD:
-        log(f"{symbol}: market cap too low (${mc/1e6:.0f}M < $1B). Skip."); _fs("market_cap"); return []
-    # אם mc=None (לא זמין) — ממשיכים, לא דוחים
+        log(f"{symbol}: market cap too low (${mc/1e6:.0f}M < ${MIN_MARKET_CAP_USD/1e9:.1f}B). Skip."); _fs("market_cap"); return []
+    # FIXED: אם mc=None (לא זמין) — ממשיכים, לא דוחים
 
     # --- Data ---
     df = fetch_data_twelvedata(symbol, outputsize=500)
@@ -3632,7 +3698,10 @@ def get_sector_rotation_adjustment(ticker: str, rotation_map: dict) -> tuple[flo
 # ============================================================
 
 POSITIONS_FILE      = _state_path(os.getenv("POSITIONS_FILE",      "open_positions.json"))
-TRAILING_ATR_MULT   = float(os.getenv("TRAILING_ATR_MULT",   "1.5"))   # trailing stop = ATR × 1.5 מתחת לשיא
+TRAILING_ATR_MULT   = 2.5   # FIXED: wider trailing stop, ATR × 2.5 below high
+TRAILING_START_PROFIT_PCT = 4.0  # trailing starts only after +4% profit
+TRAILING_START_DAYS = 5          # or after 5 days, only if profitable
+TRAILING_START_DAYS_PROFIT_PCT = 1.0
 POSITION_MAX_DAYS   = int(os.getenv("POSITION_MAX_DAYS",     "30"))    # סגור פוזיציה אחרי 30 יום
 SEND_POSITIONS_STATUS_EMAIL = os.getenv("SEND_POSITIONS_STATUS_EMAIL", "True").lower() in ("1", "true", "yes")
 
@@ -3706,6 +3775,8 @@ def open_position(alert: dict) -> None:
             "target":        target,
             "date_open":     datetime.now().strftime("%Y-%m-%d"),
             "highest_price": entry,      # שיא מאז הכניסה
+            "stop_method":    "smart_atr_support",
+            "trailing_status":"waiting",
             "closed":        False,
             "close_reason":  None,
             "close_price":   None,
@@ -3713,7 +3784,7 @@ def open_position(alert: dict) -> None:
             "pnl_pct":       None,
         })
         _save_positions(positions)
-        log(f"📂 Position opened: {ticker} @ {entry:.2f} | stop={stop:.2f} | target={target:.2f}")
+        log(f"📂 Position opened: {ticker} @ {entry:.2f} | stop={stop:.2f} | target={target:.2f} | SMART: smart_atr_support")
     except Exception as e:
         log(f"open_position error: {e}")
 
@@ -3762,30 +3833,47 @@ def run_position_tracker(send_exit_email_fn=None) -> list[dict]:
             date_open = pd.Timestamp(p["date_open"]).date()
             days_open = (today - date_open).days
 
-            # ── Trailing Stop ────────────────────────────────
-            # חשב ATR14
+            # ── Trailing Stop חכם ─────────────────────────────
             add_technical_indicators(df)
-            atr = float(df["atr14"].iloc[-1]) if "atr14" in df.columns else price_now * 0.02
+            atr = float(df["atr14"].iloc[-1]) if "atr14" in df.columns and not pd.isna(df["atr14"].iloc[-1]) else price_now * 0.02
+
+            pnl_pct = round((price_now - entry) / max(entry, 1e-9) * 100, 2)
 
             # עדכן שיא
-            new_high = max(float(p["highest_price"]), price_now)
+            new_high = max(float(p.get("highest_price", entry) or entry), high_now, price_now)
             p["highest_price"] = new_high
 
-            # trailing stop = שיא - (ATR × mult)
-            trailing = round(new_high - TRAILING_ATR_MULT * atr, 2)
-            new_stop = max(stop_curr, trailing)  # רק מעלה — לא מורידים stop
+            trailing_active = (pnl_pct >= TRAILING_START_PROFIT_PCT) or (days_open >= TRAILING_START_DAYS and pnl_pct >= TRAILING_START_DAYS_PROFIT_PCT)
+            new_stop = stop_curr
+            if trailing_active:
+                p["trailing_status"] = "active"
+                trailing = round(new_high - TRAILING_ATR_MULT * atr, 2)
+                new_stop = max(stop_curr, trailing)  # רק מעלה — לא מורידים stop
+                if new_stop > stop_curr:
+                    log(f"   🔼 {ticker}: Trailing stop {stop_curr:.2f} → {new_stop:.2f} (high={new_high:.2f})")
+                    p["stop_current"] = new_stop
+            else:
+                p["trailing_status"] = "waiting"
 
-            if new_stop > stop_curr:
-                log(f"   🔼 {ticker}: Trailing stop {stop_curr:.2f} → {new_stop:.2f} (high={new_high:.2f})")
-                p["stop_current"] = new_stop
-
-            # ── EMA28 check ──────────────────────────────────
-            ema28_ok = True
+            # ── EMA28 / Low אתמול = אזהרות בלבד, לא יציאה ─────
+            soft_warnings = []
             if "ema28" in df.columns:
-                ema28 = float(df["ema28"].iloc[-1])
-                ema28_ok = price_now >= ema28 * 0.99  # מרווח 1%
+                try:
+                    ema28 = float(df["ema28"].iloc[-1])
+                    if price_now < ema28 * 0.99:
+                        soft_warnings.append(f"⚠️ מתחת ל-EMA28 ({price_now:.2f})")
+                except Exception:
+                    pass
+            try:
+                if days_open >= 3 and len(df) >= 2:
+                    prev_low = float(df["low"].iloc[-2])
+                    if price_now < prev_low:
+                        soft_warnings.append(f"📉 מתחת ל-Low אתמול ({price_now:.2f} < {prev_low:.2f})")
+            except Exception:
+                pass
+            p["soft_warnings"] = soft_warnings
 
-            # ── בדוק תנאי יציאה ─────────────────────────────
+            # ── בדוק תנאי יציאה אמיתיים בלבד ─────────────────
             close_reason = None
             close_emoji  = ""
 
@@ -3795,25 +3883,9 @@ def run_position_tracker(send_exit_email_fn=None) -> list[dict]:
             elif price_now >= target:
                 close_reason = f"🎯 הגיע ליעד! ({price_now:.2f} ≥ {target:.2f})"
                 close_emoji  = "🎯"
-            elif not ema28_ok:
-                close_reason = f"⚠️ ירד מתחת ל-EMA28 ({price_now:.2f})"
-                close_emoji  = "⚠️"
-            elif days_open >= 3:
-                # ── ירד מתחת ל-Low של אתמול ──────────────────────
-                try:
-                    if len(df) >= 2:
-                        prev_low = float(df["low"].iloc[-2])
-                        pnl_pct_now = round((price_now - entry) / max(entry, 1e-9) * 100, 2)
-                        if price_now < prev_low:
-                            close_reason = f"📉 ירד מתחת ל-Low אתמול ({price_now:.2f} < {prev_low:.2f}) | רווח: {pnl_pct_now:+.1f}%"
-                            close_emoji  = "📉"
-                except Exception:
-                    pass
-            if close_reason is None and days_open >= POSITION_MAX_DAYS:
+            elif days_open >= POSITION_MAX_DAYS:
                 close_reason = f"⏰ פג זמן ({days_open} ימים)"
                 close_emoji  = "⏰"
-
-            pnl_pct = round((price_now - entry) / max(entry, 1e-9) * 100, 2)
 
             if close_reason:
                 # סגור פוזיציה
@@ -3841,8 +3913,10 @@ def run_position_tracker(send_exit_email_fn=None) -> list[dict]:
                 # פוזיציה פתוחה — לוג סטטוס
                 pct_to_target = round((target - price_now) / max(price_now, 1e-9) * 100, 1)
                 pct_to_stop   = round((price_now - new_stop) / max(price_now, 1e-9) * 100, 1)
+                warn_txt = " | ".join(p.get("soft_warnings", []))
+                warn_part = f" | warnings: {warn_txt}" if warn_txt else ""
                 log(f"   📈 {ticker}: {price_now:.2f} | P&L={pnl_pct:+.1f}% | "
-                    f"to_target={pct_to_target:.1f}% | to_stop={pct_to_stop:.1f}% | {days_open}d open")
+                    f"to_target={pct_to_target:.1f}% | to_stop={pct_to_stop:.1f}% | {days_open}d open | trailing={p.get('trailing_status', 'waiting')}{warn_part}")
 
         except Exception as e:
             log(f"   position_tracker error for {ticker}: {e}")
@@ -6093,6 +6167,9 @@ def main() -> None:
 
     log("=" * 60)
     log("Stock Scanner Unified — START")
+    log(f"Code version: {CODE_VERSION}")
+    log(f"Market cap threshold: ${MIN_MARKET_CAP_USD/1e9:.1f}B | Unknown MC behavior: PASS")
+    log("RESET VERIFIED FIX FILE")
     log("=" * 60)
     # ── מנע Sleep במהלך הסריקה ──────────────────────────────
     try:
@@ -6265,7 +6342,7 @@ def main() -> None:
             stats["found"] += len(new)
         except Exception:
             stats["errors"] += 1
-            log(f"Critical error {symbol}:\n{traceback.format_exc()}")
+            log(f"Critical error {symbol}: {type(e).__name__}: {e}")
 
     # שומר היסטוריית התראות. את _df מנקים רק אחרי שליחת המייל,
     # כדי שהגרפים וה-RS במייל לא יצטרכו להוריד נתונים מחדש.
@@ -6277,7 +6354,7 @@ def main() -> None:
             send_daily_summary_email(stats, filter_stats, regime, PREFILTER_STATS)
         except Exception:
             stats["errors"] += 1
-            log(f"Daily summary email error:\n{traceback.format_exc()}")
+            log(f"Daily summary email error: {type(e).__name__}: {e}")
     else:
         all_alerts.sort(key=lambda a: float(a.get("score",0) or 0), reverse=True)
         # בחר את הסטאפ הכי טוב לכל טיקר, אחרי שכל הסריקה הסתיימה
@@ -6300,7 +6377,7 @@ def main() -> None:
             log("TOP: " + ", ".join(f"{a['ticker']}({a['score']})" for a in top))
         except Exception:
             stats["errors"] += 1
-            log(f"Email error:\n{traceback.format_exc()}")
+            log(f"Email error: {type(e).__name__}: {e}")
 
     # נקה DataFrames מהזיכרון אחרי שסיימנו לשלוח מיילים וליצור גרפים
     for a in all_alerts:
