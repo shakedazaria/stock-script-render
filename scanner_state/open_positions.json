@@ -2423,11 +2423,11 @@
     "target": 308.35001,
     "date_open": "2026-08-19",
     "highest_price": 290.6000061035156,
-    "closed": false,
-    "close_reason": null,
-    "close_price": null,
-    "close_date": null,
-    "pnl_pct": null
+    "closed": true,
+    "close_reason": "\ud83d\udcc9 \u05d9\u05e8\u05d3 \u05de\u05ea\u05d7\u05ea \u05dc-Low \u05d0\u05ea\u05de\u05d5\u05dc (286.56 < 289.89) | \u05e8\u05d5\u05d5\u05d7: +2.7%",
+    "close_price": 286.55999755859375,
+    "close_date": "2026-08-27",
+    "pnl_pct": 2.71
   },
   {
     "ticker": "FCFS",
