@@ -2419,10 +2419,10 @@
     "pattern": "Double Bottom",
     "entry": 279.0,
     "stop_initial": 271.50679107142855,
-    "stop_current": 281.37,
+    "stop_current": 282.64,
     "target": 308.35001,
     "date_open": "2026-08-19",
-    "highest_price": 289.5400085449219,
+    "highest_price": 290.6000061035156,
     "closed": false,
     "close_reason": null,
     "close_price": null,
@@ -2449,14 +2449,14 @@
     "pattern": "Falling Wedge",
     "entry": 151.93555555555557,
     "stop_initial": 145.69185735714288,
-    "stop_current": 151.37,
+    "stop_current": 151.47,
     "target": 177.83,
     "date_open": "2026-08-21",
     "highest_price": 157.35000610351562,
-    "closed": false,
-    "close_reason": null,
-    "close_price": null,
-    "close_date": null,
-    "pnl_pct": null
+    "closed": true,
+    "close_reason": "\ud83d\udcc9 \u05d9\u05e8\u05d3 \u05de\u05ea\u05d7\u05ea \u05dc-Low \u05d0\u05ea\u05de\u05d5\u05dc (154.41 < 155.80) | \u05e8\u05d5\u05d5\u05d7: +1.6%",
+    "close_price": 154.41000366210938,
+    "close_date": "2026-08-27",
+    "pnl_pct": 1.63
   }
 ]

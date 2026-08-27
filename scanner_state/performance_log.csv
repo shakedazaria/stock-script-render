@@ -235,4 +235,4 @@ date_sent,ticker,pattern,entry,stop,target,score,rr,price_5d,price_10d,price_20d
 2026-08-19,ECL,Double Bottom,279.0,271.51,308.35,55.5,3.34,286.98,,,OPEN (+2.9%),,,False
 2026-08-19,ECL,Double Bottom,279.0,271.51,308.35,58.5,3.34,286.98,,,OPEN (+2.9%),,,False
 2026-08-20,FCFS,Falling Wedge,211.14,202.16,238.06,49.0,2.65,229.51,,,OPEN (+8.7%),,,False
-2026-08-21,YUM,Falling Wedge,151.94,145.69,177.83,48.0,3.84,,,,,,,False
+2026-08-21,YUM,Falling Wedge,151.94,145.69,177.83,48.0,3.84,154.41,,,OPEN (+1.6%),,,False
