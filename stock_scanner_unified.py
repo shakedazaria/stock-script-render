@@ -22,10 +22,10 @@ stock_scanner_unified.py
 """
 
 # ============================================================
-# RESET VERIFIED FIX FILE — 2026-08-27
+# RESET VERIFIED FIX FILE — 2026-09-02 V6
 # This marker proves this is the rebuilt fixed file, not an old download copy.
 # ============================================================
-CODE_VERSION = "2026-08-27-RESET-verified-marketcap-tracker-security-v5"
+CODE_VERSION = "2026-09-02-v6-dynamic-threshold-phase2-breakdown"
 RESET_VERIFIED_FIX_FILE = True
 
 
@@ -2808,7 +2808,7 @@ def detect_double_bottom(df: pd.DataFrame) -> tuple[bool, float | None, dict]:
 def _is_close_to_level(p1: float, p2: float, tol: float = TRIANGLE_PRICE_TOL) -> bool:
     return bool(p2) and abs(p1 - p2) / p2 <= tol
 
-def check_for_consolidation_breakout(df: pd.DataFrame, ticker: str) -> list[dict]:
+def check_for_consolidation_breakout(df: pd.DataFrame, ticker: str, min_score: float | None = None) -> list[dict]:
     """
     Falling Wedge — הגדרה מדויקת (bullish):
 
@@ -2824,6 +2824,7 @@ def check_for_consolidation_breakout(df: pd.DataFrame, ticker: str) -> list[dict
       - הפריצה בולישית — למעלה
     """
     alerts = []
+    effective_min_score = float(min_score if min_score is not None else MIN_ALERT_SCORE)
     if df is None or df.empty or len(df) < TRIANGLE_LOOKBACK:
         return alerts
 
@@ -2936,12 +2937,18 @@ def check_for_consolidation_breakout(df: pd.DataFrame, ticker: str) -> list[dict
 
     best.pop("_quality", None)
     score = compute_setup_score(df, ticker, best["breakout_level"], len(df) - 1, best)
-    if score < MIN_ALERT_SCORE:
+    if score < effective_min_score:
+        if DEBUG_SCAN_REASONS:
+            log(f"{ticker}: Falling Wedge — score too low ({score:.1f} < {effective_min_score:.1f})")
         return alerts
 
     stop, target, size, atr, rr = atr_stop_and_position(best["breakout_level"], df, best)
     if rr < 2.5:
+        if DEBUG_SCAN_REASONS:
+            log(f"{ticker}: Falling Wedge — RR too low ({rr:.2f} < 2.50)")
         return alerts
+    if DEBUG_SCAN_REASONS:
+        log(f"{ticker}: ✅ Falling Wedge — score={score:.1f} threshold={effective_min_score:.1f} neck={best['breakout_level']:.2f} rr={rr:.2f}")
 
     alerts.append({
         "ticker":         ticker,
@@ -2953,7 +2960,7 @@ def check_for_consolidation_breakout(df: pd.DataFrame, ticker: str) -> list[dict
         "target":         target,
         "rr_ratio":       rr,
         "meta": {**best,
-                 "score_reasons": [],
+                 "score_reasons": best.get("score_reasons", []),
                  "atr14":         float(atr),
                  "position_size": int(size)},
     })
@@ -3293,7 +3300,7 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
 
     # ====== PHASE 2 ======
     try:
-        phase2 = check_for_consolidation_breakout(df, symbol)
+        phase2 = check_for_consolidation_breakout(df, symbol, min_score=effective_min_score)
         # סנן סטאפים שרחוקים מדי מ-EMA28 או מ-MA150
         if phase2:
             phase2 = [p for p in phase2
@@ -3330,6 +3337,8 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
         bl    = alert.get("breakout_level", 0)
         if alert_already_sent(symbol, pname, bl, alert_history):
             log(f"{symbol} {pname} already sent. Skip."); continue
+        if DEBUG_SCAN_REASONS:
+            log(f"ALERT REASON {symbol}: {pname} | score={float(alert.get('score', 0) or 0):.1f} | threshold={effective_min_score:.1f} | level={bl}")
         new_alerts.append(alert)
 
     return new_alerts
@@ -6301,7 +6310,8 @@ def main() -> None:
     log("⚡ מריץ Pre-filter...")
     try:
         ticker_list, prefilter_failed = prefilter_by_ema28(ticker_list)
-        filter_stats["ema28"] += len(prefilter_failed)
+        # חשוב: לא מערבבים את דחיות ה-Pre-filter בתוך סטטיסטיקת ה-Full scan.
+        # אחרת מתקבל אחוז לא הגיוני כמו EMA28 311% מתוך המניות שנסרקו בפועל.
         log(f"⚡ Pre-filter: {len(ticker_list)} מניות ממשיכות לסריקה מלאה")
     except Exception as e:
         log(f"Pre-filter error — ממשיך בלעדיו: {e}")
@@ -6332,14 +6342,27 @@ def main() -> None:
             if not new:
                 stats["no_alert"] += 1
                 continue
+
+            accepted_count = 0
             for alert in new:
+                alert_score = float(alert.get("score", 0) or 0)
+                # חגורת בטיחות: שום סטאפ לא נשלח אם הוא מתחת לסף הדינמי של אותה ריצה.
+                if alert_score < float(dynamic_score):
+                    log(f"{symbol}: ❌ blocked before send — score {alert_score:.1f} < dynamic threshold {float(dynamic_score):.1f}")
+                    filter_stats["score_low"] += 1
+                    continue
                 all_alerts.append(alert)
                 record_alert_sent(symbol, alert.get("pattern_type",""),
                                   alert.get("breakout_level"), alert_history)
                 log_setup_for_tracking(alert)
                 open_position(alert)
                 log_to_csv(symbol, alert.get("meta", {}).get("score_reasons", []))
-            stats["found"] += len(new)
+                accepted_count += 1
+
+            if accepted_count == 0:
+                stats["no_alert"] += 1
+                continue
+            stats["found"] += accepted_count
         except Exception:
             stats["errors"] += 1
             log(f"Critical error {symbol}: {type(e).__name__}: {e}")
@@ -6392,15 +6415,22 @@ def main() -> None:
     total_scanned = stats["scanned"]
     log("=" * 60)
     log("📊 FILTER BREAKDOWN:")
-    log(f"   {'מניות נסרקו':<28} {total_scanned:>6,}")
+    log("   --- Pre-filter / Universe ---")
+    log(f"   {'מניות אחרי Universe':<28} {int(PREFILTER_STATS.get('total', 0) or 0):>6,}")
+    log(f"   {'עברו Pre-filter':<28} {int(PREFILTER_STATS.get('passed', 0) or 0):>6,}")
+    log(f"   {'נדחו ב-Pre-filter EMA28':<28} {int(PREFILTER_STATS.get('failed', 0) or 0):>6,}")
+    log(f"   {'בעיות Data שהועברו הלאה':<28} {int(PREFILTER_STATS.get('missing_tickers', 0) or 0) + int(PREFILTER_STATS.get('ticker_errors', 0) or 0):>6,}")
+    log("   --- Full scan only ---")
+    log(f"   {'מניות נסרקו בפועל':<28} {total_scanned:>6,}")
     log(f"   {'❌ Market Cap / No Data':<28} {filter_stats['market_cap'] + filter_stats['no_data']:>6,}  ({(filter_stats['market_cap']+filter_stats['no_data'])/max(total_scanned,1)*100:.0f}%)")
     log(f"   {'⏭️  דוחות קרובים':<28} {filter_stats['earnings']:>6,}  ({filter_stats['earnings']/max(total_scanned,1)*100:.0f}%)")
-    log(f"   {'❌ EMA28 (מרחק > 3%)':<28} {filter_stats['ema28']:>6,}  ({filter_stats['ema28']/max(total_scanned,1)*100:.0f}%)")
+    log(f"   {'❌ EMA28 בתוך Full scan':<28} {filter_stats['ema28']:>6,}  ({filter_stats['ema28']/max(total_scanned,1)*100:.0f}%)")
     # gap filter הוסר
     # volume filter הוסר
     # RS Score filter הוסר
     log(f"   {'❌ MA150 רחוק (> 5%)':<28} {filter_stats['ma150_dist']:>6,}  ({filter_stats['ma150_dist']/max(total_scanned,1)*100:.0f}%)")
     log(f"   {'❌ MA לא קרוב ל-neckline':<28} {filter_stats['ma_neckline']:>6,}  ({filter_stats['ma_neckline']/max(total_scanned,1)*100:.0f}%)")
+    log(f"   {'❌ ציון נמוך מהסף הדינמי':<28} {filter_stats['score_low']:>6,}  ({filter_stats['score_low']/max(total_scanned,1)*100:.0f}%)")
     log(f"   {'❌ לא נמצאה תבנית':<28} {filter_stats['no_pattern']:>6,}  ({filter_stats['no_pattern']/max(total_scanned,1)*100:.0f}%)")
     log(f"   {'✅ עברו הכל ונשלחו':<28} {stats.get('sent',0):>6,}")
     log("=" * 60)
