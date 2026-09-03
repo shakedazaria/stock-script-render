@@ -2467,13 +2467,14 @@
     "stop_current": 83.35,
     "target": 108.67,
     "date_open": "2026-09-02",
-    "highest_price": 87.16740740740741,
+    "highest_price": 87.41000366210938,
     "stop_method": "smart_atr_support",
     "trailing_status": "waiting",
     "closed": false,
     "close_reason": null,
     "close_price": null,
     "close_date": null,
-    "pnl_pct": null
+    "pnl_pct": null,
+    "soft_warnings": []
   }
 ]
