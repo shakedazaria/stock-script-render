@@ -16,16 +16,18 @@ stock_scanner_unified.py
   • Double Bottom         — תבנית W (היפוך שורי)
   • Falling Wedge (P2)    — שני קווים יורדים מתכנסים, פריצה למעלה
 
-ציון (0–10):
-  כל פטרן עובר את אותה compute_setup_score.
-  Double Bottom מקבל בונוס של +1.0 (ועוד +0.3 אם עומק >8%, +0.4 אם >20 נרות בין השפלים).
+ציון ואיכות כניסה:
+  V8 מוסיף Entry Ready Quality Engine: לא שולח מייל על תבנית בלבד.
+  מייל נשלח רק אם יש פריצה מאושרת, ווליום חזק, נר איכותי, RS חזק,
+  מחיר מעל MA150/MA200, נזילות טובה ו-R:R מתאים.
+  מועמד שלא עבר את שכבת האיכות נשמר כ-Watchlist בלבד.
 """
 
 # ============================================================
-# RESET VERIFIED FIX FILE — 2026-09-04 V7
+# RESET VERIFIED FIX FILE — 2026-09-04 V8
 # This marker proves this is the rebuilt fixed file, not an old download copy.
 # ============================================================
-CODE_VERSION = "2026-09-04-v7-nan-safe-regime-position-summary"
+CODE_VERSION = "2026-09-04-v8-entry-ready-quality-engine"
 RESET_VERIFIED_FIX_FILE = True
 
 
@@ -35,6 +37,7 @@ RESET_VERIFIED_FIX_FILE = True
 import os
 import re
 import json
+import csv
 import time
 import random
 import traceback
@@ -217,6 +220,32 @@ EMA28_REQUIRE_RISING  = os.getenv("EMA28_REQUIRE_RISING", "True").lower() in ("1
 MA150_MAX_DISTANCE    = float(os.getenv("MA150_MAX_DISTANCE", "0.05"))   # 5% — מרחק מקסימלי מ-MA150
 MA150_MAX_DISTANCE_DB = float(os.getenv("MA150_MAX_DISTANCE_DB", "0.15")) # 15% — Double Bottom בלבד
 MIN_ALERT_SCORE       = float(os.getenv("MIN_ALERT_SCORE",    "45.0"))  # ברירת מחדל — יוחלף דינמית לפי Regime
+
+# ============================================================
+#  V8 — ENTRY READY QUALITY ENGINE
+#  שכבת איכות אחרונה: מפרידה בין Watchlist לבין כניסה מיידית.
+#  המטרה: לא לשלוח מייל על תבנית בלבד — רק על פריצה מאושרת, ווליום,
+#  חוזק יחסי, מעל MA150/MA200, נר איכותי ו-R:R מספיק.
+# ============================================================
+ENTRY_ENGINE_ENABLED          = os.getenv("ENTRY_ENGINE_ENABLED", "True").lower() in ("1", "true", "yes")
+ENTRY_CANDIDATE_MIN_SCORE     = float(os.getenv("ENTRY_CANDIDATE_MIN_SCORE", "35.0"))
+ENTRY_READY_MIN_SCORE         = float(os.getenv("ENTRY_READY_MIN_SCORE", "60.0"))
+ENTRY_MIN_BREAKOUT_PCT        = float(os.getenv("ENTRY_MIN_BREAKOUT_PCT", "0.002"))   # 0.2% מעל נקודת הפריצה
+ENTRY_MAX_EXTENSION_PCT       = float(os.getenv("ENTRY_MAX_EXTENSION_PCT", "0.030"))   # לא לרדוף אחרי פריצה רחוקה מדי
+ENTRY_MIN_VOLUME_RATIO        = float(os.getenv("ENTRY_MIN_VOLUME_RATIO", "1.30"))
+ENTRY_MIN_CLOSE_POS           = float(os.getenv("ENTRY_MIN_CLOSE_POS", "0.65"))
+ENTRY_MIN_BODY_RATIO          = float(os.getenv("ENTRY_MIN_BODY_RATIO", "0.30"))
+ENTRY_MIN_RS_SCORE            = float(os.getenv("ENTRY_MIN_RS_SCORE", "70.0"))
+ENTRY_MIN_52W_HIGH_PROX       = float(os.getenv("ENTRY_MIN_52W_HIGH_PROX", "0.75"))
+ENTRY_MIN_DOLLAR_VOLUME       = float(os.getenv("ENTRY_MIN_DOLLAR_VOLUME", "5000000"))
+ENTRY_MIN_RR                  = float(os.getenv("ENTRY_MIN_RR", "2.50"))
+ENTRY_MAX_ATR_PCT             = float(os.getenv("ENTRY_MAX_ATR_PCT", "0.08"))
+ENTRY_MA150_MIN_ABOVE_PCT     = float(os.getenv("ENTRY_MA150_MIN_ABOVE_PCT", "0.000"))
+ENTRY_REQUIRE_MA150_RISING    = os.getenv("ENTRY_REQUIRE_MA150_RISING", "True").lower() in ("1", "true", "yes")
+ENTRY_REQUIRE_MA200_ABOVE     = os.getenv("ENTRY_REQUIRE_MA200_ABOVE", "True").lower() in ("1", "true", "yes")
+ENTRY_REQUIRE_REGIME_DATA_OK  = os.getenv("ENTRY_REQUIRE_REGIME_DATA_OK", "True").lower() in ("1", "true", "yes")
+ENTRY_BLOCK_BEAR_REGIME       = os.getenv("ENTRY_BLOCK_BEAR_REGIME", "True").lower() in ("1", "true", "yes")
+ENTRY_QUALITY_LOG             = _state_path(os.getenv("ENTRY_QUALITY_LOG", "entry_quality_log.csv"))
 
 # ============================================================
 #  MARKET REVERSAL DETECTOR
@@ -1663,8 +1692,12 @@ def ensure_ma_columns(df: pd.DataFrame) -> None:
     close = df["close"].squeeze()  # squeeze מבטיח Series גם אם DataFrame
     if "ema28" not in df.columns:
         df["ema28"] = close.ewm(span=28, adjust=False, min_periods=12).mean()
+    if "ma50" not in df.columns:
+        df["ma50"] = close.rolling(window=50, min_periods=20).mean()
     if "ma150" not in df.columns:
         df["ma150"] = close.rolling(window=150, min_periods=50).mean()
+    if "ma200" not in df.columns:
+        df["ma200"] = close.rolling(window=200, min_periods=80).mean()
 
 def add_technical_indicators(df: pd.DataFrame) -> None:
     """מוסיף ATR14, OBV, RSI14, MACD-hist, ADX14, CCI20."""
@@ -2432,6 +2465,476 @@ def _ma_near_neckline_filter(df: pd.DataFrame, neckline: float) -> tuple[bool, s
         return True, f"ma near neckline check error: {e}"
 
 
+# ============================================================
+#  V8 ENTRY READY ENGINE — איכות כניסה מיידית
+# ============================================================
+
+def _to_float_or_none(value) -> float | None:
+    """המרה בטוחה למספר אמיתי בלבד."""
+    try:
+        val = float(value)
+        return val if _is_finite_number(val) else None
+    except Exception:
+        return None
+
+
+def _series_last_finite(series, default=None):
+    try:
+        return _last_finite(series, default=default)
+    except TypeError:
+        return _last_finite(series) if series is not None else default
+    except Exception:
+        return default
+
+
+def _ma_is_rising(df: pd.DataFrame, col: str, bars: int = 5) -> bool | None:
+    """בודק אם ממוצע נע עולה ביחס לכמה ימים אחורה."""
+    try:
+        if col not in df.columns:
+            return None
+        s = pd.to_numeric(df[col], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+        if len(s) <= bars:
+            return None
+        now = float(s.iloc[-1])
+        prev = float(s.iloc[-bars-1])
+        if not (_is_finite_number(now) and _is_finite_number(prev)):
+            return None
+        return now > prev
+    except Exception:
+        return None
+
+
+def _calc_true_range_pct(df: pd.DataFrame) -> pd.Series:
+    high = pd.to_numeric(df["high"], errors="coerce")
+    low = pd.to_numeric(df["low"], errors="coerce")
+    close = pd.to_numeric(df["close"], errors="coerce")
+    tr = pd.concat([
+        (high - low).abs(),
+        (high - close.shift(1)).abs(),
+        (low - close.shift(1)).abs(),
+    ], axis=1).max(axis=1)
+    return tr / close.replace(0, np.nan)
+
+
+_entry_spy_line_cache: dict = {}
+
+def _rs_line_new_high(df: pd.DataFrame, lookback: int = 63) -> bool | None:
+    """בודק אם קו RS מול SPY קרוב/בשיא חדש. מחזיר None אם אין נתונים."""
+    try:
+        if df is None or len(df) < max(lookback, 30):
+            return None
+        today_key = datetime.now().strftime("%Y-%m-%d")
+        spy_df = _entry_spy_line_cache.get(today_key)
+        if spy_df is None:
+            spy_df = _normalize_yfinance_df(yf.download("SPY", period="13mo", interval="1d", progress=False, auto_adjust=True))
+            if spy_df is not None and not spy_df.empty:
+                _entry_spy_line_cache.clear()
+                _entry_spy_line_cache[today_key] = spy_df
+        if spy_df is None or spy_df.empty:
+            return None
+        stock = pd.to_numeric(df["close"], errors="coerce").dropna()
+        spy = pd.to_numeric(spy_df["close"], errors="coerce").dropna()
+        joined = pd.concat([stock.rename("stock"), spy.rename("spy")], axis=1).dropna()
+        if len(joined) < max(lookback, 30):
+            return None
+        rs_line = joined["stock"] / joined["spy"].replace(0, np.nan)
+        recent = rs_line.tail(lookback).dropna()
+        if recent.empty:
+            return None
+        now = float(recent.iloc[-1])
+        high = float(recent.max())
+        if not (_is_finite_number(now) and _is_finite_number(high) and high > 0):
+            return None
+        return now >= high * 0.995
+    except Exception:
+        return None
+
+
+def _entry_quality_metrics(df: pd.DataFrame, ticker: str, breakout_level: float,
+                           pattern_meta: dict | None = None, rr: float | None = None,
+                           regime: dict | None = None) -> dict:
+    """אוסף את כל המדדים של שכבת Entry Ready במקום אחד — נקי ומסודר."""
+    metrics = {}
+    meta = pattern_meta or {}
+    try:
+        if df is None or df.empty:
+            return metrics
+        ensure_ma_columns(df)
+        if "atr14" not in df.columns:
+            add_technical_indicators(df)
+
+        row = df.iloc[-1]
+        close = _to_float_or_none(row.get("close"))
+        open_p = _to_float_or_none(row.get("open"))
+        high = _to_float_or_none(row.get("high"))
+        low = _to_float_or_none(row.get("low"))
+        vol = _to_float_or_none(row.get("volume"))
+        breakout = _to_float_or_none(breakout_level)
+
+        metrics.update({
+            "close": close,
+            "open": open_p,
+            "high": high,
+            "low": low,
+            "volume": vol,
+            "breakout_level": breakout,
+            "rr": _to_float_or_none(rr),
+        })
+
+        ma50 = _series_last_finite(df.get("ma50"), None) if "ma50" in df.columns else None
+        ma150 = _series_last_finite(df.get("ma150"), None) if "ma150" in df.columns else None
+        ma200 = _series_last_finite(df.get("ma200"), None) if "ma200" in df.columns else None
+        ema28 = _series_last_finite(df.get("ema28"), None) if "ema28" in df.columns else None
+        atr14 = _series_last_finite(df.get("atr14"), None) if "atr14" in df.columns else None
+        metrics.update({"ma50": ma50, "ma150": ma150, "ma200": ma200, "ema28": ema28, "atr14": atr14})
+
+        if close and ma150:
+            metrics["ma150_dist_pct"] = (close - ma150) / ma150
+            metrics["above_ma150"] = close >= ma150 * (1 + ENTRY_MA150_MIN_ABOVE_PCT)
+        else:
+            metrics["ma150_dist_pct"] = None
+            metrics["above_ma150"] = False
+
+        if close and ma200:
+            metrics["ma200_dist_pct"] = (close - ma200) / ma200
+            metrics["above_ma200"] = close >= ma200
+        else:
+            metrics["ma200_dist_pct"] = None
+            metrics["above_ma200"] = None
+
+        if ma50 and ma150:
+            metrics["ma_stack_ok"] = ma50 >= ma150
+        else:
+            metrics["ma_stack_ok"] = None
+        metrics["ma150_rising"] = _ma_is_rising(df, "ma150", bars=5)
+        metrics["ema28_rising"] = _ma_is_rising(df, "ema28", bars=3)
+
+        if close and breakout:
+            metrics["breakout_pct"] = (close - breakout) / breakout
+            metrics["breakout_confirmed"] = metrics["breakout_pct"] >= ENTRY_MIN_BREAKOUT_PCT
+            metrics["not_overextended"] = metrics["breakout_pct"] <= ENTRY_MAX_EXTENSION_PCT
+        else:
+            metrics["breakout_pct"] = None
+            metrics["breakout_confirmed"] = False
+            metrics["not_overextended"] = False
+
+        if close and high and low and high > low:
+            rng = high - low
+            metrics["close_position"] = (close - low) / rng
+            metrics["body_ratio"] = abs((close or 0) - (open_p or close)) / rng
+            metrics["green_candle"] = (open_p is not None and close >= open_p)
+        else:
+            metrics["close_position"] = None
+            metrics["body_ratio"] = None
+            metrics["green_candle"] = None
+
+        if "volume" in df.columns and len(df) >= VOLUME_AVG_LOOKBACK + 1:
+            prev_vol = pd.to_numeric(df["volume"].iloc[-(VOLUME_AVG_LOOKBACK + 1):-1], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+            avg_vol20 = float(prev_vol.mean()) if len(prev_vol) else None
+        else:
+            avg_vol20 = None
+        metrics["avg_volume20"] = avg_vol20
+        if vol and avg_vol20 and avg_vol20 > 0:
+            metrics["volume_ratio"] = vol / avg_vol20
+        else:
+            metrics["volume_ratio"] = None
+        metrics["avg_dollar_volume20"] = (avg_vol20 * close) if avg_vol20 and close else None
+
+        try:
+            h = pd.to_numeric(df["high"], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+            lookback = min(252, len(h))
+            high52 = float(h.tail(lookback).max()) if lookback >= 60 else None
+            metrics["high52"] = high52
+            metrics["high52_proximity"] = (close / high52) if close and high52 and high52 > 0 else None
+        except Exception:
+            metrics["high52"] = None
+            metrics["high52_proximity"] = None
+
+        try:
+            atr_pct = (atr14 / close) if atr14 and close else None
+            metrics["atr_pct"] = atr_pct
+            tr_pct = _calc_true_range_pct(df).replace([np.inf, -np.inf], np.nan).dropna()
+            range5 = float(tr_pct.tail(5).mean()) if len(tr_pct) >= 5 else None
+            range20 = float(tr_pct.tail(20).mean()) if len(tr_pct) >= 20 else None
+            metrics["range5_pct"] = range5
+            metrics["range20_pct"] = range20
+            metrics["atr_contraction"] = bool(range5 is not None and range20 is not None and range5 <= range20 * 0.85)
+            if "volume" in df.columns and avg_vol20 and len(df) >= 26:
+                pre5 = pd.to_numeric(df["volume"].iloc[-6:-1], errors="coerce").dropna()
+                metrics["volume_dryup_before_breakout"] = bool(len(pre5) and float(pre5.mean()) <= avg_vol20 * 0.90)
+            else:
+                metrics["volume_dryup_before_breakout"] = None
+        except Exception:
+            metrics["atr_pct"] = None
+            metrics["atr_contraction"] = None
+            metrics["volume_dryup_before_breakout"] = None
+
+        try:
+            rs_data = compute_rs_score(ticker, df)
+            metrics["rs_score"] = rs_data.get("rs_score") if isinstance(rs_data, dict) else None
+            metrics["rs_summary"] = rs_data.get("summary", "RS N/A") if isinstance(rs_data, dict) else "RS N/A"
+            metrics["vs_spy_3m"] = rs_data.get("vs_spy_3m") if isinstance(rs_data, dict) else None
+        except Exception:
+            metrics["rs_score"] = None
+            metrics["rs_summary"] = "RS N/A"
+            metrics["vs_spy_3m"] = None
+        metrics["rs_line_new_high"] = _rs_line_new_high(df)
+
+        reg = regime if isinstance(regime, dict) else get_market_regime()
+        metrics["regime"] = reg.get("regime", "UNKNOWN") if isinstance(reg, dict) else "UNKNOWN"
+        metrics["regime_data_ok"] = bool(reg.get("data_ok", False)) if isinstance(reg, dict) else False
+        metrics["regime_summary"] = reg.get("summary", "UNKNOWN") if isinstance(reg, dict) else "UNKNOWN"
+
+        metrics["pattern_bars"] = int(meta.get("pattern_bars") or 0)
+        if metrics["pattern_bars"] <= 0 and meta.get("start_index") is not None:
+            try:
+                metrics["pattern_bars"] = max(0, len(df) - 1 - int(meta.get("start_index")))
+            except Exception:
+                pass
+        metrics["depth_pct"] = _to_float_or_none(meta.get("depth_pct"))
+        metrics["vol_declining"] = bool(meta.get("vol_declining", False))
+        return metrics
+    except Exception as e:
+        metrics["error"] = str(e)
+        return metrics
+
+
+def evaluate_entry_quality(df: pd.DataFrame, ticker: str, breakout_level: float,
+                           pattern_meta: dict | None = None, base_score: float = 0.0,
+                           rr: float | None = None, regime: dict | None = None) -> dict:
+    """
+    V8: מחזיר החלטה סופית האם הסטאפ הוא ENTRY_READY או Watchlist בלבד.
+    לא מספיק שיש תבנית. חייבים אישור כניסה: פריצה, ווליום, נר, RS, MA150/MA200, R:R ומצב שוק.
+    """
+    reasons: list[str] = []
+    fails: list[str] = []
+    points = 0.0
+    meta = pattern_meta or {}
+    pattern = str(meta.get("pattern_type") or meta.get("pattern") or "")
+    m = _entry_quality_metrics(df, ticker, breakout_level, meta, rr, regime)
+
+    def pct(x):
+        return "N/A" if x is None else f"{x*100:.1f}%"
+
+    regime_name = m.get("regime", "UNKNOWN")
+    if m.get("regime_data_ok") and regime_name == "BULL":
+        points += 5; reasons.append("שוק BULL עם נתוני SPY תקינים (+5)")
+    elif m.get("regime_data_ok") and regime_name == "NEUTRAL":
+        points += 3; reasons.append("שוק NEUTRAL — מותר אבל לא מושלם (+3)")
+    elif m.get("regime_data_ok") and regime_name == "BEAR":
+        reasons.append("שוק BEAR — לא מקבל נקודות שוק")
+    else:
+        reasons.append("מצב שוק UNKNOWN — לא מקבל נקודות שוק")
+
+    if m.get("above_ma150"):
+        points += 4; reasons.append(f"מחיר מעל MA150 ({pct(m.get('ma150_dist_pct'))}) (+4)")
+    else:
+        fails.append(f"מחיר לא מעל MA150 בצורה נקייה ({pct(m.get('ma150_dist_pct'))})")
+    if m.get("ma150_rising") is True:
+        points += 3; reasons.append("MA150 עולה (+3)")
+    elif m.get("ma150_rising") is False:
+        fails.append("MA150 לא עולה")
+    else:
+        fails.append("MA150 לא זמין/לא מספיק נתונים")
+    if m.get("above_ma200") is True:
+        points += 2; reasons.append("מחיר מעל MA200 (+2)")
+    elif m.get("above_ma200") is False:
+        fails.append("מחיר מתחת ל-MA200")
+    if m.get("ma_stack_ok") is True:
+        points += 1; reasons.append("MA50 מעל/שווה MA150 (+1)")
+
+    rs = m.get("rs_score")
+    if rs is not None and rs >= 85:
+        points += 10; reasons.append(f"RS חזק מאוד {rs:.0f} (+10)")
+    elif rs is not None and rs >= ENTRY_MIN_RS_SCORE:
+        points += 8; reasons.append(f"RS חזק {rs:.0f} (+8)")
+    elif rs is not None and rs >= 60:
+        points += 4; fails.append(f"RS בינוני בלבד {rs:.0f} — לא מספיק לכניסה איכותית")
+    else:
+        fails.append("RS חלש או לא זמין")
+    if m.get("rs_line_new_high") is True:
+        points += 4; reasons.append("קו RS מול SPY בשיא חדש/קרוב לשיא (+4)")
+    elif m.get("rs_line_new_high") is False:
+        fails.append("קו RS לא בשיא חדש")
+    hprox = m.get("high52_proximity")
+    if hprox is not None and hprox >= 0.90:
+        points += 4; reasons.append(f"קרוב מאוד לשיא 52 שבועות ({pct(hprox)}) (+4)")
+    elif hprox is not None and hprox >= ENTRY_MIN_52W_HIGH_PROX:
+        points += 3; reasons.append(f"קרוב מספיק לשיא 52 שבועות ({pct(hprox)}) (+3)")
+    else:
+        fails.append(f"רחוק מדי משיא 52 שבועות ({pct(hprox)})")
+    try:
+        c = m.get("close")
+        close_series = pd.to_numeric(df["close"], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+        ret20 = (c / float(close_series.iloc[-21]) - 1) if c and len(close_series) >= 21 else None
+        if ret20 is not None and ret20 > 0:
+            points += 2; reasons.append(f"מומנטום 20 יום חיובי ({ret20*100:.1f}%) (+2)")
+        elif ret20 is not None:
+            fails.append(f"מומנטום 20 יום שלילי ({ret20*100:.1f}%)")
+    except Exception:
+        pass
+
+    bars = int(m.get("pattern_bars") or 0)
+    weeks = bars / 5.0 if bars else 0.0
+    if 3 <= weeks <= 16:
+        points += 5; reasons.append(f"בסיס/תבנית נבנו {weeks:.1f} שבועות (+5)")
+    elif weeks > 0:
+        points += 2; reasons.append(f"משך תבנית פחות אידיאלי {weeks:.1f} שבועות (+2)")
+    depth = m.get("depth_pct")
+    if depth is not None and 0.08 <= depth <= 0.33:
+        points += 3; reasons.append(f"עומק תבנית בריא ({pct(depth)}) (+3)")
+    elif depth is not None:
+        points += 1; reasons.append(f"עומק תבנית לא אידיאלי ({pct(depth)}) (+1)")
+    if m.get("atr_contraction") is True:
+        points += 4; reasons.append("התכווצות תנודתיות לפני פריצה (+4)")
+    elif m.get("atr_contraction") is False:
+        fails.append("אין התכווצות תנודתיות ברורה")
+    if "wedge" in pattern.lower() and m.get("vol_declining"):
+        points += 3; reasons.append("ווליום ירד בתוך ה-Wedge לפני הפריצה (+3)")
+    elif m.get("volume_dryup_before_breakout") is True:
+        points += 3; reasons.append("Volume dry-up לפני הפריצה (+3)")
+
+    bp = m.get("breakout_pct")
+    if bp is not None and ENTRY_MIN_BREAKOUT_PCT <= bp <= ENTRY_MAX_EXTENSION_PCT:
+        points += 8; reasons.append(f"פריצה מאושרת מעל הרמה ({bp*100:.2f}%) (+8)")
+    elif bp is not None and bp < ENTRY_MIN_BREAKOUT_PCT:
+        fails.append(f"אין פריצה מאושרת — רק {bp*100:.2f}% מעל הרמה")
+    elif bp is not None:
+        fails.append(f"רחוק מדי מנקודת הכניסה — {bp*100:.1f}% מעל הפריצה")
+    else:
+        fails.append("אין רמת פריצה תקינה")
+    vr = m.get("volume_ratio")
+    if vr is not None and vr >= 2.0:
+        points += 8; reasons.append(f"ווליום פריצה חזק מאוד ×{vr:.2f} (+8)")
+    elif vr is not None and vr >= ENTRY_MIN_VOLUME_RATIO:
+        points += 6; reasons.append(f"ווליום פריצה מאשר ×{vr:.2f} (+6)")
+    else:
+        fails.append(f"ווליום לא מאשר פריצה ({'N/A' if vr is None else f'×{vr:.2f}'})")
+    cp = m.get("close_position")
+    if cp is not None and cp >= 0.80:
+        points += 6; reasons.append(f"סגירה חזקה מאוד בחלק העליון של הנר ({cp*100:.0f}%) (+6)")
+    elif cp is not None and cp >= ENTRY_MIN_CLOSE_POS:
+        points += 4; reasons.append(f"סגירה טובה בחלק העליון של הנר ({cp*100:.0f}%) (+4)")
+    else:
+        fails.append(f"הנר לא סגר מספיק חזק ({'N/A' if cp is None else f'{cp*100:.0f}%'})")
+    br = m.get("body_ratio")
+    if br is not None and br >= 0.50:
+        points += 4; reasons.append(f"גוף נר חזק ({br*100:.0f}%) (+4)")
+    elif br is not None and br >= ENTRY_MIN_BODY_RATIO:
+        points += 2; reasons.append(f"גוף נר סביר ({br*100:.0f}%) (+2)")
+    else:
+        fails.append(f"גוף נר חלש ({'N/A' if br is None else f'{br*100:.0f}%'})")
+    if m.get("green_candle") is True:
+        points += 2; reasons.append("נר ירוק ביום הפריצה (+2)")
+    if m.get("not_overextended") is True:
+        points += 2; reasons.append("לא רודפים אחרי מחיר רחוק מדי (+2)")
+
+    rr_val = m.get("rr")
+    if rr_val is not None and rr_val >= 3.0:
+        points += 7; reasons.append(f"R:R חזק {rr_val:.2f}:1 (+7)")
+    elif rr_val is not None and rr_val >= ENTRY_MIN_RR:
+        points += 5; reasons.append(f"R:R תקין {rr_val:.2f}:1 (+5)")
+    else:
+        fails.append(f"R:R נמוך מדי ({'N/A' if rr_val is None else f'{rr_val:.2f}:1'})")
+    adv = m.get("avg_dollar_volume20")
+    if adv is not None and adv >= ENTRY_MIN_DOLLAR_VOLUME * 3:
+        points += 5; reasons.append(f"נזילות גבוהה (${adv/1_000_000:.1f}M ביום) (+5)")
+    elif adv is not None and adv >= ENTRY_MIN_DOLLAR_VOLUME:
+        points += 3; reasons.append(f"נזילות מספקת (${adv/1_000_000:.1f}M ביום) (+3)")
+    else:
+        fails.append(f"נזילות נמוכה/לא זמינה (${0 if adv is None else adv/1_000_000:.1f}M ביום)")
+    atr_pct = m.get("atr_pct")
+    if atr_pct is not None and 0.015 <= atr_pct <= 0.05:
+        points += 4; reasons.append(f"ATR בריא ({atr_pct*100:.1f}%) (+4)")
+    elif atr_pct is not None and atr_pct <= ENTRY_MAX_ATR_PCT:
+        points += 2; reasons.append(f"ATR סביר ({atr_pct*100:.1f}%) (+2)")
+    else:
+        fails.append(f"ATR גבוה מדי/לא זמין ({'N/A' if atr_pct is None else f'{atr_pct*100:.1f}%'})")
+
+    blocking_fails: list[str] = []
+    if not m.get("above_ma150"):
+        blocking_fails.append("לא מעל MA150")
+    if ENTRY_REQUIRE_MA150_RISING and m.get("ma150_rising") is not True:
+        blocking_fails.append("MA150 לא עולה")
+    if ENTRY_REQUIRE_MA200_ABOVE and m.get("above_ma200") is False:
+        blocking_fails.append("מתחת ל-MA200")
+    if not m.get("breakout_confirmed"):
+        blocking_fails.append("אין פריצה מאושרת מעל הרמה")
+    if m.get("breakout_pct") is not None and m.get("breakout_pct") > ENTRY_MAX_EXTENSION_PCT:
+        blocking_fails.append("המחיר כבר רחוק מדי מהכניסה")
+    if (m.get("volume_ratio") is None) or (m.get("volume_ratio") < ENTRY_MIN_VOLUME_RATIO):
+        blocking_fails.append("ווליום לא מאשר")
+    if (m.get("close_position") is None) or (m.get("close_position") < ENTRY_MIN_CLOSE_POS):
+        blocking_fails.append("סגירת נר לא חזקה")
+    if (m.get("body_ratio") is None) or (m.get("body_ratio") < ENTRY_MIN_BODY_RATIO):
+        blocking_fails.append("גוף נר חלש")
+    if (rs is None) or (rs < ENTRY_MIN_RS_SCORE):
+        blocking_fails.append("RS לא מספיק חזק")
+    if (hprox is None) or (hprox < ENTRY_MIN_52W_HIGH_PROX):
+        blocking_fails.append("רחוק מדי משיא 52 שבועות")
+    if (adv is None) or (adv < ENTRY_MIN_DOLLAR_VOLUME):
+        blocking_fails.append("נזילות דולרית נמוכה")
+    if (rr_val is None) or (rr_val < ENTRY_MIN_RR):
+        blocking_fails.append("R:R נמוך מדי")
+    if ENTRY_REQUIRE_REGIME_DATA_OK and not m.get("regime_data_ok"):
+        blocking_fails.append("נתוני SPY/Regime לא תקינים")
+    if ENTRY_BLOCK_BEAR_REGIME and regime_name == "BEAR":
+        blocking_fails.append("שוק BEAR")
+
+    quality_score = round(max(0.0, min(100.0, points)), 1)
+    if quality_score < ENTRY_READY_MIN_SCORE:
+        blocking_fails.append(f"ציון Entry Quality נמוך ({quality_score:.1f} < {ENTRY_READY_MIN_SCORE:.1f})")
+
+    entry_ready = bool(ENTRY_ENGINE_ENABLED and not blocking_fails)
+    status = "ENTRY_READY" if entry_ready else "WATCHLIST"
+    return {
+        "status": status,
+        "entry_ready": entry_ready,
+        "quality_score": quality_score,
+        "base_score": round(float(base_score or 0.0), 1),
+        "reasons": reasons,
+        "fail_reasons": list(dict.fromkeys(fails + blocking_fails)),
+        "blocking_fails": list(dict.fromkeys(blocking_fails)),
+        "metrics": m,
+    }
+
+
+def log_entry_quality_decision(alert: dict, quality: dict) -> None:
+    """כותב לוג CSV לכל מועמד שנמצא, גם אם הוא רק Watchlist. יעזור לנו למדוד ולשפר בלי לנחש."""
+    try:
+        ticker = alert.get("ticker", "")
+        pattern = alert.get("pattern_type", "")
+        m = quality.get("metrics", {}) if isinstance(quality, dict) else {}
+        row = {
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "ticker": ticker,
+            "pattern": pattern,
+            "status": quality.get("status", "UNKNOWN"),
+            "quality_score": quality.get("quality_score"),
+            "base_score": quality.get("base_score"),
+            "entry": alert.get("breakout_level"),
+            "close": m.get("close"),
+            "rr": m.get("rr"),
+            "volume_ratio": m.get("volume_ratio"),
+            "rs_score": m.get("rs_score"),
+            "high52_proximity": m.get("high52_proximity"),
+            "breakout_pct": m.get("breakout_pct"),
+            "close_position": m.get("close_position"),
+            "ma150_dist_pct": m.get("ma150_dist_pct"),
+            "avg_dollar_volume20": m.get("avg_dollar_volume20"),
+            "regime": m.get("regime"),
+            "blocking_fails": " | ".join(quality.get("blocking_fails", [])[:10]),
+        }
+        file_exists = os.path.exists(ENTRY_QUALITY_LOG)
+        with open(ENTRY_QUALITY_LOG, "a", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=list(row.keys()))
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow(row)
+    except Exception as e:
+        log(f"entry_quality_log error: {e}")
+
+
 def get_sector_analysis(ticker: str) -> dict:
     """
     מחזיר ניתוח סקטור:
@@ -2999,8 +3502,11 @@ def check_for_consolidation_breakout(df: pd.DataFrame, ticker: str, min_score: f
                 "touches_upper":   2,
                 "touches_lower":   len(troughs_in),
                 "days_since_peak": int(days_since),
+                "pattern_bars":    int(n - pi),
+                "start_index":     int(max(0, len(df) - len(window) + pi)),
                 "vol_declining":   vol_declining,
                 "pattern_height":  float(gap_start),
+                "depth_pct":       float(gap_start / max(hp_i, 1e-9)),
                 "score_reasons":   [
                     f"Falling Wedge — קו עליון slope={upper_slope:.4f}",
                     f"Lower lows: {len(troughs_in)} שפלים",
@@ -3017,9 +3523,9 @@ def check_for_consolidation_breakout(df: pd.DataFrame, ticker: str, min_score: f
 
     best.pop("_quality", None)
     score = compute_setup_score(df, ticker, best["breakout_level"], len(df) - 1, best)
-    if score < effective_min_score:
+    if score < ENTRY_CANDIDATE_MIN_SCORE:
         if DEBUG_SCAN_REASONS:
-            log(f"{ticker}: Falling Wedge — score too low ({score:.1f} < {effective_min_score:.1f})")
+            log(f"{ticker}: Falling Wedge — candidate score too low ({score:.1f} < {ENTRY_CANDIDATE_MIN_SCORE:.1f})")
         return alerts
 
     stop, target, size, atr, rr = atr_stop_and_position(best["breakout_level"], df, best)
@@ -3028,7 +3534,7 @@ def check_for_consolidation_breakout(df: pd.DataFrame, ticker: str, min_score: f
             log(f"{ticker}: Falling Wedge — RR too low ({rr:.2f} < 2.50)")
         return alerts
     if DEBUG_SCAN_REASONS:
-        log(f"{ticker}: ✅ Falling Wedge — score={score:.1f} threshold={effective_min_score:.1f} neck={best['breakout_level']:.2f} rr={rr:.2f}")
+        log(f"{ticker}: ✅ Falling Wedge candidate — base_score={score:.1f} candidate_min={ENTRY_CANDIDATE_MIN_SCORE:.1f} neck={best['breakout_level']:.2f} rr={rr:.2f}")
 
     alerts.append({
         "ticker":         ticker,
@@ -3183,7 +3689,7 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
                 if ma_ok_e:
                     meta_db_early["pattern_type"] = "Double Bottom"
                     score_e = compute_setup_score(df, symbol, neck_db_early, len(df)-1, meta_db_early)
-                    if score_e >= effective_min_score:
+                    if score_e >= ENTRY_CANDIDATE_MIN_SCORE:
                         stop_e, target_e, size_e, atr_e, rr_e = atr_stop_and_position(neck_db_early, df, meta_db_early)
                         if rr_e >= 2.5:
                             log(f"{symbol}: ✅ Double Bottom (early) score={score_e:.0f}")
@@ -3243,7 +3749,7 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
                 if DEBUG_SCAN_REASONS: log(f"{symbol}: Cup & Handle MA check ✓ — {ma_reason}")
                 meta_ch["pattern_type"] = "Cup & Handle"
                 score = compute_setup_score(df, symbol, neck_ch, len(df)-1, meta_ch)
-                if score >= effective_min_score:
+                if score >= ENTRY_CANDIDATE_MIN_SCORE:
                     stop, target, size, atr, rr = atr_stop_and_position(neck_ch, df, meta_ch)
                     candidates.append({
                         "ticker": symbol, "phase": 1,
@@ -3292,7 +3798,7 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
             else:
                 meta_tri["pattern_type"] = "Bullish Triangle"
                 score = compute_setup_score(df, symbol, neck_tri, len(df)-1, meta_tri)
-                if score >= effective_min_score:
+                if score >= ENTRY_CANDIDATE_MIN_SCORE:
                     stop, target, size, atr, rr = atr_stop_and_position(neck_tri, df, meta_tri)
                     candidates.append({
                         "ticker": symbol, "phase": 1,
@@ -3341,7 +3847,7 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
             else:
                 meta_db["pattern_type"] = "Double Bottom"
                 score = compute_setup_score(df, symbol, neck_db, len(df)-1, meta_db)
-                if score >= effective_min_score:
+                if score >= ENTRY_CANDIDATE_MIN_SCORE:
                     stop, target, size, atr, rr = atr_stop_and_position(neck_db, df, meta_db)
                     candidates.append({
                         "ticker": symbol, "phase": 1,
@@ -3408,6 +3914,62 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
             pass
         return []
 
+    # --- V8 Entry Ready Gate: תבנית לבד לא מספיקה ---
+    if ENTRY_ENGINE_ENABLED:
+        entry_ready_candidates: list[dict] = []
+        for alert in candidates:
+            if not isinstance(alert, dict):
+                continue
+            try:
+                meta = alert.setdefault("meta", {})
+                base_score = float(alert.get("score", 0) or 0)
+                quality = evaluate_entry_quality(
+                    df=df,
+                    ticker=symbol,
+                    breakout_level=alert.get("breakout_level", 0),
+                    pattern_meta=meta,
+                    base_score=base_score,
+                    rr=alert.get("rr_ratio"),
+                    regime=get_market_regime(),
+                )
+                alert["base_score"] = base_score
+                alert["entry_quality"] = quality
+                alert["quality_score"] = quality.get("quality_score", 0)
+                alert["score"] = quality.get("quality_score", base_score)  # המייל ממוין לפי איכות כניסה אמיתית
+                meta["entry_quality"] = quality
+                meta["entry_quality_reasons"] = quality.get("reasons", [])
+                meta["fail_reasons"] = list(dict.fromkeys((meta.get("fail_reasons", []) or []) + quality.get("fail_reasons", [])))
+                log_entry_quality_decision(alert, quality)
+
+                if not quality.get("entry_ready", False):
+                    fails = quality.get("blocking_fails", []) or quality.get("fail_reasons", []) or []
+                    short = "; ".join(fails[:4]) if fails else "לא עבר שכבת איכות כניסה"
+                    log(f"{symbol}: 👀 WATCHLIST ONLY {alert.get('pattern_type','')} — {short}")
+                    _fs("entry_quality")
+                    try:
+                        log_watchlist(
+                            symbol=symbol,
+                            price=price_now,
+                            reason="תבנית קיימת אבל לא Entry Ready",
+                            pattern=alert.get("pattern_type", ""),
+                            breakout=float(alert.get("breakout_level", 0) or 0),
+                            score=float(alert.get("score", 0) or 0),
+                            details=short,
+                        )
+                    except Exception:
+                        pass
+                    continue
+
+                log(f"{symbol}: 🚀 ENTRY READY {alert.get('pattern_type','')} | quality={float(alert.get('score',0) or 0):.1f} | base={base_score:.1f} | threshold={ENTRY_READY_MIN_SCORE:.1f}")
+                entry_ready_candidates.append(alert)
+            except Exception as e:
+                log(f"{symbol}: entry quality gate error: {type(e).__name__}: {e}")
+                _fs("entry_quality")
+
+        candidates = entry_ready_candidates
+        if not candidates:
+            return []
+
     # --- dedup / cooldown ---
     new_alerts = []
     for alert in candidates:
@@ -3419,7 +3981,8 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
         if alert_already_sent(symbol, pname, bl, alert_history):
             log(f"{symbol} {pname} already sent. Skip."); continue
         if DEBUG_SCAN_REASONS:
-            log(f"ALERT REASON {symbol}: {pname} | score={float(alert.get('score', 0) or 0):.1f} | threshold={effective_min_score:.1f} | level={bl}")
+            q = alert.get("entry_quality", {}) if isinstance(alert.get("entry_quality", {}), dict) else {}
+            log(f"ALERT REASON {symbol}: {pname} | status={q.get('status','ENTRY_READY')} | quality={float(alert.get('score', 0) or 0):.1f} | base={float(alert.get('base_score', 0) or 0):.1f} | dynamic_threshold={effective_min_score:.1f} | entry_threshold={ENTRY_READY_MIN_SCORE:.1f} | level={bl}")
         new_alerts.append(alert)
 
     return new_alerts
@@ -5553,6 +6116,26 @@ def _build_html_card(alert: dict, company: dict, send_date: str, sector: dict | 
     size    = int(meta.get("position_size", 0) or 0)
     risk_ps = abs(entry - stop)
     color   = "#15803d" if score >= 70.0 else "#a16207"
+    quality = alert.get("entry_quality", {}) if isinstance(alert.get("entry_quality", {}), dict) else meta.get("entry_quality", {}) if isinstance(meta.get("entry_quality", {}), dict) else {}
+    q_status = quality.get("status", "ENTRY_READY")
+    q_reasons = quality.get("reasons", [])[:8] if isinstance(quality.get("reasons", []), list) else []
+    q_fails = quality.get("blocking_fails", [])[:6] if isinstance(quality.get("blocking_fails", []), list) else []
+    q_metrics = quality.get("metrics", {}) if isinstance(quality.get("metrics", {}), dict) else {}
+    q_line = (
+        f"Volume ×{q_metrics.get('volume_ratio'):.2f}" if isinstance(q_metrics.get('volume_ratio'), (int, float)) else "Volume N/A"
+    ) + " | " + (
+        f"RS {q_metrics.get('rs_score'):.0f}" if isinstance(q_metrics.get('rs_score'), (int, float)) else "RS N/A"
+    ) + " | " + (
+        f"52W {q_metrics.get('high52_proximity')*100:.0f}%" if isinstance(q_metrics.get('high52_proximity'), (int, float)) else "52W N/A"
+    )
+    quality_lis = "".join(f"<li>✅ {r}</li>" for r in q_reasons) or "<li>✅ עבר שכבת Entry Ready</li>"
+    quality_bad = "".join(f"<li>⚠️ {r}</li>" for r in q_fails)
+    quality_html = f'''
+  <div style="padding:14px;border-bottom:1px solid #e5e7eb;background:#f0fdf4;">
+    <h3 style="margin:0 0 8px;color:#166534;">🚀 Entry Ready Quality</h3>
+    <div style="font-size:12px;color:#374151;margin-bottom:6px;"><b>{q_status}</b> · {q_line}</div>
+    <ul style="margin:0;padding-right:16px;font-size:12px;">{quality_lis}{quality_bad}</ul>
+  </div>'''
 
     ok_lis  = "".join(f'<li>✅ {r}</li>' for r in reasons) or "<li>✅ ללא פירוט</li>"
     bad_lis = "".join(f'<li>⚠️ {r}</li>' for r in fails)
@@ -5765,6 +6348,7 @@ def _build_html_card(alert: dict, company: dict, send_date: str, sector: dict | 
     <h3 style="margin:0 0 8px;color:#1d4ed8;">קריטריונים שאומתו</h3>
     <ul style="margin:0;padding-right:16px;">{ok_lis}</ul>
   </div>
+  {quality_html}
   {warns}
   {sector_html}
   {intel_html}
@@ -5791,6 +6375,9 @@ def create_chart(ticker: str, df: pd.DataFrame, alert: dict) -> str | None:
         if "ma150" in df_c.columns:
             fig.add_trace(go.Scatter(x=df_c.index, y=df_c["ma150"], name="MA150",
                                       line=dict(color="orange", width=1, dash="dash")))
+        if "ma200" in df_c.columns:
+            fig.add_trace(go.Scatter(x=df_c.index, y=df_c["ma200"], name="MA200",
+                                      line=dict(color="gray", width=1, dash="dot")))
         bl = alert.get("breakout_level")
         if bl:
             fig.add_hline(y=bl, line_color="green", line_dash="dash", line_width=2)
@@ -5826,7 +6413,7 @@ def send_email_alerts(alerts: list[dict]) -> None:
     header = f"""<html><head><meta charset="utf-8"></head>
 <body dir="rtl" style="margin:0;padding:0;background:#f3f4f6;">
 <div style="max-width:900px;margin:0 auto;padding:12px;text-align:center;">
-  <h2 style="color:#1d4ed8;">🚨 סורק המניות — {len(alerts)} התראות ({subj_str})</h2>
+  <h2 style="color:#1d4ed8;">🚀 סורק המניות — {len(alerts)} Entry Ready ({subj_str})</h2>
 </div>"""
     footer = """<p style="text-align:center;font-size:11px;color:#6b7280;margin:20px 0;">
   הודעה אוטומטית — אינה מהווה ייעוץ פיננסי.</p></body></html>"""
@@ -5918,9 +6505,9 @@ def send_email_alerts(alerts: list[dict]) -> None:
     msg["To"]      = ", ".join(TO_EMAILS)
     if len(alerts) == 1:
         a = alerts[0]
-        msg["Subject"] = f"📈 {a.get('ticker','')} | {a.get('pattern_type','')} | Score {a.get('score',0):.1f}"
+        msg["Subject"] = f"🚀 ENTRY READY {a.get('ticker','')} | {a.get('pattern_type','')} | Quality {a.get('score',0):.1f}"
     else:
-        msg["Subject"] = f"🚨 {len(alerts)} התראות פריצה — {subj_str}"
+        msg["Subject"] = f"🚀 {len(alerts)} Entry Ready סטאפים — {subj_str}"
     msg.attach(MIMEText(header + cards + footer, "html", "utf-8"))
     for att in all_attachments:
         msg.attach(att)
@@ -6001,6 +6588,7 @@ def send_daily_summary_email(stats: dict, filter_stats: dict, regime: dict | Non
             {row("EMA28", filter_stats.get("ema28",0))}
             {row("MA150 רחוק", filter_stats.get("ma150_dist",0))}
             {row("MA לא קרוב ל־neckline", filter_stats.get("ma_neckline",0))}
+            {row("תבנית קיימת אבל לא Entry Ready", filter_stats.get("entry_quality",0))}
             {row("לא נמצאה תבנית", filter_stats.get("no_pattern",0))}
             {row("Reverse Scanner", filter_stats.get("reverse_scan",0))}
           </table>
@@ -6264,6 +6852,7 @@ def main() -> None:
     log("Stock Scanner Unified — START")
     log(f"Code version: {CODE_VERSION}")
     log(f"Market cap threshold: ${MIN_MARKET_CAP_USD/1e9:.1f}B | Unknown MC behavior: PASS")
+    log(f"Entry Ready threshold: quality>={ENTRY_READY_MIN_SCORE:.1f} | candidate_score>={ENTRY_CANDIDATE_MIN_SCORE:.1f}")
     log("RESET VERIFIED FIX FILE")
     log("=" * 60)
     # ── מנע Sleep במהלך הסריקה ──────────────────────────────
@@ -6343,7 +6932,7 @@ def main() -> None:
                 {"scanned": 0, "skipped_bl": 0, "no_alert": 0, "found": 0, "errors": 0, "sent": 0},
                 {
                     "market_cap": 0, "no_data": 0, "earnings": 0, "ema28": 0,
-                    "ma150_dist": 0, "ma_neckline": 0, "no_pattern": 0, "reverse_scan": 0,
+                    "ma150_dist": 0, "ma_neckline": 0, "no_pattern": 0, "reverse_scan": 0, "entry_quality": 0,
                 },
                 regime,
                 PREFILTER_STATS,
@@ -6361,6 +6950,7 @@ def main() -> None:
     dynamic_score = get_dynamic_min_score()
     regime_name   = regime.get("regime", "NEUTRAL")
     log(f"🎯 MIN_ALERT_SCORE דינמי: {dynamic_score} (Regime={regime_name})")
+    log(f"🚀 V8 Entry Ready Engine: min_quality={ENTRY_READY_MIN_SCORE:.1f}, volume×{ENTRY_MIN_VOLUME_RATIO:.2f}, RS>={ENTRY_MIN_RS_SCORE:.0f}, breakout>={ENTRY_MIN_BREAKOUT_PCT*100:.1f}%")
 
     # ── Market Reversal Detector ──────────────────────────────
     try:
@@ -6385,6 +6975,7 @@ def main() -> None:
         "ma_neckline":   0,
         "no_pattern":    0,
         "score_low":     0,
+        "entry_quality": 0,
         "reverse_scan":  0,
         "passed":        0,
     }
@@ -6432,7 +7023,16 @@ def main() -> None:
             accepted_count = 0
             for alert in new:
                 alert_score = float(alert.get("score", 0) or 0)
-                # חגורת בטיחות: שום סטאפ לא נשלח אם הוא מתחת לסף הדינמי של אותה ריצה.
+                # V8 safety: שום סטאפ לא נשלח אם הוא לא Entry Ready או מתחת לסף איכות הכניסה.
+                q = alert.get("entry_quality", {}) if isinstance(alert.get("entry_quality", {}), dict) else {}
+                if ENTRY_ENGINE_ENABLED and not q.get("entry_ready", False):
+                    log(f"{symbol}: ❌ blocked before send — not ENTRY_READY")
+                    filter_stats["entry_quality"] += 1
+                    continue
+                if alert_score < float(ENTRY_READY_MIN_SCORE):
+                    log(f"{symbol}: ❌ blocked before send — entry quality {alert_score:.1f} < ENTRY_READY_MIN_SCORE {float(ENTRY_READY_MIN_SCORE):.1f}")
+                    filter_stats["score_low"] += 1
+                    continue
                 if alert_score < float(dynamic_score):
                     log(f"{symbol}: ❌ blocked before send — score {alert_score:.1f} < dynamic threshold {float(dynamic_score):.1f}")
                     filter_stats["score_low"] += 1
@@ -6516,7 +7116,8 @@ def main() -> None:
     # RS Score filter הוסר
     log(f"   {'❌ MA150 רחוק (> 5%)':<28} {filter_stats['ma150_dist']:>6,}  ({filter_stats['ma150_dist']/max(total_scanned,1)*100:.0f}%)")
     log(f"   {'❌ MA לא קרוב ל-neckline':<28} {filter_stats['ma_neckline']:>6,}  ({filter_stats['ma_neckline']/max(total_scanned,1)*100:.0f}%)")
-    log(f"   {'❌ ציון נמוך מהסף הדינמי':<28} {filter_stats['score_low']:>6,}  ({filter_stats['score_low']/max(total_scanned,1)*100:.0f}%)")
+    log(f"   {'❌ ציון נמוך מהסף':<28} {filter_stats['score_low']:>6,}  ({filter_stats['score_low']/max(total_scanned,1)*100:.0f}%)")
+    log(f"   {'👀 תבנית קיימת אבל לא Entry Ready':<28} {filter_stats['entry_quality']:>6,}  ({filter_stats['entry_quality']/max(total_scanned,1)*100:.0f}%)")
     log(f"   {'❌ Reverse Scanner / מכירה מוסדית':<28} {filter_stats['reverse_scan']:>6,}  ({filter_stats['reverse_scan']/max(total_scanned,1)*100:.0f}%)")
     log(f"   {'❌ לא נמצאה תבנית':<28} {filter_stats['no_pattern']:>6,}  ({filter_stats['no_pattern']/max(total_scanned,1)*100:.0f}%)")
     log(f"   {'✅ עברו הכל ונשלחו':<28} {stats.get('sent',0):>6,}")
