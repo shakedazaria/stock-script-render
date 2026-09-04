@@ -22,10 +22,10 @@ stock_scanner_unified.py
 """
 
 # ============================================================
-# RESET VERIFIED FIX FILE — 2026-09-02 V6
+# RESET VERIFIED FIX FILE — 2026-09-04 V7
 # This marker proves this is the rebuilt fixed file, not an old download copy.
 # ============================================================
-CODE_VERSION = "2026-09-02-v6-dynamic-threshold-phase2-breakdown"
+CODE_VERSION = "2026-09-04-v7-nan-safe-regime-position-summary"
 RESET_VERIFIED_FIX_FILE = True
 
 
@@ -62,6 +62,74 @@ try:
 except Exception:
     go = pio = None
     PLOTLY_AVAILABLE = False
+
+# ============================================================
+#  DATA SAFETY HELPERS — מונעים NaN מ-Yahoo / yfinance
+# ============================================================
+def _is_finite_number(value) -> bool:
+    """True רק למספר אמיתי — לא None, לא NaN ולא inf."""
+    try:
+        return bool(np.isfinite(float(value)))
+    except Exception:
+        return False
+
+
+def _normalize_yfinance_df(df: pd.DataFrame | None) -> pd.DataFrame | None:
+    """
+    מנקה DataFrame שמגיע מ-yfinance:
+    - מוריד MultiIndex לעמודות רגילות
+    - הופך OHLCV למספרים
+    - מוחק שורות שה-Close שלהן NaN/inf
+
+    זה פותר מצב שבו Yahoo מחזיר שורה אחרונה ריקה לפני פתיחת המסחר,
+    ואז מופיע בלוג: SPY +nan% או P&L=nan%.
+    """
+    try:
+        if df is None or getattr(df, "empty", True):
+            return None
+        out = df.copy()
+        if isinstance(out.columns, pd.MultiIndex):
+            out.columns = [str(c[0]).lower() for c in out.columns]
+        else:
+            out.columns = [str(c).lower() for c in out.columns]
+        out = out.loc[:, ~out.columns.duplicated()]
+        if "close" not in out.columns:
+            return None
+        for col in ("open", "high", "low", "close", "volume"):
+            if col in out.columns:
+                out[col] = pd.to_numeric(out[col], errors="coerce")
+        out = out.replace([np.inf, -np.inf], np.nan)
+        out = out.dropna(subset=["close"])
+        if out.empty:
+            return None
+        return out
+    except Exception:
+        return None
+
+
+def _last_finite(series, default=None):
+    """מחזיר את הערך המספרי התקין האחרון מתוך Series."""
+    try:
+        s = pd.to_numeric(series, errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+        if s.empty:
+            return default
+        val = float(s.iloc[-1])
+        return val if _is_finite_number(val) else default
+    except Exception:
+        return default
+
+
+def _safe_pct(numerator, denominator, default=None):
+    """אחוז בטוח — לא מחזיר NaN."""
+    try:
+        n = float(numerator)
+        d = float(denominator)
+        if not _is_finite_number(n) or not _is_finite_number(d) or abs(d) < 1e-9:
+            return default
+        val = n / d * 100.0
+        return val if _is_finite_number(val) else default
+    except Exception:
+        return default
 
 # ============================================================
 #  CONFIG  — ערכים ברירת-מחדל, הכל אפשר לדרוס דרך env-vars
@@ -171,10 +239,12 @@ _HISTORICAL_FACTS = [
 def _check_vix() -> tuple[bool, float, str]:
     """בודק אם VIX מעל 30. מחזיר (triggered, value, description)."""
     try:
-        df = yf.download("^VIX", period="5d", progress=False, auto_adjust=True)
+        df = _normalize_yfinance_df(yf.download("^VIX", period="5d", progress=False, auto_adjust=True))
         if df is None or df.empty:
             return False, 0.0, "VIX לא זמין"
-        val = float(df["Close"].iloc[-1])
+        val = _last_finite(df["close"])
+        if not _is_finite_number(val):
+            return False, 0.0, "❌ VIX לא זמין — נתונים לא תקינים"
         triggered = val >= 30
         emoji = "✅" if triggered else "❌"
         return triggered, val, f"{emoji} VIX: {val:.1f} ({'מעל' if triggered else 'מתחת ל'}-30)"
@@ -217,21 +287,21 @@ def _check_fear_greed() -> tuple[bool, float, str]:
 def _check_s5fi() -> tuple[bool, float, str]:
     """
     בודק רוחב שוק — SPY ביחס ל-MA200.
-    מחליף את S5FI שאינו זמין ב-yfinance.
-    אם SPY נמצא יותר מ-10% מתחת ל-MA200 — שוק במצוקה קיצונית.
+    FIX V7: אם Yahoo מחזיר NaN, לא מציגים +nan% ולא מפעילים סיגנל.
     """
     try:
-        df = yf.download("SPY", period="300d", progress=False, auto_adjust=True)
-        if df is None or df.empty or len(df) < 200:
+        df = _normalize_yfinance_df(yf.download("SPY", period="300d", progress=False, auto_adjust=True))
+        if df is None or len(df) < 200:
             return False, 0.0, "❌ SPY MA200 לא זמין"
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = [c[0].lower() for c in df.columns]
-        else:
-            df.columns = [c.lower() for c in df.columns]
-        price  = float(df["close"].iloc[-1])
-        ma200  = float(df["close"].rolling(200).mean().iloc[-1])
-        dist   = (price - ma200) / ma200 * 100
-        triggered = dist <= -10.0  # מתחת ל-10% מ-MA200
+        close = df["close"]
+        price = _last_finite(close)
+        ma200 = _last_finite(close.rolling(200).mean())
+        if not _is_finite_number(price) or not _is_finite_number(ma200):
+            return False, 0.0, "❌ SPY MA200 לא זמין — נתוני Yahoo לא תקינים"
+        dist = _safe_pct(price - ma200, ma200, default=None)
+        if dist is None:
+            return False, 0.0, "❌ SPY MA200 לא זמין — חישוב לא תקין"
+        triggered = dist <= -10.0
         emoji = "✅" if triggered else "❌"
         return triggered, dist, f"{emoji} SPY vs MA200: {dist:+.1f}% ({'מצוקה קיצונית' if triggered else 'תקין'})"
     except Exception as e:
@@ -239,16 +309,14 @@ def _check_s5fi() -> tuple[bool, float, str]:
 
 
 def _check_three_red_days() -> tuple[bool, int, str]:
-    """בודק 3 ימים אדומים ברצף ב-SPY."""
+    """בודק 3 ימים אדומים ברצף ב-SPY. לא מחזיר nan בלוג."""
     try:
-        df = yf.download("SPY", period="10d", progress=False, auto_adjust=True)
+        df = _normalize_yfinance_df(yf.download("SPY", period="10d", progress=False, auto_adjust=True))
         if df is None or len(df) < 4:
             return False, 0, "❌ SPY לא זמין"
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = [c[0].lower() for c in df.columns]
-        else:
-            df.columns = [c.lower() for c in df.columns]
-        closes = [float(v) for v in df["close"].iloc[-4:].values]
+        closes = list(pd.to_numeric(df["close"], errors="coerce").dropna().tail(4).astype(float).values)
+        if len(closes) < 4 or any(not _is_finite_number(v) for v in closes):
+            return False, 0, "❌ SPY לא זמין — אין 4 סגירות תקינות"
         red_days = 0
         for i in range(1, 4):
             if closes[i] < closes[i-1]:
@@ -257,27 +325,33 @@ def _check_three_red_days() -> tuple[bool, int, str]:
                 break
         triggered = red_days >= 3
         emoji = "✅" if triggered else "❌"
-        pct = (closes[-1] - closes[-4]) / closes[-4] * 100
+        pct = _safe_pct(closes[-1] - closes[-4], closes[-4], default=None)
+        if pct is None:
+            return False, 0, "❌ SPY לא זמין — חישוב ימים אדומים לא תקין"
         return triggered, red_days, f"{emoji} SPY: {red_days} ימים אדומים ברצף ({pct:.1f}% ירידה)"
     except Exception as e:
         return False, 0, f"❌ SPY שגיאה: {e}"
+
 def _check_reversal_signals() -> tuple[bool, float, str]:
     """
     בודק אם השוק הולך להתהפך — SPY חוצה מעל EMA28 אחרי BEAR.
-    מחזיר (reversing, spy_dist_pct, description).
+    FIX V7: מתעלם משורת Yahoo ריקה ומחזיר UNKNOWN במקום nan.
     """
     try:
-        df = yf.download("SPY", period="60d", progress=False, auto_adjust=True)
+        df = _normalize_yfinance_df(yf.download("SPY", period="60d", progress=False, auto_adjust=True))
         if df is None or len(df) < 30:
             return False, 0.0, "SPY לא זמין"
-        closes = df["Close"]
+        closes = df["close"]
         ema28 = closes.ewm(span=28, adjust=False).mean()
-        price = float(closes.iloc[-1])
-        ema  = float(ema28.iloc[-1])
-        dist = (price - ema) / ema * 100
-        # בדוק אם SPY חצה מעל EMA28 לאחרונה (היום מעל, אתמול מתחת)
-        prev_price = float(closes.iloc[-2])
-        prev_ema   = float(ema28.iloc[-2])
+        price = _last_finite(closes)
+        ema = _last_finite(ema28)
+        prev_price = float(closes.iloc[-2]) if len(closes) >= 2 else np.nan
+        prev_ema = float(ema28.iloc[-2]) if len(ema28) >= 2 else np.nan
+        if not all(_is_finite_number(v) for v in (price, ema, prev_price, prev_ema)):
+            return False, 0.0, "SPY לא זמין — נתוני EMA28 לא תקינים"
+        dist = _safe_pct(price - ema, ema, default=None)
+        if dist is None:
+            return False, 0.0, "SPY לא זמין — חישוב EMA28 לא תקין"
         crossed_above = prev_price < prev_ema and price > ema
         vix_trig, vix_val, _ = _check_vix()
         vix_dropping = vix_val < 25 and not vix_trig
@@ -426,22 +500,28 @@ def run_market_reversal_detector() -> None:
 
 def get_dynamic_min_score() -> float:
     """
-    מחזיר ציון מינימלי דינמי לפי מצב השוק:
-      🐂 BULL  (SPY > +2% מ-MA50) → 50
-      🟡 NEUTRAL (-2% עד +2%)    → 40
-      🔴 BEAR  (SPY < -2%)        → 30
+    מחזיר ציון מינימלי דינמי לפי מצב השוק.
+    FIX V7: אם נתוני SPY לא תקינים — לא מורידים סף, משתמשים בסף בטוח 55.
+      🐂 BULL    → 55
+      🟡 NEUTRAL → 45
+      🔴 BEAR    → 55  (לא מקלים בשוק חלש)
+      ❔ UNKNOWN → 55  (נתוני SPY חסרים/NaN)
     """
     try:
         regime = get_market_regime()
-        r = regime.get("regime", "NEUTRAL")
+        r = regime.get("regime", "UNKNOWN")
+        data_ok = bool(regime.get("data_ok", False))
+        if not data_ok or r == "UNKNOWN":
+            return 55.0
         if r == "BULL":
             return 55.0
-        elif r == "BEAR":
-            return 40.0
-        else:
+        if r == "NEUTRAL":
             return 45.0
+        if r == "BEAR":
+            return 55.0
+        return 55.0
     except Exception:
-        return MIN_ALERT_SCORE
+        return 55.0
 
 # --- Falling Wedge ---
 TRIANGLE_LOOKBACK      = int(os.getenv("TRIANGLE_LOOKBACK",      "90"))    # 3 חודשים לחיפוש הטריז
@@ -1039,10 +1119,10 @@ def _is_israel_weekend_now() -> bool:
 def get_latest_market_session_date(symbol: str = MARKET_SCAN_SYMBOL) -> str | None:
     """
     מזהה את יום המסחר האחרון לפי הנר היומי האחרון של SPY.
-    לא משתמשים בלוח חגים ידני — אם אין נר חדש, אין סריקה חדשה.
+    FIX V7: משתמש רק בנר שיש לו Close תקין, כדי ששורה ריקה מ-Yahoo לא תיחשב כיום מסחר.
     """
     try:
-        df = yf.download(
+        df = _normalize_yfinance_df(yf.download(
             symbol,
             period="10d",
             interval="1d",
@@ -1050,7 +1130,7 @@ def get_latest_market_session_date(symbol: str = MARKET_SCAN_SYMBOL) -> str | No
             auto_adjust=True,
             threads=False,
             timeout=15,
-        )
+        ))
         if df is None or df.empty:
             return None
         last_idx = pd.to_datetime(df.index[-1])
@@ -3076,6 +3156,7 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
     df = fetch_data_twelvedata(symbol, outputsize=500)
     if df is None or df.empty:
         df = fetch_data_yfinance(symbol)
+    df = _normalize_yfinance_df(df) if df is not None else None
     if df is None or df.empty or len(df) < 50:
         log(f"{symbol}: no data. Skip."); _fs("no_data"); return []
 
@@ -3369,16 +3450,14 @@ def _get_spy_returns() -> dict:
     if _rs_spy_cache.get("date") == today:
         return _rs_spy_cache.get("returns", {})
     try:
-        spy_df = yf.download("SPY", period="13mo", interval="1d",
-                             progress=False, auto_adjust=True)
+        spy_df = _normalize_yfinance_df(yf.download("SPY", period="13mo", interval="1d",
+                                                    progress=False, auto_adjust=True))
         if spy_df is None or len(spy_df) < 60:
             return {}
-        if isinstance(spy_df.columns, pd.MultiIndex):
-            spy_df.columns = [c[0].lower() for c in spy_df.columns]
-        else:
-            spy_df.columns = [c.lower() for c in spy_df.columns]
-        close = spy_df["close"] if "close" in spy_df.columns else spy_df.iloc[:, 0]
-        now   = float(close.iloc[-1])
+        close = spy_df["close"]
+        now = _last_finite(close)
+        if not _is_finite_number(now):
+            return {}
         ret = {
             "3m":  (now - float(close.iloc[-63]))  / max(float(close.iloc[-63]),  1e-9) if len(close) >= 63  else None,
             "6m":  (now - float(close.iloc[-126])) / max(float(close.iloc[-126]), 1e-9) if len(close) >= 126 else None,
@@ -3480,12 +3559,9 @@ _regime_cache: dict | None = None
 
 def get_market_regime() -> dict:
     """
-    בודק את מצב השוק לפי SPY vs MA50:
-    BULL  — SPY מעל MA50 ועולה  → מסחר רגיל
-    NEUTRAL — SPY סביב MA50     → מסחר זהיר
-    BEAR  — SPY מתחת MA50       → לא לשלוח התראות כניסה
-
-    מחזיר: { regime, spy_price, ma50, vs_ma50_pct, emoji, allow_trading }
+    בודק את מצב השוק לפי SPY vs MA50.
+    FIX V7: אם Yahoo מחזיר שורת NaN, מנקים אותה. אם עדיין אין נתונים תקינים —
+    מחזירים UNKNOWN ולא BEAR, כדי שלא יירד הסף בטעות.
     """
     global _regime_cache
     if _regime_cache is not None:
@@ -3497,44 +3573,56 @@ def get_market_regime() -> dict:
         "ma50":          None,
         "vs_ma50_pct":   None,
         "emoji":         "🟡",
-        "allow_trading": True,   # ברירת מחדל — תמיד אפשר
-        "summary":       "מצב שוק לא ידוע",
+        "allow_trading": True,
+        "data_ok":       False,
+        "summary":       "🟡 Market Regime: UNKNOWN | SPY data unavailable — using safe threshold",
     }
     try:
-        df = yf.download("SPY", period="3mo", interval="1d",
-                         progress=False, auto_adjust=True)
+        df = _normalize_yfinance_df(yf.download("SPY", period="3mo", interval="1d",
+                                                progress=False, auto_adjust=True))
         if df is None or len(df) < REGIME_MA_PERIOD + 2:
+            log(f"🌍 {result['summary']}")
             _regime_cache = result
             return result
 
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = [c[0].lower() for c in df.columns]
-        else:
-            df.columns = [c.lower() for c in df.columns]
+        close = df["close"]
+        price = _last_finite(close)
+        ma_series = close.rolling(REGIME_MA_PERIOD).mean()
+        ma50 = _last_finite(ma_series)
 
-        close = df["close"] if "close" in df.columns else df.iloc[:, 0]
-        price = float(close.iloc[-1])
-        ma50  = float(close.rolling(REGIME_MA_PERIOD).mean().iloc[-1])
-        prev_ma50 = float(close.rolling(REGIME_MA_PERIOD).mean().iloc[-2])
-        vs_ma50   = round((price - ma50) / max(ma50, 1e-9) * 100, 2)
+        ma_clean = pd.to_numeric(ma_series, errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+        prev_ma50 = float(ma_clean.iloc[-2]) if len(ma_clean) >= 2 else None
+
+        if not all(_is_finite_number(v) for v in (price, ma50, prev_ma50)):
+            log(f"🌍 {result['summary']}")
+            _regime_cache = result
+            return result
+
+        vs_ma50_raw = _safe_pct(price - ma50, ma50, default=None)
+        if vs_ma50_raw is None:
+            log(f"🌍 {result['summary']}")
+            _regime_cache = result
+            return result
+        vs_ma50 = round(vs_ma50_raw, 2)
         ma_rising = ma50 > prev_ma50
 
         if price > ma50 and ma_rising:
-            regime, emoji, allow = "BULL",    "🟢", True
+            regime, emoji, allow = "BULL", "🟢", True
         elif price > ma50 and not ma_rising:
             regime, emoji, allow = "NEUTRAL", "🟡", True
         elif price < ma50 and vs_ma50 > -3:
             regime, emoji, allow = "NEUTRAL", "🟡", True
         else:
-            regime, emoji, allow = "BEAR",    "🔴", not REGIME_ENABLED
+            regime, emoji, allow = "BEAR", "🔴", not REGIME_ENABLED
 
         result.update({
             "regime":        regime,
-            "spy_price":     round(price, 2),
-            "ma50":          round(ma50, 2),
+            "spy_price":     round(float(price), 2),
+            "ma50":          round(float(ma50), 2),
             "vs_ma50_pct":   vs_ma50,
             "emoji":         emoji,
             "allow_trading": allow,
+            "data_ok":       True,
             "summary":       f"{emoji} Market Regime: {regime} | SPY {vs_ma50:+.1f}% vs MA{REGIME_MA_PERIOD}",
         })
         log(f"🌍 {result['summary']}")
@@ -3543,15 +3631,11 @@ def get_market_regime() -> dict:
 
     except Exception as e:
         log(f"get_market_regime error: {e}")
+        log(f"🌍 {result['summary']}")
 
     _regime_cache = result
     return result
 
-
-# ============================================================
-#  SECTOR ROTATION INTELLIGENCE
-#  בודק כל בוקר לאן זורם הכסף — ומשפיע על ציוני הסטאפים
-# ============================================================
 
 # בונוס/קנס לסטאפים לפי חוזק הסקטור
 SECTOR_ROTATION_BONUS  = float(os.getenv("SECTOR_ROTATION_BONUS",  "0.8"))   # בונוס לסקטור HOT
@@ -3581,16 +3665,16 @@ def build_sector_rotation_map() -> dict:
 
     # הורד SPY כבסיס להשוואה
     try:
-        spy_df = yf.download("SPY", period="3mo", interval="1d",
-                             progress=False, auto_adjust=True)
-        if isinstance(spy_df.columns, pd.MultiIndex):
-            spy_df.columns = [c[0].lower() for c in spy_df.columns]
-        else:
-            spy_df.columns = [c.lower() for c in spy_df.columns]
-        spy_close = spy_df["close"] if "close" in spy_df.columns else spy_df.iloc[:, 0]
-        spy_now   = float(spy_close.iloc[-1])
-        spy_20d   = float(spy_close.iloc[-21]) if len(spy_close) >= 21 else float(spy_close.iloc[0])
-        spy_perf  = (spy_now - spy_20d) / max(spy_20d, 1e-9) * 100
+        spy_df = _normalize_yfinance_df(yf.download("SPY", period="3mo", interval="1d",
+                                                    progress=False, auto_adjust=True))
+        if spy_df is None or len(spy_df) < 21:
+            raise ValueError("SPY sector benchmark unavailable")
+        spy_close = spy_df["close"]
+        spy_now = _last_finite(spy_close)
+        spy_20d = float(spy_close.iloc[-21]) if len(spy_close) >= 21 else float(spy_close.iloc[0])
+        if not _is_finite_number(spy_now) or not _is_finite_number(spy_20d):
+            raise ValueError("SPY sector benchmark not finite")
+        spy_perf = _safe_pct(spy_now - spy_20d, spy_20d, default=0.0) or 0.0
     except Exception:
         spy_perf = 0.0
         spy_now  = None
@@ -3603,18 +3687,13 @@ def build_sector_rotation_map() -> dict:
                 list(SECTOR_ETF_MAP.values()).index(etf)], {})
             continue
         try:
-            df = yf.download(etf, period="3mo", interval="1d",
-                             progress=False, auto_adjust=True)
+            df = _normalize_yfinance_df(yf.download(etf, period="3mo", interval="1d",
+                                                    progress=False, auto_adjust=True))
             if df is None or len(df) < 25:
                 result[sector] = {"etf": etf, "rank": "NEUTRAL", "error": "no data"}
                 continue
 
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = [c[0].lower() for c in df.columns]
-            else:
-                df.columns = [c.lower() for c in df.columns]
-
-            close = df["close"] if "close" in df.columns else df.iloc[:, 0]
+            close = df["close"]
             now    = float(close.iloc[-1])
             d5     = float(close.iloc[-6])  if len(close) >= 6  else float(close.iloc[0])
             d20    = float(close.iloc[-21]) if len(close) >= 21 else float(close.iloc[0])
@@ -3824,21 +3903,23 @@ def run_position_tracker(send_exit_email_fn=None) -> list[dict]:
         ticker = p["ticker"]
         try:
             # הורד נתונים עדכניים
-            df = yf.download(ticker, period="60d", interval="1d",
-                             progress=False, auto_adjust=True)
+            df = _normalize_yfinance_df(yf.download(ticker, period="60d", interval="1d",
+                                                    progress=False, auto_adjust=True))
             if df is None or df.empty:
+                p["data_status"] = "price_unavailable"
+                log(f"   ⚠️ {ticker}: price data unavailable — keeping position open, no P&L update")
                 continue
 
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = [c[0].lower() for c in df.columns]
-            else:
-                df.columns = [c.lower() for c in df.columns]
-
-            price_now = float(df["close"].iloc[-1])
-            high_now  = float(df["high"].iloc[-1])
+            price_now = _last_finite(df["close"])
+            high_now = _last_finite(df["high"] if "high" in df.columns else df["close"], default=price_now)
             entry     = float(p["entry"])
             stop_curr = float(p["stop_current"])
             target    = float(p["target"])
+            if not all(_is_finite_number(v) for v in (price_now, high_now, entry, stop_curr, target)):
+                p["data_status"] = "price_unavailable"
+                log(f"   ⚠️ {ticker}: invalid price data — keeping position open, no P&L update")
+                continue
+            p["data_status"] = "ok"
             date_open = pd.Timestamp(p["date_open"]).date()
             days_open = (today - date_open).days
 
@@ -4021,24 +4102,29 @@ def send_positions_status_email() -> None:
                 continue
 
             try:
-                df = yf.download(ticker, period="60d", interval="1d", progress=False, auto_adjust=True)
+                df = _normalize_yfinance_df(yf.download(ticker, period="60d", interval="1d", progress=False, auto_adjust=True))
                 if df is None or df.empty:
+                    p["data_status"] = "price_unavailable"
                     cards.append(f"""
 <div dir="rtl" style="font-family:Arial,sans-serif;max-width:560px;margin:12px auto;border:1px solid #e5e7eb;border-radius:10px;background:#fff;padding:14px 16px;">
   <div style="font-size:19px;font-weight:700;color:#374151;">⚠️ {ticker}</div>
-  <div style="font-size:13px;color:#6b7280;margin-top:6px;">לא הצלחתי להוריד נתונים עדכניים. לא סוגר אוטומטית — בדיקה ידנית מומלצת.</div>
+  <div style="font-size:13px;color:#6b7280;margin-top:6px;">לא הצלחתי לקבל מחיר עדכני תקין. הפוזיציה נשארת פתוחה ולא מחושב P&L כדי לא להציג nan.</div>
 </div>""")
                     continue
 
-                if isinstance(df.columns, pd.MultiIndex):
-                    df.columns = [c[0].lower() for c in df.columns]
-                else:
-                    df.columns = [str(c).lower() for c in df.columns]
-
-                price_now = float(df["close"].iloc[-1])
+                price_now = _last_finite(df["close"])
                 entry = float(p.get("entry", 0) or 0)
                 stop = float(p.get("stop_current", p.get("stop_initial", 0)) or 0)
                 target = float(p.get("target", 0) or 0)
+                if not all(_is_finite_number(v) for v in (price_now, entry, stop, target)):
+                    p["data_status"] = "price_unavailable"
+                    cards.append(f"""
+<div dir="rtl" style="font-family:Arial,sans-serif;max-width:560px;margin:12px auto;border:1px solid #e5e7eb;border-radius:10px;background:#fff;padding:14px 16px;">
+  <div style="font-size:19px;font-weight:700;color:#374151;">⚠️ {ticker}</div>
+  <div style="font-size:13px;color:#6b7280;margin-top:6px;">התקבלו נתונים לא תקינים מ-Yahoo. לא מוצג P&L ולא מתבצעת החלטת יציאה אוטומטית.</div>
+</div>""")
+                    continue
+                p["data_status"] = "ok"
                 highest = max(float(p.get("highest_price", entry) or entry), price_now)
 
                 # עדכון highest_price גם אם אין יציאה — כדי שהמעקב יישמר בקובץ state.
@@ -6363,7 +6449,7 @@ def main() -> None:
                 stats["no_alert"] += 1
                 continue
             stats["found"] += accepted_count
-        except Exception:
+        except Exception as e:
             stats["errors"] += 1
             log(f"Critical error {symbol}: {type(e).__name__}: {e}")
 
@@ -6431,6 +6517,7 @@ def main() -> None:
     log(f"   {'❌ MA150 רחוק (> 5%)':<28} {filter_stats['ma150_dist']:>6,}  ({filter_stats['ma150_dist']/max(total_scanned,1)*100:.0f}%)")
     log(f"   {'❌ MA לא קרוב ל-neckline':<28} {filter_stats['ma_neckline']:>6,}  ({filter_stats['ma_neckline']/max(total_scanned,1)*100:.0f}%)")
     log(f"   {'❌ ציון נמוך מהסף הדינמי':<28} {filter_stats['score_low']:>6,}  ({filter_stats['score_low']/max(total_scanned,1)*100:.0f}%)")
+    log(f"   {'❌ Reverse Scanner / מכירה מוסדית':<28} {filter_stats['reverse_scan']:>6,}  ({filter_stats['reverse_scan']/max(total_scanned,1)*100:.0f}%)")
     log(f"   {'❌ לא נמצאה תבנית':<28} {filter_stats['no_pattern']:>6,}  ({filter_stats['no_pattern']/max(total_scanned,1)*100:.0f}%)")
     log(f"   {'✅ עברו הכל ונשלחו':<28} {stats.get('sent',0):>6,}")
     log("=" * 60)
