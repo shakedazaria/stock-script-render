@@ -2476,5 +2476,22 @@
     "close_date": null,
     "pnl_pct": null,
     "soft_warnings": []
+  },
+  {
+    "ticker": "ARCO",
+    "pattern": "Falling Wedge",
+    "entry": 8.236842105263158,
+    "stop_initial": 7.88,
+    "stop_current": 7.88,
+    "target": 9.44,
+    "date_open": "2026-09-04",
+    "highest_price": 8.236842105263158,
+    "stop_method": "smart_atr_support",
+    "trailing_status": "waiting",
+    "closed": false,
+    "close_reason": null,
+    "close_price": null,
+    "close_date": null,
+    "pnl_pct": null
   }
 ]
