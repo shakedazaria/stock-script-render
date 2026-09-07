@@ -2475,7 +2475,8 @@
     "close_price": null,
     "close_date": null,
     "pnl_pct": null,
-    "soft_warnings": []
+    "soft_warnings": [],
+    "data_status": "ok"
   },
   {
     "ticker": "ARCO",
@@ -2485,13 +2486,15 @@
     "stop_current": 7.88,
     "target": 9.44,
     "date_open": "2026-09-04",
-    "highest_price": 8.236842105263158,
+    "highest_price": 8.329999923706055,
     "stop_method": "smart_atr_support",
     "trailing_status": "waiting",
     "closed": false,
     "close_reason": null,
     "close_price": null,
     "close_date": null,
-    "pnl_pct": null
+    "pnl_pct": null,
+    "data_status": "ok",
+    "soft_warnings": []
   }
 ]
