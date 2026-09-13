@@ -18,16 +18,18 @@ stock_scanner_unified.py
 
 ציון ואיכות כניסה:
   V8 מוסיף Entry Ready Quality Engine: לא שולח מייל על תבנית בלבד.
-  מייל נשלח רק אם יש פריצה מאושרת, ווליום חזק, נר איכותי, RS חזק,
+  V9 מוסיף Pattern Expansion Engine עם תבניות איכותיות נוספות:
+  Flat Base, Darvas Box, VCP, EMA21/MA50 Pullback Bounce, Breakout Retest.
+  מייל נשלח רק אם יש פריצה/חזרה מאושרת, ווליום/נר איכותיים, RS חזק,
   מחיר מעל MA150/MA200, נזילות טובה ו-R:R מתאים.
   מועמד שלא עבר את שכבת האיכות נשמר כ-Watchlist בלבד.
 """
 
 # ============================================================
-# RESET VERIFIED FIX FILE — 2026-09-04 V8
+# RESET VERIFIED FIX FILE — 2026-09-13 V9
 # This marker proves this is the rebuilt fixed file, not an old download copy.
 # ============================================================
-CODE_VERSION = "2026-09-04-v8-entry-ready-quality-engine"
+CODE_VERSION = "2026-09-13-v9-pattern-expansion-engine"
 RESET_VERIFIED_FIX_FILE = True
 
 
@@ -54,6 +56,9 @@ import requests
 import yfinance as yf
 from scipy.signal import argrelextrema
 import warnings
+import math
+from dataclasses import dataclass, field, asdict
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -246,6 +251,15 @@ ENTRY_REQUIRE_MA200_ABOVE     = os.getenv("ENTRY_REQUIRE_MA200_ABOVE", "True").l
 ENTRY_REQUIRE_REGIME_DATA_OK  = os.getenv("ENTRY_REQUIRE_REGIME_DATA_OK", "True").lower() in ("1", "true", "yes")
 ENTRY_BLOCK_BEAR_REGIME       = os.getenv("ENTRY_BLOCK_BEAR_REGIME", "True").lower() in ("1", "true", "yes")
 ENTRY_QUALITY_LOG             = _state_path(os.getenv("ENTRY_QUALITY_LOG", "entry_quality_log.csv"))
+
+# ============================================================
+#  V9 — PATTERN EXPANSION ENGINE
+#  מוסיף תבניות כניסה איכותיות בלי לשנות את סדר הסינון הקיים.
+#  סדר הסינון נשאר: Market Cap → Data → Earnings → EMA28 → Reverse Scanner → Patterns → Entry Quality.
+# ============================================================
+V9_PATTERN_ENGINE_ENABLED     = os.getenv("V9_PATTERN_ENGINE_ENABLED", "True").lower() in ("1", "true", "yes")
+V9_MAX_CANDIDATES_PER_TICKER  = int(os.getenv("V9_MAX_CANDIDATES_PER_TICKER", "3"))
+V9_INCLUDE_REJECTED_DEBUG     = os.getenv("V9_INCLUDE_REJECTED_DEBUG", "False").lower() in ("1", "true", "yes")
 
 # ============================================================
 #  MARKET REVERSAL DETECTOR
@@ -2935,6 +2949,1455 @@ def log_entry_quality_decision(alert: dict, quality: dict) -> None:
         log(f"entry_quality_log error: {e}")
 
 
+
+# ============================================================
+#  V9 — PATTERN EXPANSION FUNCTIONS
+#  פונקציות עצמאיות ומסודרות לתבניות החדשות:
+#  Flat Base, Darvas Box, VCP, EMA Pullback Bounce, Breakout Retest.
+# ============================================================
+ENTRY_READY = "ENTRY_READY"
+ALMOST_READY = "ALMOST_READY"
+REJECTED = "REJECTED"
+
+
+@dataclass(frozen=True)
+class V9PatternConfig:
+    """Central place for all V9 pattern thresholds."""
+
+    # General quality gates
+    entry_ready_min_quality: float = 60.0
+    almost_ready_min_quality: float = 45.0
+    min_rs_score: float = 70.0
+    strong_rs_score: float = 80.0
+    min_rr: float = 2.5
+    max_entry_extension_pct: float = 3.0
+    max_stop_risk_pct: float = 12.0
+    min_dollar_volume_20: float = 10_000_000.0
+
+    # Trend filters
+    require_above_ma150: bool = True
+    require_ma150_rising: bool = True
+    ma150_rising_lookback: int = 10
+    min_52w_high_proximity: float = 0.85  # close / 52w high
+
+    # Breakout confirmation
+    min_breakout_pct: float = 0.003       # 0.3% above pivot
+    strong_breakout_pct: float = 0.005    # 0.5% above pivot
+    min_volume_ratio: float = 1.30
+    strong_volume_ratio: float = 1.50
+    min_close_position: float = 0.65      # close in upper 35% of daily range
+
+    # Base / box settings
+    flat_base_min_days: int = 15
+    flat_base_max_days: int = 60
+    flat_base_default_days: int = 35
+    flat_base_max_depth_pct: float = 18.0
+    flat_base_min_touches: int = 2
+    flat_base_watchlist_distance_pct: float = 3.0
+
+    darvas_windows: Tuple[int, ...] = (20, 40, 55)
+    darvas_max_depth_pct: float = 20.0
+    darvas_watchlist_distance_pct: float = 3.0
+
+    # VCP settings
+    vcp_min_days: int = 30
+    vcp_max_days: int = 90
+    vcp_default_days: int = 60
+    vcp_min_contractions: int = 2
+    vcp_volume_dryup_ratio: float = 0.80
+    vcp_range_contraction_ratio: float = 0.80
+    vcp_watchlist_distance_pct: float = 3.0
+
+    # Pullback settings
+    pullback_min_days: int = 2
+    pullback_max_days: int = 10
+    pullback_min_depth_pct: float = 3.0
+    pullback_max_depth_pct: float = 12.0
+    ema_touch_tolerance_pct: float = 1.0
+    pullback_bounce_min_volume_ratio: float = 1.00
+
+    # Retest settings
+    retest_breakout_lookback_days: int = 10
+    retest_box_window: int = 40
+    retest_max_above_pivot_pct: float = 2.0
+    retest_max_below_pivot_pct: float = 1.0
+
+
+@dataclass
+class PatternCandidate:
+    ticker: str
+    pattern_name: str
+    status: str
+    pivot: Optional[float]
+    entry: Optional[float]
+    stop: Optional[float]
+    target: Optional[float]
+    risk_pct: Optional[float]
+    target_pct: Optional[float]
+    rr: Optional[float]
+    base_score: float
+    entry_quality: float
+    breakout_pct: Optional[float] = None
+    base_depth_pct: Optional[float] = None
+    volume_ratio: Optional[float] = None
+    rs_score: Optional[float] = None
+    close_position: Optional[float] = None
+    distance_from_52w_high_pct: Optional[float] = None
+    dollar_volume_20: Optional[float] = None
+    missing_confirmations: List[str] = field(default_factory=list)
+    notes: List[str] = field(default_factory=list)
+    meta: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    def short_reason(self) -> str:
+        if not self.missing_confirmations:
+            return "all confirmations passed"
+        return "; ".join(self.missing_confirmations[:6])
+
+
+# ---------------------------------------------------------------------------
+# Basic helpers
+# ---------------------------------------------------------------------------
+
+
+def safe_float(value: Any, default: Optional[float] = None) -> Optional[float]:
+    """Convert a value to float and protect against NaN/inf."""
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return default
+    if math.isnan(value) or math.isinf(value):
+        return default
+    return value
+
+
+def pct_change(new: float, old: float) -> Optional[float]:
+    old = safe_float(old)
+    new = safe_float(new)
+    if old is None or new is None or old == 0:
+        return None
+    return (new - old) / old * 100.0
+
+
+def clean_ohlcv(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize OHLCV dataframe and remove rows with unusable prices."""
+    if df is None or df.empty:
+        return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
+
+    out = df.copy()
+
+    # Accept lowercase columns too.
+    rename_map = {}
+    for c in out.columns:
+        lc = str(c).lower()
+        if lc == "open":
+            rename_map[c] = "Open"
+        elif lc == "high":
+            rename_map[c] = "High"
+        elif lc == "low":
+            rename_map[c] = "Low"
+        elif lc == "close":
+            rename_map[c] = "Close"
+        elif lc in ("volume", "vol"):
+            rename_map[c] = "Volume"
+    out = out.rename(columns=rename_map)
+
+    required = ["Open", "High", "Low", "Close", "Volume"]
+    for col in required:
+        if col not in out.columns:
+            out[col] = np.nan
+        out[col] = pd.to_numeric(out[col], errors="coerce")
+
+    out = out[required].replace([np.inf, -np.inf], np.nan)
+    out = out.dropna(subset=["Open", "High", "Low", "Close"])
+    out = out[(out["High"] > 0) & (out["Low"] > 0) & (out["Close"] > 0)]
+    out["Volume"] = out["Volume"].fillna(0.0).clip(lower=0.0)
+    return out
+
+
+def add_v9_indicators(df: pd.DataFrame) -> pd.DataFrame:
+    """Add indicators used by all V9 pattern functions."""
+    out = clean_ohlcv(df)
+    if out.empty:
+        return out
+
+    close = out["Close"]
+    high = out["High"]
+    low = out["Low"]
+    volume = out["Volume"]
+
+    out["EMA21"] = close.ewm(span=21, adjust=False).mean()
+    out["EMA28"] = close.ewm(span=28, adjust=False).mean()
+    out["MA50"] = close.rolling(50, min_periods=20).mean()
+    out["MA150"] = close.rolling(150, min_periods=80).mean()
+    out["MA200"] = close.rolling(200, min_periods=100).mean()
+    out["VOL20"] = volume.rolling(20, min_periods=10).mean()
+    out["DOLLAR_VOL20"] = (close * volume).rolling(20, min_periods=10).mean()
+    out["HIGH_52W"] = high.rolling(252, min_periods=120).max()
+
+    prev_close = close.shift(1)
+    tr = pd.concat([
+        high - low,
+        (high - prev_close).abs(),
+        (low - prev_close).abs(),
+    ], axis=1).max(axis=1)
+    out["ATR5"] = tr.rolling(5, min_periods=3).mean()
+    out["ATR10"] = tr.rolling(10, min_periods=5).mean()
+    out["ATR14"] = tr.rolling(14, min_periods=7).mean()
+    out["ATR20"] = tr.rolling(20, min_periods=10).mean()
+    out["ATR30"] = tr.rolling(30, min_periods=15).mean()
+
+    daily_range = (high - low).replace(0, np.nan)
+    out["CLOSE_POSITION"] = ((close - low) / daily_range).clip(0, 1)
+    out["VOLUME_RATIO20"] = volume / out["VOL20"].replace(0, np.nan)
+    out["DIST_52W_HIGH_PCT"] = (close / out["HIGH_52W"].replace(0, np.nan) - 1.0) * 100.0
+    return out
+
+
+def latest_value(df: pd.DataFrame, column: str, default: Optional[float] = None) -> Optional[float]:
+    if df is None or df.empty or column not in df.columns:
+        return default
+    return safe_float(df[column].iloc[-1], default)
+
+
+def is_ma_rising(df: pd.DataFrame, column: str = "MA150", lookback: int = 10) -> bool:
+    if df is None or df.empty or column not in df.columns or len(df) <= lookback:
+        return False
+    now = safe_float(df[column].iloc[-1])
+    past = safe_float(df[column].iloc[-1 - lookback])
+    if now is None or past is None:
+        return False
+    return now >= past
+
+
+def candle_close_position(df: pd.DataFrame) -> Optional[float]:
+    return latest_value(df, "CLOSE_POSITION")
+
+
+def current_volume_ratio(df: pd.DataFrame) -> Optional[float]:
+    return latest_value(df, "VOLUME_RATIO20")
+
+
+def current_dollar_volume(df: pd.DataFrame) -> Optional[float]:
+    return latest_value(df, "DOLLAR_VOL20")
+
+
+def current_52w_proximity(df: pd.DataFrame) -> Optional[float]:
+    close = latest_value(df, "Close")
+    high_52w = latest_value(df, "HIGH_52W")
+    if close is None or high_52w is None or high_52w <= 0:
+        return None
+    return close / high_52w
+
+
+def compute_rr(entry: float, stop: float, target: float) -> Tuple[Optional[float], Optional[float], Optional[float]]:
+    entry = safe_float(entry)
+    stop = safe_float(stop)
+    target = safe_float(target)
+    if entry is None or stop is None or target is None or entry <= 0:
+        return None, None, None
+    risk = entry - stop
+    reward = target - entry
+    if risk <= 0 or reward <= 0:
+        return None, None, None
+    risk_pct = risk / entry * 100.0
+    target_pct = reward / entry * 100.0
+    rr = reward / risk
+    return risk_pct, target_pct, rr
+
+
+def count_level_touches(series: pd.Series, level: float, tolerance_pct: float = 1.0) -> int:
+    level = safe_float(level)
+    if level is None or level <= 0 or series is None or series.empty:
+        return 0
+    tolerance = level * tolerance_pct / 100.0
+    return int(((series - level).abs() <= tolerance).sum())
+
+
+def pct_distance_to_level(price: float, level: float) -> Optional[float]:
+    price = safe_float(price)
+    level = safe_float(level)
+    if price is None or level is None or level <= 0:
+        return None
+    return (price - level) / level * 100.0
+
+
+def compute_rs_score_vs_spy(stock_df: pd.DataFrame, spy_df: Optional[pd.DataFrame]) -> Optional[float]:
+    """
+    Simple standalone relative strength score vs SPY.
+
+    This is NOT a universe percentile rank. It is a fallback score for standalone use.
+    In the big scanner, prefer using the existing universe-based RS score if available.
+    """
+    if spy_df is None or spy_df.empty:
+        return None
+
+    s = clean_ohlcv(stock_df)
+    spy = clean_ohlcv(spy_df)
+    if len(s) < 65 or len(spy) < 65:
+        return None
+
+    weights = [(63, 0.45), (126, 0.35), (252, 0.20)]
+    raw = 50.0
+    total_weight = 0.0
+
+    for days, weight in weights:
+        if len(s) <= days or len(spy) <= days:
+            continue
+        stock_ret = pct_change(s["Close"].iloc[-1], s["Close"].iloc[-days])
+        spy_ret = pct_change(spy["Close"].iloc[-1], spy["Close"].iloc[-days])
+        if stock_ret is None or spy_ret is None:
+            continue
+        relative = stock_ret - spy_ret
+        # Map rough relative outperformance into score contribution.
+        # +30% relative over period tends toward 100; -30% tends toward 0.
+        score_part = max(0.0, min(100.0, 50.0 + relative * 1.67))
+        raw += (score_part - 50.0) * weight
+        total_weight += weight
+
+    if total_weight == 0:
+        return None
+    return max(0.0, min(100.0, raw))
+
+
+# ---------------------------------------------------------------------------
+# Quality scoring and classification
+# ---------------------------------------------------------------------------
+
+
+def common_quality_checks(
+    df: pd.DataFrame,
+    *,
+    rs_score: Optional[float],
+    pivot: Optional[float],
+    entry: Optional[float],
+    stop: Optional[float],
+    target: Optional[float],
+    is_breakout_or_bounce: bool,
+    config: V9PatternConfig,
+    require_volume: bool = True,
+    market_regime: str = "NEUTRAL",
+) -> Tuple[float, List[str], Dict[str, Any]]:
+    """
+    Shared quality layer.
+
+    Returns:
+        quality score 0-100, missing confirmations, metrics dict.
+    """
+    missing: List[str] = []
+    metrics: Dict[str, Any] = {}
+    score = 0.0
+
+    close = latest_value(df, "Close")
+    ma150 = latest_value(df, "MA150")
+    ma200 = latest_value(df, "MA200")
+    vol_ratio = current_volume_ratio(df)
+    close_pos = candle_close_position(df)
+    dollar_vol = current_dollar_volume(df)
+    high_proximity = current_52w_proximity(df)
+
+    risk_pct, target_pct, rr = compute_rr(entry, stop, target) if entry and stop and target else (None, None, None)
+
+    metrics.update({
+        "close": close,
+        "ma150": ma150,
+        "ma200": ma200,
+        "volume_ratio": vol_ratio,
+        "close_position": close_pos,
+        "dollar_volume_20": dollar_vol,
+        "high_52w_proximity": high_proximity,
+        "risk_pct": risk_pct,
+        "target_pct": target_pct,
+        "rr": rr,
+    })
+
+    # Market regime safety
+    if str(market_regime).upper() in {"BULL", "NEUTRAL"}:
+        score += 8
+    elif str(market_regime).upper() == "UNKNOWN":
+        score += 3
+        missing.append("market regime unknown")
+    else:
+        missing.append("market regime is BEAR")
+
+    # Trend quality
+    if close is not None and ma150 is not None and close > ma150:
+        score += 8
+    else:
+        missing.append("close not above MA150")
+
+    if close is not None and ma200 is not None and close > ma200:
+        score += 5
+    else:
+        missing.append("close not above MA200")
+
+    if is_ma_rising(df, "MA150", config.ma150_rising_lookback):
+        score += 7
+    else:
+        missing.append("MA150 not rising")
+
+    # Relative strength
+    if rs_score is not None and rs_score >= config.strong_rs_score:
+        score += 20
+    elif rs_score is not None and rs_score >= config.min_rs_score:
+        score += 15
+    else:
+        missing.append(f"RS below {config.min_rs_score:.0f}")
+
+    # 52-week high proximity
+    if high_proximity is not None and high_proximity >= 0.90:
+        score += 10
+    elif high_proximity is not None and high_proximity >= config.min_52w_high_proximity:
+        score += 7
+    else:
+        missing.append(f"not close enough to 52w high ({config.min_52w_high_proximity:.0%}+ needed)")
+
+    # Liquidity
+    if dollar_vol is not None and dollar_vol >= config.min_dollar_volume_20:
+        score += 5
+    else:
+        missing.append("dollar volume too low / unavailable")
+
+    # Entry confirmation
+    if is_breakout_or_bounce:
+        score += 10
+    else:
+        missing.append("no confirmed breakout/bounce yet")
+
+    if require_volume:
+        if vol_ratio is not None and vol_ratio >= config.strong_volume_ratio:
+            score += 12
+        elif vol_ratio is not None and vol_ratio >= config.min_volume_ratio:
+            score += 9
+        else:
+            missing.append(f"volume below {config.min_volume_ratio:.1f}x")
+    else:
+        if vol_ratio is not None and vol_ratio >= config.pullback_bounce_min_volume_ratio:
+            score += 7
+        else:
+            missing.append("bounce volume not supportive")
+
+    if close_pos is not None and close_pos >= 0.75:
+        score += 8
+    elif close_pos is not None and close_pos >= config.min_close_position:
+        score += 6
+    else:
+        missing.append("daily close not strong enough")
+
+    # Risk / reward
+    if rr is not None and rr >= 3.0:
+        score += 10
+    elif rr is not None and rr >= config.min_rr:
+        score += 8
+    else:
+        missing.append(f"RR below {config.min_rr:.1f}")
+
+    if risk_pct is not None and risk_pct <= config.max_stop_risk_pct:
+        score += 5
+    else:
+        missing.append(f"stop risk above {config.max_stop_risk_pct:.0f}% / unavailable")
+
+    # Avoid chasing too far above pivot.
+    breakout_pct = pct_distance_to_level(entry, pivot) if entry is not None and pivot is not None else None
+    metrics["breakout_pct"] = breakout_pct
+    if breakout_pct is not None:
+        if breakout_pct <= config.max_entry_extension_pct:
+            score += 5
+        else:
+            missing.append(f"entry extended {breakout_pct:.1f}% above pivot")
+
+    return max(0.0, min(100.0, score)), missing, metrics
+
+
+def classify_quality(quality: float, missing: Sequence[str], config: V9PatternConfig) -> str:
+    hard_fail_phrases = (
+        "market regime is BEAR",
+        "close not above MA150",
+        "RR below",
+        "entry extended",
+        "stop risk above",
+    )
+    has_hard_fail = any(any(phrase in m for phrase in hard_fail_phrases) for m in missing)
+    if quality >= config.entry_ready_min_quality and not has_hard_fail:
+        return ENTRY_READY
+    if quality >= config.almost_ready_min_quality:
+        return ALMOST_READY
+    return REJECTED
+
+
+def make_candidate(
+    *,
+    ticker: str,
+    pattern_name: str,
+    df: pd.DataFrame,
+    pivot: Optional[float],
+    entry: Optional[float],
+    stop: Optional[float],
+    target: Optional[float],
+    base_score: float,
+    rs_score: Optional[float],
+    base_depth_pct: Optional[float],
+    is_breakout_or_bounce: bool,
+    config: V9PatternConfig,
+    require_volume: bool,
+    market_regime: str,
+    notes: Optional[List[str]] = None,
+    meta: Optional[Dict[str, Any]] = None,
+) -> PatternCandidate:
+    quality, missing, metrics = common_quality_checks(
+        df,
+        rs_score=rs_score,
+        pivot=pivot,
+        entry=entry,
+        stop=stop,
+        target=target,
+        is_breakout_or_bounce=is_breakout_or_bounce,
+        config=config,
+        require_volume=require_volume,
+        market_regime=market_regime,
+    )
+    total_quality = min(100.0, quality + base_score)
+    status = classify_quality(total_quality, missing, config)
+    risk_pct, target_pct, rr = compute_rr(entry, stop, target) if entry and stop and target else (None, None, None)
+
+    high_proximity = current_52w_proximity(df)
+    dist_52w = None
+    if high_proximity is not None:
+        dist_52w = (high_proximity - 1.0) * 100.0
+
+    return PatternCandidate(
+        ticker=ticker,
+        pattern_name=pattern_name,
+        status=status,
+        pivot=safe_float(pivot),
+        entry=safe_float(entry),
+        stop=safe_float(stop),
+        target=safe_float(target),
+        risk_pct=risk_pct,
+        target_pct=target_pct,
+        rr=rr,
+        base_score=round(float(base_score), 2),
+        entry_quality=round(float(total_quality), 2),
+        breakout_pct=metrics.get("breakout_pct"),
+        base_depth_pct=base_depth_pct,
+        volume_ratio=metrics.get("volume_ratio"),
+        rs_score=rs_score,
+        close_position=metrics.get("close_position"),
+        distance_from_52w_high_pct=dist_52w,
+        dollar_volume_20=metrics.get("dollar_volume_20"),
+        missing_confirmations=missing,
+        notes=notes or [],
+        meta=meta or {},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Pattern 1 — Flat Base / Rectangle Breakout
+# ---------------------------------------------------------------------------
+
+
+def detect_flat_base_breakout(
+    ticker: str,
+    df: pd.DataFrame,
+    *,
+    rs_score: Optional[float] = None,
+    market_regime: str = "NEUTRAL",
+    config: V9PatternConfig = V9PatternConfig(),
+    base_days: Optional[int] = None,
+) -> Optional[PatternCandidate]:
+    """
+    Detect Flat Base / Rectangle Breakout.
+
+    Logic:
+        - Prior base range is narrow and clear.
+        - Current close breaks above base high, or is close enough for watchlist.
+        - Volume, trend, candle strength, RS and R:R are evaluated by common layer.
+    """
+    data = add_v9_indicators(df)
+    if len(data) < 180:
+        return None
+
+    base_days = base_days or config.flat_base_default_days
+    base_days = max(config.flat_base_min_days, min(config.flat_base_max_days, base_days))
+    if len(data) <= base_days + 5:
+        return None
+
+    current = data.iloc[-1]
+    base = data.iloc[-1 - base_days:-1]
+    close = safe_float(current["Close"])
+    if close is None:
+        return None
+
+    base_high = safe_float(base["High"].max())
+    base_low = safe_float(base["Low"].min())
+    if base_high is None or base_low is None or base_high <= 0 or base_low <= 0:
+        return None
+
+    base_depth_pct = (base_high - base_low) / base_high * 100.0
+    if base_depth_pct > config.flat_base_max_depth_pct * 1.35:
+        return None
+
+    resistance_touches = count_level_touches(base["High"], base_high, tolerance_pct=1.25)
+    support_touches = count_level_touches(base["Low"], base_low, tolerance_pct=1.50)
+
+    breakout_pct = pct_distance_to_level(close, base_high)
+    is_breakout = breakout_pct is not None and breakout_pct >= config.min_breakout_pct * 100.0
+    is_watchlist = breakout_pct is not None and -config.flat_base_watchlist_distance_pct <= breakout_pct < config.min_breakout_pct * 100.0
+
+    if not is_breakout and not is_watchlist:
+        return None
+
+    base_score = 0.0
+    notes: List[str] = []
+    if base_depth_pct <= 12.0:
+        base_score += 8
+        notes.append("tight base")
+    elif base_depth_pct <= config.flat_base_max_depth_pct:
+        base_score += 5
+    else:
+        notes.append("base depth is wide")
+        base_score -= 3
+
+    if resistance_touches >= config.flat_base_min_touches:
+        base_score += 4
+    else:
+        notes.append("not enough resistance touches")
+
+    if support_touches >= config.flat_base_min_touches:
+        base_score += 3
+
+    vol10 = safe_float(base["Volume"].tail(10).mean())
+    vol_prev = safe_float(base["Volume"].head(max(5, len(base) // 2)).mean())
+    if vol10 is not None and vol_prev is not None and vol_prev > 0 and vol10 <= vol_prev:
+        base_score += 3
+        notes.append("volume contracted inside base")
+
+    pivot = base_high
+    entry = close
+    # Prefer a practical stop near the recent swing low, but not above base support.
+    recent_low = safe_float(data["Low"].iloc[-11:-1].min())
+    stop = None
+    if recent_low is not None:
+        stop = max(base_low, recent_low) * 0.995
+    technical_target = base_high + (base_high - base_low)
+    target_by_r = entry + (entry - stop) * config.min_rr if stop is not None and entry > stop else None
+    if target_by_r is not None:
+        target = max(technical_target, target_by_r)
+    else:
+        target = technical_target
+
+    return make_candidate(
+        ticker=ticker,
+        pattern_name="Flat Base / Rectangle Breakout",
+        df=data,
+        pivot=pivot,
+        entry=entry,
+        stop=stop,
+        target=target,
+        base_score=base_score,
+        rs_score=rs_score,
+        base_depth_pct=base_depth_pct,
+        is_breakout_or_bounce=is_breakout,
+        config=config,
+        require_volume=True,
+        market_regime=market_regime,
+        notes=notes,
+        meta={
+            "base_days": base_days,
+            "base_high": base_high,
+            "base_low": base_low,
+            "resistance_touches": resistance_touches,
+            "support_touches": support_touches,
+            "is_watchlist": is_watchlist,
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Pattern 2 — Darvas Box / 20-40-55 Day High Breakout
+# ---------------------------------------------------------------------------
+
+
+def detect_darvas_box_breakout(
+    ticker: str,
+    df: pd.DataFrame,
+    *,
+    rs_score: Optional[float] = None,
+    market_regime: str = "NEUTRAL",
+    config: V9PatternConfig = V9PatternConfig(),
+) -> Optional[PatternCandidate]:
+    """
+    Detect Darvas Box / rolling high breakout.
+
+    The function checks 20/40/55-day boxes and returns the strongest one.
+    """
+    data = add_v9_indicators(df)
+    if len(data) < 180:
+        return None
+
+    close = latest_value(data, "Close")
+    if close is None:
+        return None
+
+    best_candidate: Optional[PatternCandidate] = None
+    for window in config.darvas_windows:
+        if len(data) <= window + 5:
+            continue
+
+        box = data.iloc[-1 - window:-1]
+        box_high = safe_float(box["High"].max())
+        box_low = safe_float(box["Low"].min())
+        if box_high is None or box_low is None or box_high <= 0:
+            continue
+
+        box_depth_pct = (box_high - box_low) / box_high * 100.0
+        if box_depth_pct > config.darvas_max_depth_pct * 1.35:
+            continue
+
+        breakout_pct = pct_distance_to_level(close, box_high)
+        is_breakout = breakout_pct is not None and breakout_pct >= config.min_breakout_pct * 100.0
+        is_watchlist = breakout_pct is not None and -config.darvas_watchlist_distance_pct <= breakout_pct < config.min_breakout_pct * 100.0
+        if not is_breakout and not is_watchlist:
+            continue
+
+        touches = count_level_touches(box["High"], box_high, tolerance_pct=1.25)
+        base_score = 0.0
+        notes: List[str] = [f"{window} day box"]
+        if box_depth_pct <= 12.0:
+            base_score += 8
+            notes.append("tight box")
+        elif box_depth_pct <= config.darvas_max_depth_pct:
+            base_score += 5
+        else:
+            base_score -= 3
+            notes.append("box depth is wide")
+        if touches >= 2:
+            base_score += 4
+            notes.append("clear box resistance")
+
+        recent_low = safe_float(data["Low"].iloc[-11:-1].min())
+        stop = max(box_low, recent_low) * 0.995 if recent_low is not None else box_low * 0.995
+        technical_target = box_high + (box_high - box_low)
+        target_by_r = close + (close - stop) * config.min_rr if stop is not None and close > stop else None
+        if target_by_r is not None:
+            target = max(technical_target, target_by_r)
+        else:
+            target = technical_target
+
+        candidate = make_candidate(
+            ticker=ticker,
+            pattern_name="Darvas Box Breakout",
+            df=data,
+            pivot=box_high,
+            entry=close,
+            stop=stop,
+            target=target,
+            base_score=base_score,
+            rs_score=rs_score,
+            base_depth_pct=box_depth_pct,
+            is_breakout_or_bounce=is_breakout,
+            config=config,
+            require_volume=True,
+            market_regime=market_regime,
+            notes=notes,
+            meta={
+                "box_window": window,
+                "box_high": box_high,
+                "box_low": box_low,
+                "resistance_touches": touches,
+                "is_watchlist": is_watchlist,
+            },
+        )
+
+        if best_candidate is None or candidate.entry_quality > best_candidate.entry_quality:
+            best_candidate = candidate
+
+    return best_candidate
+
+
+# ---------------------------------------------------------------------------
+# Pattern 3 — VCP: Volatility Contraction Pattern
+# ---------------------------------------------------------------------------
+
+
+def _segment_range_pct(segment: pd.DataFrame) -> Optional[float]:
+    if segment is None or segment.empty:
+        return None
+    high = safe_float(segment["High"].max())
+    low = safe_float(segment["Low"].min())
+    if high is None or low is None or high <= 0:
+        return None
+    return (high - low) / high * 100.0
+
+
+def _count_contractions(ranges: Sequence[Optional[float]], ratio: float) -> int:
+    valid = [r for r in ranges if r is not None]
+    if len(valid) < 2:
+        return 0
+    count = 0
+    for prev, curr in zip(valid, valid[1:]):
+        if curr <= prev * ratio:
+            count += 1
+    return count
+
+
+def detect_vcp(
+    ticker: str,
+    df: pd.DataFrame,
+    *,
+    rs_score: Optional[float] = None,
+    market_regime: str = "NEUTRAL",
+    config: V9PatternConfig = V9PatternConfig(),
+    lookback_days: Optional[int] = None,
+) -> Optional[PatternCandidate]:
+    """
+    Detect VCP — Volatility Contraction Pattern.
+
+    This is a practical approximation:
+        - Base range contracts across 3 segments.
+        - Recent ATR/range is lower than prior ATR/range.
+        - Volume dries up before breakout.
+        - Entry requires breakout over recent pivot.
+    """
+    data = add_v9_indicators(df)
+    if len(data) < 180:
+        return None
+
+    lookback_days = lookback_days or config.vcp_default_days
+    lookback_days = max(config.vcp_min_days, min(config.vcp_max_days, lookback_days))
+    if len(data) <= lookback_days + 5:
+        return None
+
+    current = data.iloc[-1]
+    close = safe_float(current["Close"])
+    if close is None:
+        return None
+
+    base = data.iloc[-1 - lookback_days:-1]
+    seg_size = max(5, len(base) // 3)
+    seg1 = base.iloc[:seg_size]
+    seg2 = base.iloc[seg_size:2 * seg_size]
+    seg3 = base.iloc[2 * seg_size:]
+    ranges = [_segment_range_pct(seg1), _segment_range_pct(seg2), _segment_range_pct(seg3)]
+    contractions = _count_contractions(ranges, config.vcp_range_contraction_ratio)
+
+    atr5 = latest_value(data, "ATR5")
+    atr20 = latest_value(data, "ATR20")
+    atr10 = latest_value(data, "ATR10")
+    atr30 = latest_value(data, "ATR30")
+    atr_contracting = (
+        atr5 is not None and atr20 is not None and atr20 > 0 and atr5 < atr20
+        and atr10 is not None and atr30 is not None and atr30 > 0 and atr10 < atr30
+    )
+
+    recent_range = _segment_range_pct(data.iloc[-6:-1])
+    prior_range = _segment_range_pct(data.iloc[-26:-6])
+    range_contracting = (
+        recent_range is not None and prior_range is not None and prior_range > 0
+        and recent_range <= prior_range * config.vcp_range_contraction_ratio
+    )
+
+    vol5 = safe_float(data["Volume"].iloc[-6:-1].mean())
+    vol20 = latest_value(data, "VOL20")
+    volume_dryup = vol5 is not None and vol20 is not None and vol20 > 0 and vol5 <= vol20 * config.vcp_volume_dryup_ratio
+
+    if contractions < 1 and not (atr_contracting and range_contracting and volume_dryup):
+        return None
+
+    # VCP pivot: high of the final tight area, not necessarily whole base high.
+    tight_area = data.iloc[-16:-1]
+    pivot = safe_float(tight_area["High"].max())
+    base_high = safe_float(base["High"].max())
+    base_low = safe_float(base["Low"].min())
+    if pivot is None or base_high is None or base_low is None:
+        return None
+
+    base_depth_pct = (base_high - base_low) / base_high * 100.0 if base_high > 0 else None
+    breakout_pct = pct_distance_to_level(close, pivot)
+    is_breakout = breakout_pct is not None and breakout_pct >= config.min_breakout_pct * 100.0
+    is_watchlist = breakout_pct is not None and -config.vcp_watchlist_distance_pct <= breakout_pct < config.min_breakout_pct * 100.0
+    if not is_breakout and not is_watchlist:
+        return None
+
+    base_score = 0.0
+    notes: List[str] = []
+    if contractions >= config.vcp_min_contractions:
+        base_score += 8
+        notes.append(f"{contractions} volatility contractions")
+    elif contractions == 1:
+        base_score += 4
+        notes.append("early contraction")
+    if atr_contracting:
+        base_score += 4
+        notes.append("ATR contracting")
+    if range_contracting:
+        base_score += 4
+        notes.append("recent range contracted")
+    if volume_dryup:
+        base_score += 4
+        notes.append("volume dry-up")
+
+    # Stop below final contraction low.
+    last_contraction_low = safe_float(tight_area["Low"].min())
+    stop = last_contraction_low * 0.995 if last_contraction_low is not None else None
+    # VCP is best measured by R-multiple; technical target may be base height too aggressive.
+    target = close + (close - stop) * 3.0 if stop is not None and close > stop else None
+
+    return make_candidate(
+        ticker=ticker,
+        pattern_name="VCP Breakout",
+        df=data,
+        pivot=pivot,
+        entry=close,
+        stop=stop,
+        target=target,
+        base_score=base_score,
+        rs_score=rs_score,
+        base_depth_pct=base_depth_pct,
+        is_breakout_or_bounce=is_breakout,
+        config=config,
+        require_volume=True,
+        market_regime=market_regime,
+        notes=notes,
+        meta={
+            "lookback_days": lookback_days,
+            "segment_ranges_pct": ranges,
+            "contractions": contractions,
+            "atr_contracting": atr_contracting,
+            "range_contracting": range_contracting,
+            "volume_dryup": volume_dryup,
+            "tight_area_low": last_contraction_low,
+            "is_watchlist": is_watchlist,
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Pattern 4 — EMA21 / MA50 Pullback Bounce
+# ---------------------------------------------------------------------------
+
+
+def _find_recent_pullback_window(data: pd.DataFrame, config: V9PatternConfig) -> Optional[pd.DataFrame]:
+    """Find a recent 2-10 day pullback before the current candle."""
+    if len(data) < config.pullback_max_days + 30:
+        return None
+
+    # Try different pullback lengths and choose the one with a reasonable depth.
+    current_close = latest_value(data, "Close")
+    if current_close is None:
+        return None
+
+    best: Optional[pd.DataFrame] = None
+    best_depth = -1.0
+    for days in range(config.pullback_min_days, config.pullback_max_days + 1):
+        window = data.iloc[-1 - days:-1]
+        if window.empty:
+            continue
+        pullback_high = safe_float(window["High"].max())
+        pullback_low = safe_float(window["Low"].min())
+        if pullback_high is None or pullback_low is None or pullback_high <= 0:
+            continue
+        depth = (pullback_high - pullback_low) / pullback_high * 100.0
+        if config.pullback_min_depth_pct <= depth <= config.pullback_max_depth_pct and depth > best_depth:
+            best = window
+            best_depth = depth
+    return best
+
+
+def detect_ema_pullback_bounce(
+    ticker: str,
+    df: pd.DataFrame,
+    *,
+    rs_score: Optional[float] = None,
+    market_regime: str = "NEUTRAL",
+    config: V9PatternConfig = V9PatternConfig(),
+) -> Optional[PatternCandidate]:
+    """
+    Detect EMA21 / MA50 Pullback Bounce.
+
+    This is not a pure breakout pattern. It looks for:
+        - Existing uptrend.
+        - Controlled pullback to EMA21 or MA50.
+        - Current candle bounces above prior high with strong close.
+    """
+    data = add_v9_indicators(df)
+    if len(data) < 220:
+        return None
+
+    close = latest_value(data, "Close")
+    open_ = latest_value(data, "Open")
+    prev_high = safe_float(data["High"].iloc[-2]) if len(data) >= 2 else None
+    if close is None or open_ is None or prev_high is None:
+        return None
+
+    pullback = _find_recent_pullback_window(data, config)
+    if pullback is None or pullback.empty:
+        return None
+
+    pullback_high = safe_float(pullback["High"].max())
+    pullback_low = safe_float(pullback["Low"].min())
+    if pullback_high is None or pullback_low is None or pullback_high <= 0:
+        return None
+    pullback_depth_pct = (pullback_high - pullback_low) / pullback_high * 100.0
+
+    ema21_recent = data["EMA21"].iloc[-1 - len(pullback):-1]
+    ma50_recent = data["MA50"].iloc[-1 - len(pullback):-1]
+    touched_ema21 = bool((pullback["Low"].values <= ema21_recent.values * (1.0 + config.ema_touch_tolerance_pct / 100.0)).any())
+    touched_ma50 = bool((pullback["Low"].values <= ma50_recent.values * (1.0 + config.ema_touch_tolerance_pct / 100.0)).any())
+    if not touched_ema21 and not touched_ma50:
+        return None
+
+    # Existing uptrend before pullback.
+    before_pullback_close = safe_float(data["Close"].iloc[-1 - len(pullback) - 20]) if len(data) > len(pullback) + 25 else None
+    pre_pullback_high = safe_float(data["High"].iloc[-1 - len(pullback) - 20:-1 - len(pullback)].max())
+    prior_momentum = False
+    if before_pullback_close is not None and pre_pullback_high is not None and before_pullback_close > 0:
+        prior_momentum = (pre_pullback_high - before_pullback_close) / before_pullback_close * 100.0 >= 6.0
+
+    is_green = close > open_
+    bounce_confirmed = close > prev_high and is_green
+
+    vol_pullback = safe_float(pullback["Volume"].mean())
+    vol20 = latest_value(data, "VOL20")
+    pullback_volume_quiet = vol_pullback is not None and vol20 is not None and vol20 > 0 and vol_pullback <= vol20
+
+    base_score = 0.0
+    notes: List[str] = []
+    if touched_ema21:
+        base_score += 4
+        notes.append("pullback touched EMA21")
+    if touched_ma50:
+        base_score += 4
+        notes.append("pullback touched MA50")
+    if prior_momentum:
+        base_score += 5
+        notes.append("prior momentum before pullback")
+    if pullback_volume_quiet:
+        base_score += 4
+        notes.append("pullback volume was quiet")
+    if config.pullback_min_depth_pct <= pullback_depth_pct <= 8.0:
+        base_score += 4
+        notes.append("healthy shallow pullback")
+    elif pullback_depth_pct <= config.pullback_max_depth_pct:
+        base_score += 2
+
+    pivot = prev_high
+    entry = close
+    stop = pullback_low * 0.995
+    # First target: prior swing high; if too close, use 2.5R.
+    prior_swing_high = safe_float(data["High"].iloc[-45:-1 - len(pullback)].max()) if len(data) > 50 else None
+    target_by_r = entry + (entry - stop) * 2.5 if entry > stop else None
+    if prior_swing_high is not None and prior_swing_high > entry:
+        target = max(prior_swing_high, target_by_r or prior_swing_high)
+    else:
+        target = target_by_r
+
+    return make_candidate(
+        ticker=ticker,
+        pattern_name="EMA21/MA50 Pullback Bounce",
+        df=data,
+        pivot=pivot,
+        entry=entry,
+        stop=stop,
+        target=target,
+        base_score=base_score,
+        rs_score=rs_score,
+        base_depth_pct=pullback_depth_pct,
+        is_breakout_or_bounce=bounce_confirmed,
+        config=config,
+        require_volume=False,
+        market_regime=market_regime,
+        notes=notes,
+        meta={
+            "pullback_days": len(pullback),
+            "pullback_high": pullback_high,
+            "pullback_low": pullback_low,
+            "touched_ema21": touched_ema21,
+            "touched_ma50": touched_ma50,
+            "bounce_confirmed": bounce_confirmed,
+            "pullback_volume_quiet": pullback_volume_quiet,
+            "prior_swing_high": prior_swing_high,
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Pattern 5 — Breakout Retest Entry
+# ---------------------------------------------------------------------------
+
+
+def _find_recent_breakout_for_retest(data: pd.DataFrame, config: V9PatternConfig) -> Optional[Dict[str, Any]]:
+    """Find a recent breakout over a prior box high."""
+    if len(data) < config.retest_box_window + config.retest_breakout_lookback_days + 10:
+        return None
+
+    # We do not use today as the original breakout day. We search previous 1-10 days.
+    for offset in range(2, config.retest_breakout_lookback_days + 2):
+        idx = -offset
+        prior_box = data.iloc[idx - config.retest_box_window:idx]
+        if len(prior_box) < config.retest_box_window:
+            continue
+        pivot = safe_float(prior_box["High"].max())
+        box_low = safe_float(prior_box["Low"].min())
+        breakout_close = safe_float(data["Close"].iloc[idx])
+        breakout_volume_ratio = safe_float(data["VOLUME_RATIO20"].iloc[idx])
+        if pivot is None or box_low is None or breakout_close is None or pivot <= 0:
+            continue
+        breakout_pct = pct_distance_to_level(breakout_close, pivot)
+        if breakout_pct is None:
+            continue
+        if breakout_pct >= config.min_breakout_pct * 100.0 and (breakout_volume_ratio is None or breakout_volume_ratio >= 1.0):
+            return {
+                "breakout_idx": idx,
+                "days_ago": offset - 1,
+                "pivot": pivot,
+                "box_low": box_low,
+                "breakout_close": breakout_close,
+                "breakout_volume_ratio": breakout_volume_ratio,
+                "breakout_pct": breakout_pct,
+            }
+    return None
+
+
+def detect_breakout_retest_entry(
+    ticker: str,
+    df: pd.DataFrame,
+    *,
+    rs_score: Optional[float] = None,
+    market_regime: str = "NEUTRAL",
+    config: V9PatternConfig = V9PatternConfig(),
+) -> Optional[PatternCandidate]:
+    """
+    Detect Breakout Retest Entry.
+
+    Looks for:
+        - A breakout in the last 1-10 days.
+        - Pullback/retest to the old pivot from above.
+        - Current candle bounces back above pivot and prior high.
+    """
+    data = add_v9_indicators(df)
+    if len(data) < 220:
+        return None
+
+    br = _find_recent_breakout_for_retest(data, config)
+    if br is None:
+        return None
+
+    close = latest_value(data, "Close")
+    open_ = latest_value(data, "Open")
+    prev_high = safe_float(data["High"].iloc[-2]) if len(data) > 1 else None
+    if close is None or open_ is None or prev_high is None:
+        return None
+
+    pivot = br["pivot"]
+    breakout_idx = br["breakout_idx"]
+    after_breakout = data.iloc[breakout_idx + 1:]
+    if len(after_breakout) < 2:
+        return None
+
+    retest_low = safe_float(after_breakout["Low"].min())
+    min_close_after_breakout = safe_float(after_breakout["Close"].min())
+    if retest_low is None or min_close_after_breakout is None:
+        return None
+
+    # Clean retest: low comes close to pivot, but closes do not lose it deeply.
+    touched_retest_zone = (
+        retest_low <= pivot * (1.0 + config.retest_max_above_pivot_pct / 100.0)
+        and retest_low >= pivot * (1.0 - config.retest_max_below_pivot_pct / 100.0)
+    )
+    no_failed_breakout = min_close_after_breakout >= pivot * (1.0 - config.retest_max_below_pivot_pct / 100.0)
+    if not touched_retest_zone and not no_failed_breakout:
+        return None
+
+    bounce_confirmed = close > pivot and close > prev_high and close > open_
+
+    base_score = 0.0
+    notes: List[str] = [f"original breakout {br['days_ago']} days ago"]
+    if touched_retest_zone:
+        base_score += 8
+        notes.append("clean retest of pivot")
+    if no_failed_breakout:
+        base_score += 6
+        notes.append("no deep close below pivot")
+    if br.get("breakout_volume_ratio") is not None and br["breakout_volume_ratio"] >= config.min_volume_ratio:
+        base_score += 5
+        notes.append("original breakout had volume")
+
+    entry = close
+    stop = retest_low * 0.995
+    box_height = pivot - br["box_low"]
+    technical_target = pivot + box_height if box_height > 0 else None
+    target_by_r = entry + (entry - stop) * 2.5 if entry > stop else None
+    if technical_target is not None and target_by_r is not None:
+        target = max(technical_target, target_by_r)
+    else:
+        target = technical_target or target_by_r
+
+    return make_candidate(
+        ticker=ticker,
+        pattern_name="Breakout Retest Entry",
+        df=data,
+        pivot=pivot,
+        entry=entry,
+        stop=stop,
+        target=target,
+        base_score=base_score,
+        rs_score=rs_score,
+        base_depth_pct=None,
+        is_breakout_or_bounce=bounce_confirmed,
+        config=config,
+        require_volume=False,
+        market_regime=market_regime,
+        notes=notes,
+        meta={
+            **br,
+            "retest_low": retest_low,
+            "min_close_after_breakout": min_close_after_breakout,
+            "touched_retest_zone": touched_retest_zone,
+            "no_failed_breakout": no_failed_breakout,
+            "bounce_confirmed": bounce_confirmed,
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Combined standalone runner, still not integrated with the big scanner
+# ---------------------------------------------------------------------------
+
+
+def find_v9_pattern_candidates(
+    ticker: str,
+    df: pd.DataFrame,
+    *,
+    rs_score: Optional[float] = None,
+    spy_df: Optional[pd.DataFrame] = None,
+    market_regime: str = "NEUTRAL",
+    config: V9PatternConfig = V9PatternConfig(),
+    include_rejected: bool = False,
+) -> List[PatternCandidate]:
+    """
+    Run all V9 pattern functions on one ticker and return sorted candidates.
+
+    This is still standalone. Later we can connect this function naturally into
+    scan_stock(...) or the existing pattern pipeline.
+    """
+    data = add_v9_indicators(df)
+    if data.empty:
+        return []
+
+    if rs_score is None and spy_df is not None:
+        rs_score = compute_rs_score_vs_spy(data, spy_df)
+
+    detectors = [
+        detect_flat_base_breakout,
+        detect_darvas_box_breakout,
+        detect_vcp,
+        detect_ema_pullback_bounce,
+        detect_breakout_retest_entry,
+    ]
+
+    candidates: List[PatternCandidate] = []
+    for detector in detectors:
+        try:
+            candidate = detector(
+                ticker,
+                data,
+                rs_score=rs_score,
+                market_regime=market_regime,
+                config=config,
+            )
+        except Exception as exc:  # Defensive: one pattern should not break the ticker scan.
+            candidates.append(PatternCandidate(
+                ticker=ticker,
+                pattern_name=getattr(detector, "__name__", "unknown_detector"),
+                status=REJECTED,
+                pivot=None,
+                entry=None,
+                stop=None,
+                target=None,
+                risk_pct=None,
+                target_pct=None,
+                rr=None,
+                base_score=0.0,
+                entry_quality=0.0,
+                rs_score=rs_score,
+                missing_confirmations=["detector error"],
+                notes=[str(exc)],
+                meta={"detector": getattr(detector, "__name__", "unknown_detector")},
+            ))
+            continue
+
+        if candidate is not None and (include_rejected or candidate.status != REJECTED):
+            candidates.append(candidate)
+
+    candidates.sort(key=lambda c: (status_rank(c.status), c.entry_quality), reverse=True)
+    return candidates
+
+
+def status_rank(status: str) -> int:
+    return {
+        ENTRY_READY: 3,
+        ALMOST_READY: 2,
+        REJECTED: 1,
+    }.get(status, 0)
+
+
+def select_best_candidate(candidates: Sequence[PatternCandidate]) -> Optional[PatternCandidate]:
+    if not candidates:
+        return None
+    return sorted(candidates, key=lambda c: (status_rank(c.status), c.entry_quality), reverse=True)[0]
+
+
+def candidates_to_dataframe(candidates: Sequence[PatternCandidate]) -> pd.DataFrame:
+    """Convenience helper for logging/debugging candidates."""
+    rows = [c.to_dict() for c in candidates]
+    if not rows:
+        return pd.DataFrame()
+    return pd.DataFrame(rows)
+
+
+def format_candidate_for_log(candidate: PatternCandidate) -> str:
+    """One-line log text that can be used later in the big scanner."""
+    return (
+        f"{candidate.ticker}: {candidate.status} {candidate.pattern_name} | "
+        f"quality={candidate.entry_quality:.1f} | "
+        f"pivot={candidate.pivot} entry={candidate.entry} stop={candidate.stop} "
+        f"target={candidate.target} rr={candidate.rr} | "
+        f"missing={candidate.short_reason()}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# V9 integration helpers — adapt PatternCandidate into the existing alert dict
+# ---------------------------------------------------------------------------
+
+
+def _make_v9_pattern_config() -> V9PatternConfig:
+    """Build V9 config from the existing V8 environment variables to keep one source of truth."""
+    return V9PatternConfig(
+        entry_ready_min_quality=float(ENTRY_READY_MIN_SCORE),
+        almost_ready_min_quality=max(45.0, float(ENTRY_CANDIDATE_MIN_SCORE)),
+        min_rs_score=float(ENTRY_MIN_RS_SCORE),
+        strong_rs_score=max(80.0, float(ENTRY_MIN_RS_SCORE) + 10.0),
+        min_rr=float(ENTRY_MIN_RR),
+        max_entry_extension_pct=float(ENTRY_MAX_EXTENSION_PCT) * 100.0,
+        max_stop_risk_pct=12.0,
+        min_dollar_volume_20=float(ENTRY_MIN_DOLLAR_VOLUME),
+        require_above_ma150=True,
+        require_ma150_rising=bool(ENTRY_REQUIRE_MA150_RISING),
+        min_52w_high_proximity=float(ENTRY_MIN_52W_HIGH_PROX),
+        min_breakout_pct=float(ENTRY_MIN_BREAKOUT_PCT),
+        strong_breakout_pct=max(float(ENTRY_MIN_BREAKOUT_PCT) * 2.5, 0.005),
+        min_volume_ratio=float(ENTRY_MIN_VOLUME_RATIO),
+        strong_volume_ratio=max(float(ENTRY_MIN_VOLUME_RATIO) + 0.20, 1.50),
+        min_close_position=float(ENTRY_MIN_CLOSE_POS),
+    )
+
+
+def _v9_pattern_candidate_to_alert(candidate: PatternCandidate) -> dict:
+    """Convert a V9 PatternCandidate to the legacy alert structure used by the scanner."""
+    meta = dict(candidate.meta or {})
+    pattern_bars = (
+        meta.get("lookback_days")
+        or meta.get("base_days")
+        or meta.get("box_window")
+        or meta.get("pullback_days")
+        or meta.get("days_ago")
+        or 0
+    )
+    depth_decimal = None
+    try:
+        if candidate.base_depth_pct is not None:
+            depth_decimal = float(candidate.base_depth_pct) / 100.0
+    except Exception:
+        depth_decimal = None
+
+    fail_reasons = list(dict.fromkeys(candidate.missing_confirmations or []))
+    notes = list(dict.fromkeys(candidate.notes or []))
+    meta.update({
+        "pattern_type": candidate.pattern_name,
+        "pattern_source": "V9_PATTERN_EXPANSION",
+        "v9_status": candidate.status,
+        "v9_base_score": candidate.base_score,
+        "v9_entry_quality_raw": candidate.entry_quality,
+        "v9_missing_confirmations": fail_reasons,
+        "v9_notes": notes,
+        "pattern_bars": int(pattern_bars or 0),
+        "depth_pct": depth_decimal,
+        "base_depth_pct": depth_decimal,
+        "breakout_pct": candidate.breakout_pct,
+        "volume_ratio": candidate.volume_ratio,
+        "rs_score": candidate.rs_score,
+        "close_position": candidate.close_position,
+        "distance_from_52w_high_pct": candidate.distance_from_52w_high_pct,
+        "dollar_volume_20": candidate.dollar_volume_20,
+        "fail_reasons": fail_reasons,
+    })
+
+    return {
+        "ticker": candidate.ticker,
+        "phase": 3,
+        "pattern_type": candidate.pattern_name,
+        "breakout_level": candidate.pivot or candidate.entry or 0,
+        "score": max(float(candidate.entry_quality or 0.0), float(candidate.base_score or 0.0)),
+        "stop_loss": candidate.stop,
+        "target": candidate.target,
+        "rr_ratio": candidate.rr,
+        "meta": meta,
+    }
+
+
+def append_v9_pattern_candidates(symbol: str, df: pd.DataFrame, candidates: list[dict]) -> int:
+    """
+    Run the V9 pattern expansion after the old pattern engines.
+    This does not change early filters. It only adds more structured candidates
+    before the existing Entry Ready gate decides what can actually be sent.
+    """
+    if not V9_PATTERN_ENGINE_ENABLED:
+        return 0
+    try:
+        rs_score = None
+        try:
+            rs_data = compute_rs_score(symbol, df)
+            if isinstance(rs_data, dict):
+                rs_score = rs_data.get("rs_score")
+        except Exception:
+            rs_score = None
+
+        try:
+            regime_data = get_market_regime()
+            regime_name = regime_data.get("regime", "UNKNOWN") if isinstance(regime_data, dict) else "UNKNOWN"
+        except Exception:
+            regime_name = "UNKNOWN"
+
+        v9_candidates = find_v9_pattern_candidates(
+            symbol,
+            df,
+            rs_score=rs_score,
+            market_regime=regime_name,
+            config=_make_v9_pattern_config(),
+            include_rejected=bool(V9_INCLUDE_REJECTED_DEBUG),
+        )
+        if not v9_candidates:
+            return 0
+
+        added = 0
+        max_candidates = max(1, int(V9_MAX_CANDIDATES_PER_TICKER))
+        for candidate in v9_candidates[:max_candidates]:
+            if candidate.status == REJECTED and not V9_INCLUDE_REJECTED_DEBUG:
+                continue
+            candidates.append(_v9_pattern_candidate_to_alert(candidate))
+            added += 1
+            if DEBUG_SCAN_REASONS:
+                log(f"{symbol}: 🧩 V9 candidate — {format_candidate_for_log(candidate)}")
+        return added
+    except Exception as e:
+        log(f"{symbol}: V9 pattern expansion error: {type(e).__name__}: {e}")
+        return 0
+
+
 def get_sector_analysis(ticker: str) -> dict:
     """
     מחזיר ניתוח סקטור:
@@ -3897,7 +5360,14 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
     except Exception as e:
         log(f"{symbol} Phase2 error: {e}")
 
-
+    # ====== PHASE 3 — V9 PATTERN EXPANSION ======
+    # מוסיף תבניות איכותיות חדשות, בלי לשנות את הסינונים המוקדמים.
+    try:
+        added_v9 = append_v9_pattern_candidates(symbol, df, candidates)
+        if added_v9 and DEBUG_SCAN_REASONS:
+            log(f"{symbol}: 🧩 V9 Pattern Expansion added {added_v9} candidate(s)")
+    except Exception as e:
+        log(f"{symbol} V9 Pattern Expansion error: {type(e).__name__}: {e}")
 
     if not candidates:
         _fs("no_pattern")
@@ -6951,6 +8421,7 @@ def main() -> None:
     regime_name   = regime.get("regime", "NEUTRAL")
     log(f"🎯 MIN_ALERT_SCORE דינמי: {dynamic_score} (Regime={regime_name})")
     log(f"🚀 V8 Entry Ready Engine: min_quality={ENTRY_READY_MIN_SCORE:.1f}, volume×{ENTRY_MIN_VOLUME_RATIO:.2f}, RS>={ENTRY_MIN_RS_SCORE:.0f}, breakout>={ENTRY_MIN_BREAKOUT_PCT*100:.1f}%")
+    log(f"🧩 V9 Pattern Expansion: enabled={V9_PATTERN_ENGINE_ENABLED}, max_per_ticker={V9_MAX_CANDIDATES_PER_TICKER}, patterns=FlatBase/Darvas/VCP/EMA-Pullback/Retest")
 
     # ── Market Reversal Detector ──────────────────────────────
     try:
