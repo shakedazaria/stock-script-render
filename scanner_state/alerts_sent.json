@@ -12484,5 +12484,16 @@
       }
     ]
   },
-  "ARCO_Falling Wedge_66": "2026-09-04T05:24:34.154831"
+  "ARCO_Falling Wedge_66": "2026-09-04T05:24:34.154831",
+  "MSGE": {
+    "time": 1789370883.813703,
+    "patterns": [
+      {
+        "name": "EMA21/MA50 Pullback Bounce",
+        "level": 76.89,
+        "time": 1789370883.813703
+      }
+    ]
+  },
+  "MSGE_EMA21/MA50 Pullback Bounce_66": "2026-09-14T07:28:03.813705"
 }
