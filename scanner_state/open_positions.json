@@ -2498,23 +2498,27 @@
     "close_date": null,
     "pnl_pct": null,
     "data_status": "ok",
-    "soft_warnings": []
+    "soft_warnings": [
+      "\u26a0\ufe0f \u05de\u05ea\u05d7\u05ea \u05dc-EMA28 (7.94)"
+    ]
   },
   {
     "ticker": "MSGE",
     "pattern": "EMA21/MA50 Pullback Bounce",
     "entry": 76.89,
     "stop_initial": 74.9633,
-    "stop_current": 74.9633,
+    "stop_current": 76.31,
     "target": 90.41,
     "date_open": "2026-09-14",
-    "highest_price": 76.89,
+    "highest_price": 80.94999694824219,
     "stop_method": "smart_atr_support",
-    "trailing_status": "waiting",
+    "trailing_status": "active",
     "closed": false,
     "close_reason": null,
     "close_price": null,
     "close_date": null,
-    "pnl_pct": null
+    "pnl_pct": null,
+    "data_status": "ok",
+    "soft_warnings": []
   }
 ]
