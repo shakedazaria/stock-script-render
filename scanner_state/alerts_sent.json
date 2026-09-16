@@ -7723,12 +7723,12 @@
     ]
   },
   "WHD": {
-    "time": 1756036216.832636,
+    "time": 1789544126.714271,
     "patterns": [
       {
-        "name": "Falling Wedge",
-        "level": 42.98153199022042,
-        "time": 1756036216.832636
+        "name": "EMA21/MA50 Pullback Bounce",
+        "level": 69.17,
+        "time": 1789544126.714271
       }
     ]
   },
@@ -12495,5 +12495,17 @@
       }
     ]
   },
-  "MSGE_EMA21/MA50 Pullback Bounce_66": "2026-09-14T07:28:03.813705"
+  "MSGE_EMA21/MA50 Pullback Bounce_66": "2026-09-14T07:28:03.813705",
+  "BIO": {
+    "time": 1789542720.145704,
+    "patterns": [
+      {
+        "name": "EMA21/MA50 Pullback Bounce",
+        "level": 370.51999,
+        "time": 1789542720.145704
+      }
+    ]
+  },
+  "BIO_EMA21/MA50 Pullback Bounce_66": "2026-09-16T07:12:00.145706",
+  "WHD_EMA21/MA50 Pullback Bounce_66": "2026-09-16T07:35:26.714273"
 }

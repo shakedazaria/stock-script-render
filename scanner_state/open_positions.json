@@ -2492,14 +2492,15 @@
     "highest_price": 8.329999923706055,
     "stop_method": "smart_atr_support",
     "trailing_status": "waiting",
-    "closed": false,
-    "close_reason": null,
-    "close_price": null,
-    "close_date": null,
-    "pnl_pct": null,
+    "closed": true,
+    "close_reason": "\ud83d\uded1 \u05e4\u05d2\u05e2 \u05d1-Stop Loss (7.78 \u2264 7.88)",
+    "close_price": 7.78000020980835,
+    "close_date": "2026-09-16",
+    "pnl_pct": -5.55,
     "data_status": "ok",
     "soft_warnings": [
-      "\u26a0\ufe0f \u05de\u05ea\u05d7\u05ea \u05dc-EMA28 (7.94)"
+      "\u26a0\ufe0f \u05de\u05ea\u05d7\u05ea \u05dc-EMA28 (7.78)",
+      "\ud83d\udcc9 \u05de\u05ea\u05d7\u05ea \u05dc-Low \u05d0\u05ea\u05de\u05d5\u05dc (7.78 < 7.90)"
     ]
   },
   {
@@ -2507,10 +2508,10 @@
     "pattern": "EMA21/MA50 Pullback Bounce",
     "entry": 76.89,
     "stop_initial": 74.9633,
-    "stop_current": 76.31,
+    "stop_current": 76.86,
     "target": 90.41,
     "date_open": "2026-09-14",
-    "highest_price": 80.94999694824219,
+    "highest_price": 81.54000091552734,
     "stop_method": "smart_atr_support",
     "trailing_status": "active",
     "closed": false,
@@ -2520,5 +2521,39 @@
     "pnl_pct": null,
     "data_status": "ok",
     "soft_warnings": []
+  },
+  {
+    "ticker": "BIO",
+    "pattern": "EMA21/MA50 Pullback Bounce",
+    "entry": 370.51999,
+    "stop_initial": 363.8317,
+    "stop_current": 363.8317,
+    "target": 413.42075,
+    "date_open": "2026-09-16",
+    "highest_price": 370.51999,
+    "stop_method": "smart_atr_support",
+    "trailing_status": "waiting",
+    "closed": false,
+    "close_reason": null,
+    "close_price": null,
+    "close_date": null,
+    "pnl_pct": null
+  },
+  {
+    "ticker": "WHD",
+    "pattern": "EMA21/MA50 Pullback Bounce",
+    "entry": 69.17,
+    "stop_initial": 66.291875,
+    "stop_current": 66.291875,
+    "target": 78.74531249999997,
+    "date_open": "2026-09-16",
+    "highest_price": 69.17,
+    "stop_method": "smart_atr_support",
+    "trailing_status": "waiting",
+    "closed": false,
+    "close_reason": null,
+    "close_price": null,
+    "close_date": null,
+    "pnl_pct": null
   }
 ]
