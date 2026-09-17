@@ -2513,14 +2513,16 @@
     "date_open": "2026-09-14",
     "highest_price": 81.54000091552734,
     "stop_method": "smart_atr_support",
-    "trailing_status": "active",
+    "trailing_status": "waiting",
     "closed": false,
     "close_reason": null,
     "close_price": null,
     "close_date": null,
     "pnl_pct": null,
     "data_status": "ok",
-    "soft_warnings": []
+    "soft_warnings": [
+      "\ud83d\udcc9 \u05de\u05ea\u05d7\u05ea \u05dc-Low \u05d0\u05ea\u05de\u05d5\u05dc (79.31 < 79.60)"
+    ]
   },
   {
     "ticker": "BIO",
@@ -2530,14 +2532,16 @@
     "stop_current": 363.8317,
     "target": 413.42075,
     "date_open": "2026-09-16",
-    "highest_price": 370.51999,
+    "highest_price": 385.3299865722656,
     "stop_method": "smart_atr_support",
     "trailing_status": "waiting",
     "closed": false,
     "close_reason": null,
     "close_price": null,
     "close_date": null,
-    "pnl_pct": null
+    "pnl_pct": null,
+    "data_status": "ok",
+    "soft_warnings": []
   },
   {
     "ticker": "WHD",
@@ -2547,7 +2551,28 @@
     "stop_current": 66.291875,
     "target": 78.74531249999997,
     "date_open": "2026-09-16",
-    "highest_price": 69.17,
+    "highest_price": 69.47000122070312,
+    "stop_method": "smart_atr_support",
+    "trailing_status": "waiting",
+    "closed": false,
+    "close_reason": null,
+    "close_price": null,
+    "close_date": null,
+    "pnl_pct": null,
+    "data_status": "ok",
+    "soft_warnings": [
+      "\u26a0\ufe0f \u05de\u05ea\u05d7\u05ea \u05dc-EMA28 (67.20)"
+    ]
+  },
+  {
+    "ticker": "PRLB",
+    "pattern": "VCP Breakout",
+    "entry": 82.55,
+    "stop_initial": 76.16725,
+    "stop_current": 76.16725,
+    "target": 104.45824999999999,
+    "date_open": "2026-09-17",
+    "highest_price": 82.55,
     "stop_method": "smart_atr_support",
     "trailing_status": "waiting",
     "closed": false,

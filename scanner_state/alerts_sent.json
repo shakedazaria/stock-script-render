@@ -12507,5 +12507,16 @@
     ]
   },
   "BIO_EMA21/MA50 Pullback Bounce_66": "2026-09-16T07:12:00.145706",
-  "WHD_EMA21/MA50 Pullback Bounce_66": "2026-09-16T07:35:26.714273"
+  "WHD_EMA21/MA50 Pullback Bounce_66": "2026-09-16T07:35:26.714273",
+  "PRLB": {
+    "time": 1789624799.006004,
+    "patterns": [
+      {
+        "name": "VCP Breakout",
+        "level": 82.55,
+        "time": 1789624799.006004
+      }
+    ]
+  },
+  "PRLB_VCP Breakout_66": "2026-09-17T05:59:59.006006"
 }

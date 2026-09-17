@@ -241,3 +241,4 @@ date_sent,ticker,pattern,entry,stop,target,score,rr,price_5d,price_10d,price_20d
 2026-09-14,MSGE,EMA21/MA50 Pullback Bounce,76.89,74.96,90.41,73.0,2.65,,,,,,,False
 2026-09-16,BIO,EMA21/MA50 Pullback Bounce,370.52,363.83,413.42,76.0,2.5,,,,,,,False
 2026-09-16,WHD,EMA21/MA50 Pullback Bounce,69.17,66.29,78.75,77.0,2.5,,,,,,,False
+2026-09-17,PRLB,VCP Breakout,82.55,76.17,104.46,76.0,3.0,,,,,,,False
