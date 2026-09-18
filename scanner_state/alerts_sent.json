@@ -12518,5 +12518,27 @@
       }
     ]
   },
-  "PRLB_VCP Breakout_66": "2026-09-17T05:59:59.006006"
+  "PRLB_VCP Breakout_66": "2026-09-17T05:59:59.006006",
+  "NTCT": {
+    "time": 1789706794.830404,
+    "patterns": [
+      {
+        "name": "EMA21/MA50 Pullback Bounce",
+        "level": 39.060001,
+        "time": 1789706794.830404
+      }
+    ]
+  },
+  "NTCT_EMA21/MA50 Pullback Bounce_66": "2026-09-18T04:46:34.830407",
+  "TSM": {
+    "time": 1789707378.68163,
+    "patterns": [
+      {
+        "name": "EMA21/MA50 Pullback Bounce",
+        "level": 419.85001,
+        "time": 1789707378.68163
+      }
+    ]
+  },
+  "TSM_EMA21/MA50 Pullback Bounce_66": "2026-09-18T04:56:18.681631"
 }
