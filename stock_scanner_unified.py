@@ -23,13 +23,15 @@ stock_scanner_unified.py
   מייל נשלח רק אם יש פריצה/חזרה מאושרת, ווליום/נר איכותיים, RS חזק,
   מחיר מעל MA150/MA200, נזילות טובה ו-R:R מתאים.
   מועמד שלא עבר את שכבת האיכות נשמר כ-Watchlist בלבד.
+  V9.1 מוסיף Professional Trade Quality Engine מעל התבניות הקיימות — בלי לשנות את
+  זיהוי התבניות: Trend/RS/Sector/Accumulation/Execution/Risk/Market Context.
 """
 
 # ============================================================
-# RESET VERIFIED FIX FILE — 2026-09-13 V9
+# RESET VERIFIED FIX FILE — 2026-09-20 V9.1
 # This marker proves this is the rebuilt fixed file, not an old download copy.
 # ============================================================
-CODE_VERSION = "2026-09-13-v9-pattern-expansion-engine"
+CODE_VERSION = "2026-09-20-v9.1-professional-trade-quality-engine"
 RESET_VERIFIED_FIX_FILE = True
 
 
@@ -260,6 +262,22 @@ ENTRY_QUALITY_LOG             = _state_path(os.getenv("ENTRY_QUALITY_LOG", "entr
 V9_PATTERN_ENGINE_ENABLED     = os.getenv("V9_PATTERN_ENGINE_ENABLED", "True").lower() in ("1", "true", "yes")
 V9_MAX_CANDIDATES_PER_TICKER  = int(os.getenv("V9_MAX_CANDIDATES_PER_TICKER", "3"))
 V9_INCLUDE_REJECTED_DEBUG     = os.getenv("V9_INCLUDE_REJECTED_DEBUG", "False").lower() in ("1", "true", "yes")
+
+# ============================================================
+#  V9.1 — PROFESSIONAL TRADE QUALITY ENGINE
+#  שכבת דירוג מקצועית מעל התבניות הקיימות.
+#  IMPORTANT: השכבה הזאת לא משנה שום Pattern detector. היא פועלת רק אחרי
+#  שהמועמד כבר עבר את V8 Entry Ready, כדי לבחור רק עסקאות עם Context חזק.
+# ============================================================
+PRO_ENGINE_ENABLED            = os.getenv("PRO_ENGINE_ENABLED", "True").lower() in ("1", "true", "yes")
+PRO_MIN_SCORE                 = float(os.getenv("PRO_MIN_SCORE", "75.0"))
+PRO_MIN_TREND_SCORE           = float(os.getenv("PRO_MIN_TREND_SCORE", "55.0"))
+PRO_MIN_RS_PROFILE_SCORE      = float(os.getenv("PRO_MIN_RS_PROFILE_SCORE", "65.0"))
+PRO_MIN_MARKET_CONTEXT_SCORE  = float(os.getenv("PRO_MIN_MARKET_CONTEXT_SCORE", "25.0"))
+PRO_MAX_STOP_RISK_PCT         = float(os.getenv("PRO_MAX_STOP_RISK_PCT", "0.12"))
+PRO_BLOCK_FROZEN_SECTOR       = os.getenv("PRO_BLOCK_FROZEN_SECTOR", "True").lower() in ("1", "true", "yes")
+PRO_BLOCK_DISTRIBUTION        = os.getenv("PRO_BLOCK_DISTRIBUTION", "True").lower() in ("1", "true", "yes")
+PRO_QUALITY_LOG               = _state_path(os.getenv("PRO_QUALITY_LOG", "professional_quality_log.csv"))
 
 # ============================================================
 #  MARKET REVERSAL DETECTOR
@@ -4398,6 +4416,442 @@ def append_v9_pattern_candidates(symbol: str, df: pd.DataFrame, candidates: list
         return 0
 
 
+# ============================================================
+#  V9.1 — PROFESSIONAL TRADE QUALITY ENGINE
+#  Final context/ranking layer. Pattern detectors are intentionally untouched.
+# ============================================================
+_PRO_ENGINE_CACHE: dict = {}
+
+
+def _pro_clamp(value: float, low: float = 0.0, high: float = 100.0) -> float:
+    try:
+        return round(max(low, min(high, float(value))), 1)
+    except Exception:
+        return round(low, 1)
+
+
+def _pro_ma_slope_pct(df: pd.DataFrame, column: str, bars: int) -> Optional[float]:
+    """Percent change of a moving-average line over N bars. None when unavailable."""
+    try:
+        if column not in df.columns or len(df) <= bars:
+            return None
+        s = pd.to_numeric(df[column], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+        if len(s) <= bars:
+            return None
+        now = float(s.iloc[-1])
+        old = float(s.iloc[-(bars + 1)])
+        if not (_is_finite_number(now) and _is_finite_number(old) and old != 0):
+            return None
+        return (now / old - 1.0) * 100.0
+    except Exception:
+        return None
+
+
+def _professional_trend_profile(df: pd.DataFrame) -> dict:
+    """Scores trend quality without changing any pattern detector."""
+    out = {"score": 0.0, "reasons": [], "metrics": {}}
+    try:
+        if df is None or df.empty:
+            return out
+        ensure_ma_columns(df)
+        close = _series_last_finite(df.get("close"), None)
+        ma50 = _series_last_finite(df.get("ma50"), None) if "ma50" in df.columns else None
+        ma150 = _series_last_finite(df.get("ma150"), None) if "ma150" in df.columns else None
+        ma200 = _series_last_finite(df.get("ma200"), None) if "ma200" in df.columns else None
+        s50 = _pro_ma_slope_pct(df, "ma50", 10)
+        s150 = _pro_ma_slope_pct(df, "ma150", 20)
+        s200 = _pro_ma_slope_pct(df, "ma200", 20)
+        score = 0.0
+        reasons = []
+
+        if close is not None and ma50 is not None and close > ma50:
+            score += 18; reasons.append("מחיר מעל MA50")
+        if ma50 is not None and ma150 is not None and ma50 > ma150:
+            score += 20; reasons.append("MA50 מעל MA150")
+        if ma150 is not None and ma200 is not None and ma150 > ma200:
+            score += 18; reasons.append("MA150 מעל MA200")
+        if s50 is not None and s50 > 0:
+            score += 16; reasons.append(f"MA50 עולה ({s50:+.1f}%/10d)")
+        if s150 is not None and s150 > 0:
+            score += 16; reasons.append(f"MA150 עולה ({s150:+.1f}%/20d)")
+        if s200 is not None and s200 >= 0:
+            score += 12; reasons.append(f"MA200 יציב/עולה ({s200:+.1f}%/20d)")
+
+        out = {
+            "score": _pro_clamp(score),
+            "reasons": reasons,
+            "metrics": {
+                "close": close, "ma50": ma50, "ma150": ma150, "ma200": ma200,
+                "ma50_slope_10d_pct": s50, "ma150_slope_20d_pct": s150, "ma200_slope_20d_pct": s200,
+            },
+        }
+    except Exception as e:
+        out["error"] = str(e)
+    return out
+
+
+def _professional_rs_profile(ticker: str, df: pd.DataFrame) -> dict:
+    """Multi-horizon relative strength: 1M/3M/6M/12M + RS-line confirmation."""
+    out = {"score": 0.0, "reasons": [], "metrics": {}}
+    try:
+        rs = compute_rs_score(ticker, df)
+        base_rs = _to_float_or_none(rs.get("rs_score")) if isinstance(rs, dict) else None
+        rels = []
+        rel_map = {}
+        for key in ("1m", "3m", "6m", "12m"):
+            val = _to_float_or_none(rs.get(f"vs_spy_{key}")) if isinstance(rs, dict) else None
+            if val is not None:
+                rels.append(val)
+                rel_map[key] = val
+        positive = sum(1 for v in rels if v > 0)
+        available = len(rels)
+        score = (base_rs or 0.0) * 0.50
+        if available:
+            score += 35.0 * (positive / available)
+        r1 = rel_map.get("1m")
+        r3 = rel_map.get("3m")
+        if r1 is not None:
+            if r1 >= 5: score += 8
+            elif r1 > 0: score += 5
+        if r3 is not None:
+            if r3 >= 8: score += 7
+            elif r3 > 0: score += 4
+        rs_high = _rs_line_new_high(df)
+        if rs_high is True:
+            score += 10
+
+        reasons = []
+        if base_rs is not None:
+            reasons.append(f"RS בסיס {base_rs:.0f}")
+        if available:
+            reasons.append(f"מנצח SPY ב-{positive}/{available} חלונות")
+        if rs_high is True:
+            reasons.append("קו RS בשיא/קרוב לשיא")
+        out = {
+            "score": _pro_clamp(score),
+            "reasons": reasons,
+            "metrics": {"rs_score": base_rs, "relative_windows": rel_map, "positive_windows": positive, "available_windows": available, "rs_line_new_high": rs_high},
+        }
+    except Exception as e:
+        out["error"] = str(e)
+    return out
+
+
+def _professional_sector_profile(ticker: str, rotation_map: dict | None = None) -> dict:
+    """Turns existing sector-rotation data into a normalized 0-100 context score."""
+    out = {"score": 55.0, "rank": "UNKNOWN", "sector": "N/A", "reasons": [], "metrics": {}}
+    try:
+        rotation_map = rotation_map if isinstance(rotation_map, dict) else (_sector_rotation_cache or build_sector_rotation_map())
+        info = _get_yf_info(ticker)
+        sector = str(info.get("sector") or "")
+        data = rotation_map.get(sector, {}) if sector else {}
+        rank = str(data.get("rank") or "UNKNOWN").upper()
+        rank_scores = {"HOT": 100.0, "WARM": 85.0, "NEUTRAL": 62.0, "COLD": 38.0, "FROZEN": 12.0, "UNKNOWN": 55.0}
+        score = rank_scores.get(rank, 55.0)
+        rs_spy = _to_float_or_none(data.get("rs_spy"))
+        if rs_spy is not None:
+            score += max(-10.0, min(10.0, rs_spy * 2.0))
+        reasons = [f"Sector {rank}"]
+        if rs_spy is not None:
+            reasons.append(f"Sector RS vs SPY {rs_spy:+.1f}%")
+        out = {
+            "score": _pro_clamp(score), "rank": rank, "sector": sector or "N/A", "reasons": reasons,
+            "metrics": {"etf": data.get("etf"), "rs_spy": rs_spy, "perf_5d": data.get("perf_5d"), "perf_20d": data.get("perf_20d"), "vs_ma50": data.get("vs_ma50")},
+        }
+    except Exception as e:
+        out["error"] = str(e)
+    return out
+
+
+def _professional_market_context(regime: dict | None = None, rotation_map: dict | None = None) -> dict:
+    """Market quality using current regime + breadth proxy from unique sector ETFs; no extra universe scan."""
+    out = {"score": 45.0, "regime": "UNKNOWN", "breadth_score": None, "reasons": [], "metrics": {}}
+    try:
+        reg = regime if isinstance(regime, dict) else get_market_regime()
+        name = str(reg.get("regime") or "UNKNOWN").upper()
+        regime_scores = {"BULL": 92.0, "NEUTRAL": 68.0, "BEAR": 12.0, "UNKNOWN": 45.0}
+        regime_score = regime_scores.get(name, 45.0)
+        rotation_map = rotation_map if isinstance(rotation_map, dict) else (_sector_rotation_cache or build_sector_rotation_map())
+
+        rank_weights = {"HOT": 100.0, "WARM": 82.0, "NEUTRAL": 55.0, "COLD": 25.0, "FROZEN": 0.0}
+        unique_etf = {}
+        for data in (rotation_map or {}).values():
+            if not isinstance(data, dict):
+                continue
+            etf = data.get("etf")
+            if not etf or etf in unique_etf:
+                continue
+            unique_etf[etf] = rank_weights.get(str(data.get("rank") or "NEUTRAL").upper(), 55.0)
+        breadth = (sum(unique_etf.values()) / len(unique_etf)) if unique_etf else None
+        score = regime_score if breadth is None else regime_score * 0.65 + breadth * 0.35
+        reasons = [f"Market {name}"]
+        if breadth is not None:
+            reasons.append(f"Sector breadth {breadth:.0f}/100")
+        out = {
+            "score": _pro_clamp(score), "regime": name, "breadth_score": None if breadth is None else round(breadth, 1), "reasons": reasons,
+            "metrics": {"regime_score": regime_score, "unique_sector_etfs": len(unique_etf), "allow_trading": reg.get("allow_trading")},
+        }
+    except Exception as e:
+        out["error"] = str(e)
+    return out
+
+
+def _professional_accumulation_profile(df: pd.DataFrame) -> dict:
+    """Institutional-style accumulation proxy: OBV/CMF + up/down volume balance."""
+    out = {"score": 50.0, "distribution": False, "reasons": [], "metrics": {}}
+    try:
+        ad = get_accumulation_score(df)
+        label = str(ad.get("score") or "NEUTRAL").upper() if isinstance(ad, dict) else "NEUTRAL"
+        base = {"ACCUMULATION": 70.0, "NEUTRAL": 50.0, "DISTRIBUTION": 18.0}.get(label, 50.0)
+        closes = pd.to_numeric(df["close"], errors="coerce")
+        vols = pd.to_numeric(df["volume"], errors="coerce") if "volume" in df.columns else pd.Series(dtype=float)
+        frame = pd.DataFrame({"close": closes, "volume": vols}).replace([np.inf, -np.inf], np.nan).dropna().tail(21)
+        up_down_ratio = None
+        high_vol_up = 0
+        high_vol_down = 0
+        if len(frame) >= 10:
+            delta = frame["close"].diff()
+            prev20 = frame["volume"].iloc[:-1]
+            avg_vol = float(prev20.mean()) if len(prev20) else None
+            up_vol = float(frame.loc[delta > 0, "volume"].sum())
+            down_vol = float(frame.loc[delta < 0, "volume"].sum())
+            if down_vol > 0:
+                up_down_ratio = up_vol / down_vol
+            elif up_vol > 0:
+                up_down_ratio = 3.0
+            if avg_vol and avg_vol > 0:
+                high_vol_up = int(((delta > 0) & (frame["volume"] >= avg_vol * 1.15)).sum())
+                high_vol_down = int(((delta < 0) & (frame["volume"] >= avg_vol * 1.15)).sum())
+
+        score = base
+        if up_down_ratio is not None:
+            if up_down_ratio >= 1.5: score += 20
+            elif up_down_ratio >= 1.15: score += 12
+            elif up_down_ratio >= 0.90: score += 4
+            elif up_down_ratio < 0.75: score -= 15
+        cmf = _to_float_or_none(ad.get("cmf")) if isinstance(ad, dict) else None
+        if cmf is not None:
+            if cmf >= 0.10: score += 10
+            elif cmf >= 0.03: score += 6
+            elif cmf <= -0.10: score -= 12
+            elif cmf < -0.03: score -= 6
+        if high_vol_up > high_vol_down:
+            score += min(8.0, float(high_vol_up - high_vol_down) * 2.0)
+
+        distribution = bool(label == "DISTRIBUTION" and (up_down_ratio is None or up_down_ratio < 0.90) and (cmf is None or cmf < -0.03))
+        reasons = [str(ad.get("summary") or label) if isinstance(ad, dict) else label]
+        if up_down_ratio is not None:
+            reasons.append(f"Up/Down volume {up_down_ratio:.2f}x")
+        out = {
+            "score": _pro_clamp(score), "distribution": distribution, "reasons": reasons,
+            "metrics": {"obv_trend": ad.get("obv_trend") if isinstance(ad, dict) else None, "cmf": cmf, "up_down_volume_ratio": up_down_ratio, "high_volume_up_days": high_vol_up, "high_volume_down_days": high_vol_down},
+        }
+    except Exception as e:
+        out["error"] = str(e)
+    return out
+
+
+def _professional_execution_profile(df: pd.DataFrame, entry_quality: dict) -> dict:
+    """Differentiates a barely-valid trigger from a clean, decisive trigger."""
+    out = {"score": 0.0, "reasons": [], "metrics": {}}
+    try:
+        m = entry_quality.get("metrics", {}) if isinstance(entry_quality, dict) else {}
+        vr = _to_float_or_none(m.get("volume_ratio"))
+        cp = _to_float_or_none(m.get("close_position"))
+        body = _to_float_or_none(m.get("body_ratio"))
+        bp = _to_float_or_none(m.get("breakout_pct"))
+        open_p = _to_float_or_none(m.get("open")); high = _to_float_or_none(m.get("high")); low = _to_float_or_none(m.get("low")); close = _to_float_or_none(m.get("close"))
+        upper_wick = None
+        if None not in (open_p, high, low, close) and high > low:
+            upper_wick = max(0.0, high - max(open_p, close)) / (high - low)
+
+        score = 0.0
+        if vr is not None:
+            if vr >= 2.0: score += 25
+            elif vr >= 1.5: score += 22
+            elif vr >= ENTRY_MIN_VOLUME_RATIO: score += 18
+        if cp is not None:
+            if cp >= 0.85: score += 20
+            elif cp >= 0.75: score += 18
+            elif cp >= ENTRY_MIN_CLOSE_POS: score += 14
+        if body is not None:
+            if body >= 0.60: score += 16
+            elif body >= 0.45: score += 13
+            elif body >= ENTRY_MIN_BODY_RATIO: score += 9
+        if upper_wick is not None:
+            if upper_wick <= 0.12: score += 16
+            elif upper_wick <= 0.25: score += 12
+            elif upper_wick <= 0.40: score += 6
+        if bp is not None:
+            if ENTRY_MIN_BREAKOUT_PCT <= bp <= 0.015: score += 18
+            elif bp <= ENTRY_MAX_EXTENSION_PCT: score += 10
+        if m.get("green_candle") is True:
+            score += 5
+
+        reasons = []
+        if vr is not None: reasons.append(f"Volume {vr:.2f}x")
+        if cp is not None: reasons.append(f"Close position {cp*100:.0f}%")
+        if upper_wick is not None: reasons.append(f"Upper wick {upper_wick*100:.0f}%")
+        if bp is not None: reasons.append(f"Entry extension {bp*100:.2f}%")
+        out = {"score": _pro_clamp(score), "reasons": reasons, "metrics": {"volume_ratio": vr, "close_position": cp, "body_ratio": body, "upper_wick_ratio": upper_wick, "breakout_pct": bp}}
+    except Exception as e:
+        out["error"] = str(e)
+    return out
+
+
+def _professional_risk_profile(alert: dict, df: pd.DataFrame, entry_quality: dict) -> dict:
+    """Validates trade geometry and scores the quality of the stop/target structure."""
+    out = {"score": 0.0, "valid": False, "reasons": [], "blockers": [], "metrics": {}}
+    try:
+        qmetrics = entry_quality.get("metrics", {}) if isinstance(entry_quality, dict) else {}
+        entry = _to_float_or_none(alert.get("breakout_level")) or _to_float_or_none(qmetrics.get("close"))
+        stop = _to_float_or_none(alert.get("stop_loss"))
+        target = _to_float_or_none(alert.get("target"))
+        atr = _to_float_or_none(qmetrics.get("atr14"))
+        blockers = []
+        if entry is None or stop is None or target is None:
+            blockers.append("Entry/Stop/Target לא תקינים")
+            return {"score": 0.0, "valid": False, "reasons": [], "blockers": blockers, "metrics": {"entry": entry, "stop": stop, "target": target}}
+        if stop >= entry:
+            blockers.append("Stop חייב להיות מתחת למחיר הכניסה")
+        if target <= entry:
+            blockers.append("Target חייב להיות מעל מחיר הכניסה")
+        risk = entry - stop
+        reward = target - entry
+        if risk <= 0 or reward <= 0:
+            blockers.append("Risk/Reward geometry לא חוקי")
+        if blockers:
+            return {"score": 0.0, "valid": False, "reasons": [], "blockers": blockers, "metrics": {"entry": entry, "stop": stop, "target": target, "risk": risk, "reward": reward}}
+
+        risk_pct = risk / entry
+        rr_calc = reward / risk
+        atr_risk = (risk / atr) if atr and atr > 0 else None
+        bp = _to_float_or_none(qmetrics.get("breakout_pct"))
+        score = 0.0
+        if rr_calc >= 4.0: score += 32
+        elif rr_calc >= 3.0: score += 27
+        elif rr_calc >= ENTRY_MIN_RR: score += 22
+        elif rr_calc >= 2.0: score += 12
+        if 0.01 <= risk_pct <= 0.055: score += 32
+        elif 0.005 <= risk_pct <= 0.08: score += 25
+        elif risk_pct <= 0.10: score += 15
+        else: score += 5
+        if atr_risk is not None:
+            if 0.8 <= atr_risk <= 2.5: score += 22
+            elif 0.5 <= atr_risk <= 3.5: score += 15
+            else: score += 6
+        else:
+            score += 10
+        if bp is not None:
+            if ENTRY_MIN_BREAKOUT_PCT <= bp <= 0.015: score += 14
+            elif bp <= ENTRY_MAX_EXTENSION_PCT: score += 8
+
+        if risk_pct > PRO_MAX_STOP_RISK_PCT:
+            blockers.append(f"סטופ רחב מדי ({risk_pct*100:.1f}% > {PRO_MAX_STOP_RISK_PCT*100:.1f}%)")
+        if rr_calc < ENTRY_MIN_RR:
+            blockers.append(f"R:R מחושב נמוך ({rr_calc:.2f} < {ENTRY_MIN_RR:.2f})")
+        reasons = [f"Risk {risk_pct*100:.1f}%", f"R:R calculated {rr_calc:.2f}"]
+        if atr_risk is not None:
+            reasons.append(f"Stop distance {atr_risk:.2f} ATR")
+        out = {
+            "score": _pro_clamp(score), "valid": not blockers, "reasons": reasons, "blockers": blockers,
+            "metrics": {"entry": entry, "stop": stop, "target": target, "risk": risk, "reward": reward, "risk_pct": risk_pct, "rr_calculated": rr_calc, "atr_risk_multiple": atr_risk},
+        }
+    except Exception as e:
+        out["error"] = str(e)
+        out["blockers"] = ["שגיאה בבדיקת Risk geometry"]
+    return out
+
+
+def evaluate_professional_trade_quality(df: pd.DataFrame, ticker: str, alert: dict, entry_quality: dict, regime: dict | None = None) -> dict:
+    """
+    V9.1 final professional gate.
+    Does NOT detect or alter patterns. It ranks context after a setup is already ENTRY_READY.
+    """
+    try:
+        rotation_map = _sector_rotation_cache or build_sector_rotation_map()
+        trend = _professional_trend_profile(df)
+        rs = _professional_rs_profile(ticker, df)
+        sector = _professional_sector_profile(ticker, rotation_map)
+        market = _professional_market_context(regime, rotation_map)
+        accumulation = _professional_accumulation_profile(df)
+        execution = _professional_execution_profile(df, entry_quality)
+        risk = _professional_risk_profile(alert, df, entry_quality)
+
+        # Weights sum to 100. Entry quality already passed V8; this score measures CONTEXT quality.
+        score = (
+            trend.get("score", 0) * 0.20
+            + rs.get("score", 0) * 0.20
+            + sector.get("score", 0) * 0.10
+            + market.get("score", 0) * 0.05
+            + accumulation.get("score", 0) * 0.15
+            + execution.get("score", 0) * 0.20
+            + risk.get("score", 0) * 0.10
+        )
+        score = _pro_clamp(score)
+        blockers = list(risk.get("blockers", []) or [])
+        if trend.get("score", 0) < PRO_MIN_TREND_SCORE:
+            blockers.append(f"Trend score נמוך ({trend.get('score',0):.0f} < {PRO_MIN_TREND_SCORE:.0f})")
+        if rs.get("score", 0) < PRO_MIN_RS_PROFILE_SCORE:
+            blockers.append(f"Multi-horizon RS נמוך ({rs.get('score',0):.0f} < {PRO_MIN_RS_PROFILE_SCORE:.0f})")
+        if market.get("score", 0) < PRO_MIN_MARKET_CONTEXT_SCORE:
+            blockers.append(f"Market context חלש ({market.get('score',0):.0f} < {PRO_MIN_MARKET_CONTEXT_SCORE:.0f})")
+        if PRO_BLOCK_FROZEN_SECTOR and sector.get("rank") == "FROZEN":
+            blockers.append("Sector FROZEN")
+        if PRO_BLOCK_DISTRIBUTION and accumulation.get("distribution"):
+            blockers.append("Institutional distribution חזקה")
+        if score < PRO_MIN_SCORE:
+            blockers.append(f"Professional Quality נמוך ({score:.1f} < {PRO_MIN_SCORE:.1f})")
+
+        label = "ELITE" if score >= 88 else "STRONG" if score >= 82 else "QUALIFIED" if score >= PRO_MIN_SCORE else "WATCHLIST"
+        ready = bool(PRO_ENGINE_ENABLED and not blockers)
+        return {
+            "status": "PRO_READY" if ready else "PRO_WATCHLIST",
+            "professional_ready": ready,
+            "professional_score": score,
+            "label": label,
+            "blockers": list(dict.fromkeys(blockers)),
+            "components": {"trend": trend, "rs": rs, "sector": sector, "market": market, "accumulation": accumulation, "execution": execution, "risk": risk},
+        }
+    except Exception as e:
+        return {"status": "PRO_WATCHLIST", "professional_ready": False, "professional_score": 0.0, "label": "ERROR", "blockers": [f"Professional engine error: {type(e).__name__}: {e}"], "components": {}}
+
+
+def log_professional_quality_decision(alert: dict, pro: dict) -> None:
+    """Persistent calibration log for later MFE/MAE/backtest analysis."""
+    try:
+        comps = pro.get("components", {}) if isinstance(pro, dict) else {}
+        row = {
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "ticker": alert.get("ticker", ""),
+            "pattern": alert.get("pattern_type", ""),
+            "entry_quality": (alert.get("entry_quality", {}) or {}).get("quality_score") if isinstance(alert.get("entry_quality", {}), dict) else None,
+            "professional_score": pro.get("professional_score"),
+            "professional_status": pro.get("status"),
+            "label": pro.get("label"),
+            "trend_score": (comps.get("trend", {}) or {}).get("score"),
+            "rs_profile_score": (comps.get("rs", {}) or {}).get("score"),
+            "sector_score": (comps.get("sector", {}) or {}).get("score"),
+            "sector_rank": (comps.get("sector", {}) or {}).get("rank"),
+            "market_score": (comps.get("market", {}) or {}).get("score"),
+            "accumulation_score": (comps.get("accumulation", {}) or {}).get("score"),
+            "execution_score": (comps.get("execution", {}) or {}).get("score"),
+            "risk_score": (comps.get("risk", {}) or {}).get("score"),
+            "blockers": " | ".join(pro.get("blockers", []) or []),
+        }
+        file_exists = os.path.exists(PRO_QUALITY_LOG)
+        parent = os.path.dirname(PRO_QUALITY_LOG)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        with open(PRO_QUALITY_LOG, "a", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=list(row.keys()))
+            if not file_exists or os.path.getsize(PRO_QUALITY_LOG) == 0:
+                writer.writeheader()
+            writer.writerow(row)
+    except Exception as e:
+        log(f"professional_quality_log error: {e}")
+
+
 def get_sector_analysis(ticker: str) -> dict:
     """
     מחזיר ניתוח סקטור:
@@ -5440,6 +5894,43 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
         if not candidates:
             return []
 
+    # --- V9.1 Professional Trade Quality Gate ---
+    # Pattern detectors stay untouched. This layer only ranks/filters candidates that already passed V8.
+    if PRO_ENGINE_ENABLED:
+        pro_ready_candidates: list[dict] = []
+        for alert in candidates:
+            if not isinstance(alert, dict):
+                continue
+            try:
+                q = alert.get("entry_quality", {}) if isinstance(alert.get("entry_quality", {}), dict) else {}
+                pro = evaluate_professional_trade_quality(
+                    df=df, ticker=symbol, alert=alert, entry_quality=q, regime=get_market_regime()
+                )
+                alert["entry_quality_score"] = float(q.get("quality_score", alert.get("score", 0)) or 0)
+                alert["professional_quality"] = pro
+                alert["professional_score"] = float(pro.get("professional_score", 0) or 0)
+                alert.setdefault("meta", {})["professional_quality"] = pro
+                log_professional_quality_decision(alert, pro)
+
+                if not pro.get("professional_ready", False):
+                    blockers = pro.get("blockers", []) or []
+                    short = "; ".join(blockers[:4]) if blockers else "לא עבר Professional Quality"
+                    log(f"{symbol}: 🧠 PRO WATCHLIST {alert.get('pattern_type','')} | pro={float(pro.get('professional_score',0) or 0):.1f} | entry={alert['entry_quality_score']:.1f} — {short}")
+                    _fs("professional_quality")
+                    continue
+
+                # Final ranking score = professional score. Keep V8 score separately for audit.
+                alert["score"] = float(pro.get("professional_score", 0) or 0)
+                log(f"{symbol}: ⭐ PROFESSIONAL READY {alert.get('pattern_type','')} | pro={alert['score']:.1f} | entry={alert['entry_quality_score']:.1f} | label={pro.get('label','QUALIFIED')}")
+                pro_ready_candidates.append(alert)
+            except Exception as e:
+                log(f"{symbol}: professional quality gate error: {type(e).__name__}: {e}")
+                _fs("professional_quality")
+
+        candidates = pro_ready_candidates
+        if not candidates:
+            return []
+
     # --- dedup / cooldown ---
     new_alerts = []
     for alert in candidates:
@@ -5452,7 +5943,10 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
             log(f"{symbol} {pname} already sent. Skip."); continue
         if DEBUG_SCAN_REASONS:
             q = alert.get("entry_quality", {}) if isinstance(alert.get("entry_quality", {}), dict) else {}
-            log(f"ALERT REASON {symbol}: {pname} | status={q.get('status','ENTRY_READY')} | quality={float(alert.get('score', 0) or 0):.1f} | base={float(alert.get('base_score', 0) or 0):.1f} | dynamic_threshold={effective_min_score:.1f} | entry_threshold={ENTRY_READY_MIN_SCORE:.1f} | level={bl}")
+            pro = alert.get("professional_quality", {}) if isinstance(alert.get("professional_quality", {}), dict) else {}
+            entry_score = float(alert.get("entry_quality_score", q.get("quality_score", 0)) or 0)
+            pro_score = float(alert.get("professional_score", alert.get("score", 0)) or 0)
+            log(f"ALERT REASON {symbol}: {pname} | status={q.get('status','ENTRY_READY')}/{pro.get('status','PRO_READY')} | professional={pro_score:.1f} | entry={entry_score:.1f} | base={float(alert.get('base_score', 0) or 0):.1f} | dynamic_threshold={effective_min_score:.1f} | entry_threshold={ENTRY_READY_MIN_SCORE:.1f} | pro_threshold={PRO_MIN_SCORE:.1f} | level={bl}")
         new_alerts.append(alert)
 
     return new_alerts
@@ -5492,6 +5986,7 @@ def _get_spy_returns() -> dict:
         if not _is_finite_number(now):
             return {}
         ret = {
+            "1m":  (now - float(close.iloc[-21]))  / max(float(close.iloc[-21]),  1e-9) if len(close) >= 21  else None,
             "3m":  (now - float(close.iloc[-63]))  / max(float(close.iloc[-63]),  1e-9) if len(close) >= 63  else None,
             "6m":  (now - float(close.iloc[-126])) / max(float(close.iloc[-126]), 1e-9) if len(close) >= 126 else None,
             "12m": (now - float(close.iloc[-252])) / max(float(close.iloc[-252]), 1e-9) if len(close) >= 252 else None,
@@ -5511,10 +6006,14 @@ def compute_rs_score(ticker: str, df: pd.DataFrame) -> dict:
     result = {
         "rs_score":  None,
         "rs_label":  "N/A",
+        "perf_1m":   None,
         "perf_3m":   None,
         "perf_6m":   None,
         "perf_12m":  None,
+        "vs_spy_1m": None,
         "vs_spy_3m": None,
+        "vs_spy_6m": None,
+        "vs_spy_12m": None,
         "summary":   "RS N/A",
     }
     try:
@@ -5524,24 +6023,31 @@ def compute_rs_score(ticker: str, df: pd.DataFrame) -> dict:
         now   = float(close.iloc[-1])
 
         # ביצועי המניה
+        p1m  = (now - float(close.iloc[-21]))  / max(float(close.iloc[-21]),  1e-9) if len(close) >= 21  else None
         p3m  = (now - float(close.iloc[-63]))  / max(float(close.iloc[-63]),  1e-9) if len(close) >= 63  else None
         p6m  = (now - float(close.iloc[-126])) / max(float(close.iloc[-126]), 1e-9) if len(close) >= 126 else None
         p12m = (now - float(close.iloc[-252])) / max(float(close.iloc[-252]), 1e-9) if len(close) >= 252 else None
+        result["perf_1m"]  = round(p1m  * 100, 1) if p1m  is not None else None
         result["perf_3m"]  = round(p3m  * 100, 1) if p3m  is not None else None
         result["perf_6m"]  = round(p6m  * 100, 1) if p6m  is not None else None
         result["perf_12m"] = round(p12m * 100, 1) if p12m is not None else None
 
         # ביצועי SPY
         spy  = _get_spy_returns()
+        s1m  = spy.get("1m",  0) or 0
         s3m  = spy.get("3m",  0) or 0
         s6m  = spy.get("6m",  0) or 0
         s12m = spy.get("12m", 0) or 0
 
         # עודף תשואה יחסי
+        r1m  = (p1m  - s1m)  if p1m  is not None else 0.0
         r3m  = (p3m  - s3m)  if p3m  is not None else 0.0
         r6m  = (p6m  - s6m)  if p6m  is not None else 0.0
         r12m = (p12m - s12m) if p12m is not None else 0.0
-        result["vs_spy_3m"] = round(r3m * 100, 1)
+        result["vs_spy_1m"]  = round(r1m  * 100, 1)
+        result["vs_spy_3m"]  = round(r3m  * 100, 1)
+        result["vs_spy_6m"]  = round(r6m  * 100, 1)
+        result["vs_spy_12m"] = round(r12m * 100, 1)
 
         # ציון IBD משוקלל → tanh → 0-100
         import math
@@ -7607,6 +8113,24 @@ def _build_html_card(alert: dict, company: dict, send_date: str, sector: dict | 
     <ul style="margin:0;padding-right:16px;font-size:12px;">{quality_lis}{quality_bad}</ul>
   </div>'''
 
+    pro = alert.get("professional_quality", {}) if isinstance(alert.get("professional_quality", {}), dict) else {}
+    pro_components = pro.get("components", {}) if isinstance(pro.get("components", {}), dict) else {}
+    def _pc(name):
+        try:
+            return float((pro_components.get(name, {}) or {}).get("score", 0) or 0)
+        except Exception:
+            return 0.0
+    pro_html = ""
+    if pro:
+        pro_html = f'''
+  <div style="padding:14px;border-bottom:1px solid #e5e7eb;background:#eff6ff;">
+    <h3 style="margin:0 0 8px;color:#1d4ed8;">🧠 Professional Trade Quality</h3>
+    <div style="font-size:20px;font-weight:900;color:#1d4ed8;">{float(pro.get("professional_score",0) or 0):.0f}/100 · {pro.get("label","QUALIFIED")}</div>
+    <div style="font-size:11px;color:#374151;margin-top:6px;line-height:1.7;">
+      Trend {_pc("trend"):.0f} · Multi-RS {_pc("rs"):.0f} · Sector {_pc("sector"):.0f} · Accumulation {_pc("accumulation"):.0f} · Execution {_pc("execution"):.0f} · Risk {_pc("risk"):.0f} · Market {_pc("market"):.0f}
+    </div>
+  </div>'''
+
     ok_lis  = "".join(f'<li>✅ {r}</li>' for r in reasons) or "<li>✅ ללא פירוט</li>"
     bad_lis = "".join(f'<li>⚠️ {r}</li>' for r in fails)
     warns   = (f'<div style="padding:12px 16px;"><h3 style="color:#b91c1c">אזהרות</h3>'
@@ -7819,6 +8343,7 @@ def _build_html_card(alert: dict, company: dict, send_date: str, sector: dict | 
     <ul style="margin:0;padding-right:16px;">{ok_lis}</ul>
   </div>
   {quality_html}
+  {pro_html}
   {warns}
   {sector_html}
   {intel_html}
@@ -7975,7 +8500,7 @@ def send_email_alerts(alerts: list[dict]) -> None:
     msg["To"]      = ", ".join(TO_EMAILS)
     if len(alerts) == 1:
         a = alerts[0]
-        msg["Subject"] = f"🚀 ENTRY READY {a.get('ticker','')} | {a.get('pattern_type','')} | Quality {a.get('score',0):.1f}"
+        msg["Subject"] = f"⭐ PROFESSIONAL READY {a.get('ticker','')} | {a.get('pattern_type','')} | Quality {a.get('score',0):.1f}"
     else:
         msg["Subject"] = f"🚀 {len(alerts)} Entry Ready סטאפים — {subj_str}"
     msg.attach(MIMEText(header + cards + footer, "html", "utf-8"))
@@ -8059,6 +8584,7 @@ def send_daily_summary_email(stats: dict, filter_stats: dict, regime: dict | Non
             {row("MA150 רחוק", filter_stats.get("ma150_dist",0))}
             {row("MA לא קרוב ל־neckline", filter_stats.get("ma_neckline",0))}
             {row("תבנית קיימת אבל לא Entry Ready", filter_stats.get("entry_quality",0))}
+            {row("עבר Entry Ready אך נפסל ב-Professional Quality", filter_stats.get("professional_quality",0))}
             {row("לא נמצאה תבנית", filter_stats.get("no_pattern",0))}
             {row("Reverse Scanner", filter_stats.get("reverse_scan",0))}
           </table>
@@ -8402,7 +8928,7 @@ def main() -> None:
                 {"scanned": 0, "skipped_bl": 0, "no_alert": 0, "found": 0, "errors": 0, "sent": 0},
                 {
                     "market_cap": 0, "no_data": 0, "earnings": 0, "ema28": 0,
-                    "ma150_dist": 0, "ma_neckline": 0, "no_pattern": 0, "reverse_scan": 0, "entry_quality": 0,
+                    "ma150_dist": 0, "ma_neckline": 0, "no_pattern": 0, "reverse_scan": 0, "entry_quality": 0, "professional_quality": 0,
                 },
                 regime,
                 PREFILTER_STATS,
@@ -8422,6 +8948,7 @@ def main() -> None:
     log(f"🎯 MIN_ALERT_SCORE דינמי: {dynamic_score} (Regime={regime_name})")
     log(f"🚀 V8 Entry Ready Engine: min_quality={ENTRY_READY_MIN_SCORE:.1f}, volume×{ENTRY_MIN_VOLUME_RATIO:.2f}, RS>={ENTRY_MIN_RS_SCORE:.0f}, breakout>={ENTRY_MIN_BREAKOUT_PCT*100:.1f}%")
     log(f"🧩 V9 Pattern Expansion: enabled={V9_PATTERN_ENGINE_ENABLED}, max_per_ticker={V9_MAX_CANDIDATES_PER_TICKER}, patterns=FlatBase/Darvas/VCP/EMA-Pullback/Retest")
+    log(f"🧠 V9.1 Professional Quality: enabled={PRO_ENGINE_ENABLED}, min={PRO_MIN_SCORE:.1f}, trend>={PRO_MIN_TREND_SCORE:.0f}, multi-RS>={PRO_MIN_RS_PROFILE_SCORE:.0f}, max_stop={PRO_MAX_STOP_RISK_PCT*100:.0f}%")
 
     # ── Market Reversal Detector ──────────────────────────────
     try:
@@ -8447,6 +8974,7 @@ def main() -> None:
         "no_pattern":    0,
         "score_low":     0,
         "entry_quality": 0,
+        "professional_quality": 0,
         "reverse_scan":  0,
         "passed":        0,
     }
@@ -8499,6 +9027,15 @@ def main() -> None:
                 if ENTRY_ENGINE_ENABLED and not q.get("entry_ready", False):
                     log(f"{symbol}: ❌ blocked before send — not ENTRY_READY")
                     filter_stats["entry_quality"] += 1
+                    continue
+                pro = alert.get("professional_quality", {}) if isinstance(alert.get("professional_quality", {}), dict) else {}
+                if PRO_ENGINE_ENABLED and not pro.get("professional_ready", False):
+                    log(f"{symbol}: ❌ blocked before send — not PROFESSIONAL_READY")
+                    filter_stats["professional_quality"] += 1
+                    continue
+                if PRO_ENGINE_ENABLED and alert_score < float(PRO_MIN_SCORE):
+                    log(f"{symbol}: ❌ blocked before send — professional quality {alert_score:.1f} < PRO_MIN_SCORE {float(PRO_MIN_SCORE):.1f}")
+                    filter_stats["professional_quality"] += 1
                     continue
                 if alert_score < float(ENTRY_READY_MIN_SCORE):
                     log(f"{symbol}: ❌ blocked before send — entry quality {alert_score:.1f} < ENTRY_READY_MIN_SCORE {float(ENTRY_READY_MIN_SCORE):.1f}")
@@ -8589,6 +9126,7 @@ def main() -> None:
     log(f"   {'❌ MA לא קרוב ל-neckline':<28} {filter_stats['ma_neckline']:>6,}  ({filter_stats['ma_neckline']/max(total_scanned,1)*100:.0f}%)")
     log(f"   {'❌ ציון נמוך מהסף':<28} {filter_stats['score_low']:>6,}  ({filter_stats['score_low']/max(total_scanned,1)*100:.0f}%)")
     log(f"   {'👀 תבנית קיימת אבל לא Entry Ready':<28} {filter_stats['entry_quality']:>6,}  ({filter_stats['entry_quality']/max(total_scanned,1)*100:.0f}%)")
+    log(f"   {'🧠 עבר Entry Ready, נפסל Professional':<28} {filter_stats['professional_quality']:>6,}  ({filter_stats['professional_quality']/max(total_scanned,1)*100:.0f}%)")
     log(f"   {'❌ Reverse Scanner / מכירה מוסדית':<28} {filter_stats['reverse_scan']:>6,}  ({filter_stats['reverse_scan']/max(total_scanned,1)*100:.0f}%)")
     log(f"   {'❌ לא נמצאה תבנית':<28} {filter_stats['no_pattern']:>6,}  ({filter_stats['no_pattern']/max(total_scanned,1)*100:.0f}%)")
     log(f"   {'✅ עברו הכל ונשלחו':<28} {stats.get('sent',0):>6,}")
