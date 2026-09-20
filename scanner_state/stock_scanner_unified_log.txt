@@ -179518,3 +179518,12 @@ requests.exceptions.ConnectionError: HTTPSConnectionPool(host='api.twelvedata.co
 [2026-09-19 06:34:50] ============================================================
 [2026-09-19 06:34:50] 🗓️ Market Day Guard: שבת/ראשון לפי שעון ישראל — מדלג כדי לא לסרוק ביום בלי מסחר
 [2026-09-19 06:34:50] ⏸️ No new market session — exiting before scan to prevent duplicate alerts.
+[2026-09-20 06:55:21] ============================================================
+[2026-09-20 06:55:21] Stock Scanner Unified — START
+[2026-09-20 06:55:21] Code version: 2026-09-13-v9-pattern-expansion-engine
+[2026-09-20 06:55:21] Market cap threshold: $1.0B | Unknown MC behavior: PASS
+[2026-09-20 06:55:21] Entry Ready threshold: quality>=60.0 | candidate_score>=35.0
+[2026-09-20 06:55:21] RESET VERIFIED FIX FILE
+[2026-09-20 06:55:21] ============================================================
+[2026-09-20 06:55:21] 🗓️ Market Day Guard: שבת/ראשון לפי שעון ישראל — מדלג כדי לא לסרוק ביום בלי מסחר
+[2026-09-20 06:55:21] ⏸️ No new market session — exiting before scan to prevent duplicate alerts.
