@@ -1,0 +1,4 @@
+timestamp,ticker,pattern,entry_quality,professional_score,professional_status,label,trend_score,rs_profile_score,sector_score,sector_rank,market_score,accumulation_score,execution_score,risk_score,blockers
+2026-09-21T06:35:23,WT,EMA21/MA50 Pullback Bounce,79.0,76.6,PRO_READY,QUALIFIED,100.0,94.5,33.9,COLD,68.8,18.0,97.0,88.0,
+2026-09-21T06:47:50,VOYA,EMA21/MA50 Pullback Bounce,74.0,84.1,PRO_READY,STRONG,100.0,83.0,33.9,COLD,68.8,90.0,91.0,90.0,
+2026-09-21T07:00:41,NVT,EMA21/MA50 Pullback Bounce,78.0,73.3,PRO_WATCHLIST,WATCHLIST,84.0,69.0,2.0,FROZEN,68.8,98.0,81.0,82.0,Sector FROZEN | Professional Quality נמוך (73.3 < 75.0)

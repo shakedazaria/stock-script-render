@@ -10633,12 +10633,12 @@
     ]
   },
   "WT": {
-    "time": 1765278137.246613,
+    "time": 1789972523.512902,
     "patterns": [
       {
-        "name": "EMA28_Breakout",
-        "level": 11.506885892716186,
-        "time": 1765278137.246613
+        "name": "EMA21/MA50 Pullback Bounce",
+        "level": 22.8,
+        "time": 1789972523.512902
       }
     ]
   },
@@ -11285,12 +11285,12 @@
   },
   "AFG_Falling Wedge_66": "2026-04-12T21:21:30.839840",
   "VOYA": {
-    "time": 1776020995.192038,
+    "time": 1789973270.031991,
     "patterns": [
       {
-        "name": "Falling Wedge",
-        "level": 69.78166666666668,
-        "time": 1776020995.192038
+        "name": "EMA21/MA50 Pullback Bounce",
+        "level": 101.23,
+        "time": 1789973270.031991
       }
     ]
   },
@@ -12540,5 +12540,7 @@
       }
     ]
   },
-  "TSM_EMA21/MA50 Pullback Bounce_66": "2026-09-18T04:56:18.681631"
+  "TSM_EMA21/MA50 Pullback Bounce_66": "2026-09-18T04:56:18.681631",
+  "WT_EMA21/MA50 Pullback Bounce_66": "2026-09-21T06:35:23.512903",
+  "VOYA_EMA21/MA50 Pullback Bounce_66": "2026-09-21T06:47:50.031992"
 }
