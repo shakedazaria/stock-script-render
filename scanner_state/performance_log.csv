@@ -238,9 +238,9 @@ date_sent,ticker,pattern,entry,stop,target,score,rr,price_5d,price_10d,price_20d
 2026-08-21,YUM,Falling Wedge,151.94,145.69,177.83,48.0,3.84,154.41,153.31,143.89,OPEN (+1.6%),OPEN (+0.9%),LOSS (-5.3%),True
 2026-09-02,LRN,Falling Wedge,87.17,83.35,108.67,45.0,5.44,82.15,82.7,,LOSS (-5.8%),LOSS (-5.1%),,False
 2026-09-04,ARCO,Falling Wedge,8.24,7.88,9.44,40.5,3.22,8.09,7.94,,OPEN (-1.8%),OPEN (-3.6%),,False
-2026-09-14,MSGE,EMA21/MA50 Pullback Bounce,76.89,74.96,90.41,73.0,2.65,,,,,,,False
-2026-09-16,BIO,EMA21/MA50 Pullback Bounce,370.52,363.83,413.42,76.0,2.5,,,,,,,False
-2026-09-16,WHD,EMA21/MA50 Pullback Bounce,69.17,66.29,78.75,77.0,2.5,,,,,,,False
+2026-09-14,MSGE,EMA21/MA50 Pullback Bounce,76.89,74.96,90.41,73.0,2.65,81.2,,,OPEN (+5.6%),,,False
+2026-09-16,BIO,EMA21/MA50 Pullback Bounce,370.52,363.83,413.42,76.0,2.5,377.33,,,OPEN (+1.8%),,,False
+2026-09-16,WHD,EMA21/MA50 Pullback Bounce,69.17,66.29,78.75,77.0,2.5,67.45,,,OPEN (-2.5%),,,False
 2026-09-17,PRLB,VCP Breakout,82.55,76.17,104.46,76.0,3.0,,,,,,,False
 2026-09-18,NTCT,EMA21/MA50 Pullback Bounce,39.06,36.23,46.88,69.0,2.5,,,,,,,False
 2026-09-18,TSM,EMA21/MA50 Pullback Bounce,419.85,405.78,491.46,75.0,2.5,,,,,,,False

@@ -2539,9 +2539,7 @@
     "close_date": null,
     "pnl_pct": null,
     "data_status": "ok",
-    "soft_warnings": [
-      "\ud83d\udcc9 \u05de\u05ea\u05d7\u05ea \u05dc-Low \u05d0\u05ea\u05de\u05d5\u05dc (376.41 < 377.69)"
-    ]
+    "soft_warnings": []
   },
   {
     "ticker": "WHD",
@@ -2560,20 +2558,17 @@
     "close_date": null,
     "pnl_pct": null,
     "data_status": "ok",
-    "soft_warnings": [
-      "\u26a0\ufe0f \u05de\u05ea\u05d7\u05ea \u05dc-EMA28 (66.68)",
-      "\ud83d\udcc9 \u05de\u05ea\u05d7\u05ea \u05dc-Low \u05d0\u05ea\u05de\u05d5\u05dc (66.68 < 67.14)"
-    ]
+    "soft_warnings": []
   },
   {
     "ticker": "PRLB",
     "pattern": "VCP Breakout",
     "entry": 82.55,
     "stop_initial": 76.16725,
-    "stop_current": 81.31,
+    "stop_current": 83.21,
     "target": 104.45824999999999,
     "date_open": "2026-09-17",
-    "highest_price": 87.79000091552734,
+    "highest_price": 90.04000091552734,
     "stop_method": "smart_atr_support",
     "trailing_status": "active",
     "closed": false,
@@ -2601,21 +2596,19 @@
     "close_date": null,
     "pnl_pct": null,
     "data_status": "ok",
-    "soft_warnings": [
-      "\ud83d\udcc9 \u05de\u05ea\u05d7\u05ea \u05dc-Low \u05d0\u05ea\u05de\u05d5\u05dc (38.21 < 38.49)"
-    ]
+    "soft_warnings": []
   },
   {
     "ticker": "TSM",
     "pattern": "EMA21/MA50 Pullback Bounce",
     "entry": 419.85001,
     "stop_initial": 405.78090995,
-    "stop_current": 405.78090995,
+    "stop_current": 420.92,
     "target": 491.45776012500005,
     "date_open": "2026-09-18",
-    "highest_price": 434.82000732421875,
+    "highest_price": 445.7200012207031,
     "stop_method": "smart_atr_support",
-    "trailing_status": "waiting",
+    "trailing_status": "active",
     "closed": false,
     "close_reason": null,
     "close_price": null,
@@ -2632,14 +2625,16 @@
     "stop_current": 21.492,
     "target": 27.015,
     "date_open": "2026-09-21",
-    "highest_price": 22.8,
+    "highest_price": 23.850000381469727,
     "stop_method": "smart_atr_support",
-    "trailing_status": "waiting",
+    "trailing_status": "active",
     "closed": false,
     "close_reason": null,
     "close_price": null,
     "close_date": null,
-    "pnl_pct": null
+    "pnl_pct": null,
+    "data_status": "ok",
+    "soft_warnings": []
   },
   {
     "ticker": "VOYA",
@@ -2649,13 +2644,15 @@
     "stop_current": 98.47515,
     "target": 109.30712499999998,
     "date_open": "2026-09-21",
-    "highest_price": 101.23,
+    "highest_price": 102.0999984741211,
     "stop_method": "smart_atr_support",
     "trailing_status": "waiting",
     "closed": false,
     "close_reason": null,
     "close_price": null,
     "close_date": null,
-    "pnl_pct": null
+    "pnl_pct": null,
+    "data_status": "ok",
+    "soft_warnings": []
   }
 ]
