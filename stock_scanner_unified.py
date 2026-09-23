@@ -28,10 +28,10 @@ stock_scanner_unified.py
 """
 
 # ============================================================
-# RESET VERIFIED FIX FILE — 2026-09-20 V9.1
+# RESET VERIFIED FIX FILE — 2026-09-23 V9.1.1
 # This marker proves this is the rebuilt fixed file, not an old download copy.
 # ============================================================
-CODE_VERSION = "2026-09-20-v9.1-professional-trade-quality-engine"
+CODE_VERSION = "2026-09-23-v9.1.1-market-day-guard-failsafe"
 RESET_VERIFIED_FIX_FILE = True
 
 
@@ -194,6 +194,16 @@ SKIP_ISRAEL_WEEKENDS = os.getenv("SKIP_ISRAEL_WEEKENDS", "True").lower() in ("1"
 MARKET_SCAN_SYMBOL = os.getenv("MARKET_SCAN_SYMBOL", "SPY")
 MARKET_SCAN_STATE_FILE = _state_path(os.getenv("MARKET_SCAN_STATE_FILE", "last_market_scan_date.txt"))
 FORCE_SCAN = os.getenv("FORCE_SCAN", "False").lower() in ("1", "true", "yes")
+
+# --- V9.1.1 Market Day Guard fail-safe ---
+# Yahoo occasionally serves a stale last daily candle in early-morning GitHub runs.
+# The guard now retries Yahoo, cross-checks a second liquid ETF, and then uses
+# TwelveData as an independent fallback before deciding that no new session exists.
+MARKET_GUARD_YAHOO_RETRIES = max(1, int(os.getenv("MARKET_GUARD_YAHOO_RETRIES", "3")))
+MARKET_GUARD_RETRY_DELAY_SEC = max(0.0, float(os.getenv("MARKET_GUARD_RETRY_DELAY_SEC", "2")))
+MARKET_GUARD_SECONDARY_SYMBOL = os.getenv("MARKET_GUARD_SECONDARY_SYMBOL", "QQQ").strip().upper() or "QQQ"
+MARKET_GUARD_TWELVEDATA_ENABLED = os.getenv("MARKET_GUARD_TWELVEDATA_ENABLED", "True").lower() in ("1", "true", "yes")
+MARKET_GUARD_TWELVEDATA_TIMEOUT = max(5, int(os.getenv("MARKET_GUARD_TWELVEDATA_TIMEOUT", "12")))
 
 API_KEYS = [
     key.strip()
@@ -1177,15 +1187,25 @@ def _is_israel_weekend_now() -> bool:
     return weekday in (5, 6)  # שבת=5, ראשון=6
 
 
-def get_latest_market_session_date(symbol: str = MARKET_SCAN_SYMBOL) -> str | None:
-    """
-    מזהה את יום המסחר האחרון לפי הנר היומי האחרון של SPY.
-    FIX V7: משתמש רק בנר שיש לו Close תקין, כדי ששורה ריקה מ-Yahoo לא תיחשב כיום מסחר.
-    """
+def _market_date_from_index(index) -> str | None:
+    """Normalize the last dataframe index into YYYY-MM-DD, or None if invalid."""
+    try:
+        if index is None or len(index) == 0:
+            return None
+        ts = pd.to_datetime(index[-1], errors="coerce")
+        if pd.isna(ts):
+            return None
+        return ts.date().isoformat()
+    except Exception:
+        return None
+
+
+def _get_yahoo_market_session_date_once(symbol: str) -> str | None:
+    """One Yahoo/yfinance attempt. Only a row with a finite Close can become a session date."""
     try:
         df = _normalize_yfinance_df(yf.download(
             symbol,
-            period="10d",
+            period="15d",
             interval="1d",
             progress=False,
             auto_adjust=True,
@@ -1194,12 +1214,112 @@ def get_latest_market_session_date(symbol: str = MARKET_SCAN_SYMBOL) -> str | No
         ))
         if df is None or df.empty:
             return None
-        last_idx = pd.to_datetime(df.index[-1])
-        return last_idx.date().isoformat()
+        return _market_date_from_index(df.index)
     except Exception as e:
-        log(f"Market day guard error while checking {symbol}: {e}")
+        log(f"Market day guard Yahoo error for {symbol}: {e}")
         return None
 
+
+def _get_yahoo_market_session_date(symbol: str) -> str | None:
+    """Retry Yahoo because its daily history can be stale for a short time after a US close."""
+    best_date = None
+    for attempt in range(1, MARKET_GUARD_YAHOO_RETRIES + 1):
+        date_value = _get_yahoo_market_session_date_once(symbol)
+        if date_value and (best_date is None or date_value > best_date):
+            best_date = date_value
+        if attempt < MARKET_GUARD_YAHOO_RETRIES and MARKET_GUARD_RETRY_DELAY_SEC > 0:
+            # A tiny jitter avoids repeatedly hitting the exact same cached edge response.
+            time.sleep(MARKET_GUARD_RETRY_DELAY_SEC + random.uniform(0.0, 0.35))
+    return best_date
+
+
+def _get_twelvedata_market_session_date(symbol: str) -> str | None:
+    """
+    Independent market-session fallback using TwelveData.
+    Tries a few configured keys without printing/leaking any key and without blocking the scan.
+    """
+    if not MARKET_GUARD_TWELVEDATA_ENABLED or not API_KEYS:
+        return None
+
+    # The guard needs only a handful of rows. Try at most 3 keys so a bad/rate-limited key
+    # cannot prevent the scanner from reaching the remaining data pipeline.
+    keys_to_try = API_KEYS[: min(3, len(API_KEYS))]
+    for key in keys_to_try:
+        params = {
+            "symbol": str(symbol).strip().upper(),
+            "interval": "1day",
+            "outputsize": 10,
+            "apikey": key,
+        }
+        try:
+            resp = HTTP_SESSION.get(BASE_URL, params=params, timeout=MARKET_GUARD_TWELVEDATA_TIMEOUT)
+            if resp.status_code == 429:
+                continue
+            if resp.status_code in (401, 403):
+                continue
+            if resp.status_code >= 400:
+                continue
+            payload = resp.json() if resp.content else {}
+            values = payload.get("values") or []
+            if not values:
+                continue
+
+            valid_dates = []
+            for row in values:
+                try:
+                    close = float(row.get("close"))
+                    if not _is_finite_number(close):
+                        continue
+                    dt = pd.to_datetime(row.get("datetime"), errors="coerce")
+                    if pd.isna(dt):
+                        continue
+                    valid_dates.append(dt.date().isoformat())
+                except Exception:
+                    continue
+
+            if valid_dates:
+                update_api_usage(key)
+                return max(valid_dates)
+        except Exception as e:
+            log(f"Market day guard TwelveData error for {symbol}: {e}")
+            continue
+    return None
+
+
+def get_market_session_evidence(symbol: str = MARKET_SCAN_SYMBOL) -> dict:
+    """
+    Collect session dates from multiple sources.
+
+    Decision rule intentionally favors not missing a real trading day:
+      * if ANY reliable source sees a date newer than state -> scan it;
+      * only skip when every available source is not newer than state;
+      * if every source fails -> fail open and scan without advancing the state date.
+    """
+    primary = str(symbol or MARKET_SCAN_SYMBOL).strip().upper() or "SPY"
+    secondary = MARKET_GUARD_SECONDARY_SYMBOL
+    evidence = {}
+
+    evidence[f"Yahoo:{primary}"] = _get_yahoo_market_session_date(primary)
+
+    # A second ETF helps detect a symbol-specific stale response, even though it is still Yahoo.
+    if secondary and secondary != primary:
+        evidence[f"Yahoo:{secondary}"] = _get_yahoo_market_session_date(secondary)
+
+    # Independent provider is the critical stale-Yahoo fail-safe.
+    td_date = _get_twelvedata_market_session_date(primary)
+    evidence[f"TwelveData:{primary}"] = td_date
+
+    return evidence
+
+
+def get_latest_market_session_date(symbol: str = MARKET_SCAN_SYMBOL) -> str | None:
+    """
+    Return the newest valid market-session date seen by any configured source.
+    Kept as a compatibility wrapper for the rest of the scanner.
+    """
+    evidence = get_market_session_evidence(symbol)
+    dates = [d for d in evidence.values() if d]
+    return max(dates) if dates else None
 
 def load_last_market_scan_date() -> str:
     try:
@@ -1226,8 +1346,12 @@ def save_last_market_scan_date(market_date: str | None) -> None:
 
 def should_run_for_new_market_session() -> tuple[bool, str | None, str]:
     """
-    מחליט אם להתחיל סריקה.
-    מחזיר: (should_run, market_date, reason)
+    Decide whether to start a scan.
+    Returns: (should_run, market_date, reason)
+
+    V9.1.1 fail-safe:
+    a stale Yahoo candle can no longer veto a scan by itself. We cross-check all
+    available sources and use the newest valid session date.
     """
     if FORCE_SCAN:
         return True, None, "FORCE_SCAN=True — bypass market day guard"
@@ -1238,17 +1362,50 @@ def should_run_for_new_market_session() -> tuple[bool, str | None, str]:
     if SKIP_ISRAEL_WEEKENDS and _is_israel_weekend_now():
         return False, None, "שבת/ראשון לפי שעון ישראל — מדלג כדי לא לסרוק ביום בלי מסחר"
 
-    latest_market_date = get_latest_market_session_date(MARKET_SCAN_SYMBOL)
-    if not latest_market_date:
-        # אם לא הצלחנו לבדוק — לא חוסמים את הסריקה, כדי לא לפספס יום מסחר בגלל תקלה זמנית.
-        return True, None, "לא הצלחתי לזהות יום מסחר אחרון — ממשיך כדי לא לפספס סריקה"
-
     last_scanned = load_last_market_scan_date()
-    if last_scanned == latest_market_date:
-        return False, latest_market_date, f"אין נר מסחר חדש מאז הסריקה האחרונה ({latest_market_date})"
+    evidence = get_market_session_evidence(MARKET_SCAN_SYMBOL)
+    valid = {source: date_value for source, date_value in evidence.items() if date_value}
 
-    return True, latest_market_date, f"נר מסחר חדש זוהה: {latest_market_date} (נסרק קודם: {last_scanned or 'אף פעם'})"
+    evidence_text = ", ".join(
+        f"{source}={date_value or 'N/A'}" for source, date_value in evidence.items()
+    )
+    if evidence_text:
+        log(f"🛡️ Market Day Guard sources: {evidence_text}")
 
+    if not valid:
+        # Fail open: a total provider outage must not cause a missed trading day.
+        # market_date=None means we do NOT advance last_market_scan_date blindly.
+        return True, None, "כל מקורות יום-המסחר לא זמינים — ממשיך Fail-Open ולא מעדכן state בלי תאריך מאומת"
+
+    latest_market_date = max(valid.values())
+    newer_sources = {src: d for src, d in valid.items() if (not last_scanned or d > last_scanned)}
+
+    if newer_sources:
+        source_summary = ", ".join(f"{src}={d}" for src, d in newer_sources.items())
+        stale_sources = {src: d for src, d in valid.items() if last_scanned and d <= last_scanned}
+        stale_note = ""
+        if stale_sources:
+            stale_note = " | stale/older: " + ", ".join(f"{src}={d}" for src, d in stale_sources.items())
+        return (
+            True,
+            latest_market_date,
+            f"נר מסחר חדש אומת: {latest_market_date} | source(s): {source_summary}{stale_note} "
+            f"(נסרק קודם: {last_scanned or 'אף פעם'})",
+        )
+
+    # No available source sees anything newer than state. This is the only normal skip path.
+    unique_dates = sorted(set(valid.values()))
+    if len(unique_dates) > 1:
+        # Sources disagree, but none is newer than state. Do not invent a new session.
+        return False, latest_market_date, (
+            f"אין מקור שמציג נר חדש מעבר ל-{last_scanned}; מקורות לא מסונכרנים "
+            f"({evidence_text})"
+        )
+
+    return False, latest_market_date, (
+        f"אין נר מסחר חדש מאז הסריקה האחרונה ({last_scanned or latest_market_date}); "
+        f"אומת מול {len(valid)} מקור/ות"
+    )
 
 def load_progress() -> dict:
     return _load_json(PROGRESS_FILE) or {"current_key": 0, "start_index": 0}
