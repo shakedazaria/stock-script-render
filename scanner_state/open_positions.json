@@ -2520,7 +2520,9 @@
     "close_date": null,
     "pnl_pct": null,
     "data_status": "ok",
-    "soft_warnings": []
+    "soft_warnings": [
+      "\ud83d\udcc9 \u05de\u05ea\u05d7\u05ea \u05dc-Low \u05d0\u05ea\u05de\u05d5\u05dc (79.01 < 79.88)"
+    ]
   },
   {
     "ticker": "BIO",
@@ -2558,14 +2560,16 @@
     "close_date": null,
     "pnl_pct": null,
     "data_status": "ok",
-    "soft_warnings": []
+    "soft_warnings": [
+      "\u26a0\ufe0f \u05de\u05ea\u05d7\u05ea \u05dc-EMA28 (66.57)"
+    ]
   },
   {
     "ticker": "PRLB",
     "pattern": "VCP Breakout",
     "entry": 82.55,
     "stop_initial": 76.16725,
-    "stop_current": 83.21,
+    "stop_current": 83.23,
     "target": 104.45824999999999,
     "date_open": "2026-09-17",
     "highest_price": 90.04000091552734,
@@ -2587,7 +2591,7 @@
     "stop_current": 36.22795,
     "target": 46.87512500000001,
     "date_open": "2026-09-18",
-    "highest_price": 39.470001220703125,
+    "highest_price": 39.560001373291016,
     "stop_method": "smart_atr_support",
     "trailing_status": "waiting",
     "closed": false,
@@ -2603,10 +2607,10 @@
     "pattern": "EMA21/MA50 Pullback Bounce",
     "entry": 419.85001,
     "stop_initial": 405.78090995,
-    "stop_current": 420.92,
+    "stop_current": 426.21,
     "target": 491.45776012500005,
     "date_open": "2026-09-18",
-    "highest_price": 445.7200012207031,
+    "highest_price": 450.87249755859375,
     "stop_method": "smart_atr_support",
     "trailing_status": "active",
     "closed": false,
@@ -2625,7 +2629,7 @@
     "stop_current": 21.492,
     "target": 27.015,
     "date_open": "2026-09-21",
-    "highest_price": 23.850000381469727,
+    "highest_price": 23.860000610351562,
     "stop_method": "smart_atr_support",
     "trailing_status": "active",
     "closed": false,
@@ -2647,12 +2651,14 @@
     "highest_price": 102.0999984741211,
     "stop_method": "smart_atr_support",
     "trailing_status": "waiting",
-    "closed": false,
-    "close_reason": null,
-    "close_price": null,
-    "close_date": null,
-    "pnl_pct": null,
+    "closed": true,
+    "close_reason": "\ud83d\uded1 \u05e4\u05d2\u05e2 \u05d1-Stop Loss (97.68 \u2264 98.48)",
+    "close_price": 97.67500305175781,
+    "close_date": "2026-09-23",
+    "pnl_pct": -3.51,
     "data_status": "ok",
-    "soft_warnings": []
+    "soft_warnings": [
+      "\u26a0\ufe0f \u05de\u05ea\u05d7\u05ea \u05dc-EMA28 (97.68)"
+    ]
   }
 ]
