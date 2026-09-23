@@ -28,10 +28,10 @@ stock_scanner_unified.py
 """
 
 # ============================================================
-# RESET VERIFIED FIX FILE — 2026-09-23 V9.1.1
+# RESET VERIFIED FIX FILE — 2026-09-23 V9.1.2
 # This marker proves this is the rebuilt fixed file, not an old download copy.
 # ============================================================
-CODE_VERSION = "2026-09-23-v9.1.1-market-day-guard-failsafe"
+CODE_VERSION = "2026-09-23-v9.1.2-universe-marketcap-precheck"
 RESET_VERIFIED_FIX_FILE = True
 
 
@@ -731,6 +731,25 @@ UNIVERSE_REQUIRE_MARKET_CAP  = False  # FIXED: unknown market cap is allowed to 
 UNIVERSE_MIN_RAW_ROWS        = int(os.getenv("UNIVERSE_MIN_RAW_ROWS", "4000"))
 UNIVERSE_MIN_FRESH_TICKERS   = int(os.getenv("UNIVERSE_MIN_FRESH_TICKERS", "1200"))
 UNIVERSE_MIN_CACHE_TICKERS   = int(os.getenv("UNIVERSE_MIN_CACHE_TICKERS", "500"))
+MARKET_CAP_PRECHECK_SLEEP_SECONDS = max(0.0, float(os.getenv("MARKET_CAP_PRECHECK_SLEEP_SECONDS", "0.25")))
+
+# V9.1.2 — Market-cap pipeline
+# NASDAQ screener market-cap values are kept as same-run hints and prime the
+# in-memory cache. Only tickers whose cap is missing are verified separately
+# before the expensive full scan. Unknown after verification stays fail-open
+# so a temporary data outage cannot silently remove a legitimate >$1B stock.
+UNIVERSE_MARKET_CAP_HINTS: dict[str, float | None] = {}
+UNIVERSE_MARKET_CAP_HINT_SOURCE = "none"
+MARKET_CAP_PRECHECK_STATS = {
+    "input": 0,
+    "known_pass": 0,
+    "known_reject": 0,
+    "unknown_to_verify": 0,
+    "verified_pass": 0,
+    "verified_reject": 0,
+    "unresolved_pass": 0,
+    "output": 0,
+}
 
 
 def _parse_market_number(value) -> float | None:
@@ -768,6 +787,48 @@ def _parse_market_number(value) -> float | None:
         return float(s) * mult
     except Exception:
         return None
+
+
+def _activate_universe_market_cap_hints(ticker_list: list[str], meta: dict, source: str) -> None:
+    """
+    טוען את market-cap metadata של ה-Universe שנבחר בפועל.
+    ערכים ידועים מוזנים גם ל-_mc_cache כדי שה-Full Scan לא יבצע שוב
+    בקשת yfinance מיותרת ולא יקבל מקור סותר באותה ריצה.
+    """
+    global UNIVERSE_MARKET_CAP_HINTS, UNIVERSE_MARKET_CAP_HINT_SOURCE
+
+    allowed = {str(t).strip().upper() for t in ticker_list if str(t).strip()}
+    raw = meta.get("market_caps", {}) if isinstance(meta, dict) else {}
+    hints: dict[str, float | None] = {}
+
+    if isinstance(raw, dict):
+        for sym, value in raw.items():
+            t = str(sym).strip().upper()
+            if t not in allowed:
+                continue
+            mc = _parse_market_number(value)
+            hints[t] = mc if mc is not None and mc > 0 else None
+
+    # Backward-compatible cache: old universe_cache.json has no market_caps map.
+    for t in allowed:
+        hints.setdefault(t, None)
+
+    UNIVERSE_MARKET_CAP_HINTS = hints
+    UNIVERSE_MARKET_CAP_HINT_SOURCE = str(source or "unknown")
+
+    # _mc_cache is defined later in the module but exists by the time main() runs.
+    cache = globals().get("_mc_cache")
+    if isinstance(cache, dict):
+        for t, mc in hints.items():
+            if mc is not None and _is_finite_number(mc) and float(mc) > 0:
+                cache[t] = float(mc)
+
+    known = sum(1 for v in hints.values() if v is not None and _is_finite_number(v))
+    unknown = max(len(allowed) - known, 0)
+    log(
+        f"💰 Universe market-cap hints activated: source={UNIVERSE_MARKET_CAP_HINT_SOURCE}, "
+        f"known={known}, unknown={unknown}"
+    )
 
 
 def _fetch_exchange_rows(exchange: str) -> list[dict]:
@@ -930,6 +991,7 @@ def _build_fresh_universe_from_screener() -> tuple[list[str], dict]:
 
     passed: list[str] = []
     seen: set[str] = set()
+    market_caps: dict[str, float | None] = {}
 
     for i, row in enumerate(all_rows):
         try:
@@ -981,6 +1043,7 @@ def _build_fresh_universe_from_screener() -> tuple[list[str], dict]:
                 meta["unknown_price_passed"] += 1
 
             passed.append(sym)
+            market_caps[sym] = float(mc) if mc is not None and _is_finite_number(mc) and float(mc) > 0 else None
 
         except Exception:
             meta["failed"] += 1
@@ -989,6 +1052,9 @@ def _build_fresh_universe_from_screener() -> tuple[list[str], dict]:
             log(f"   Progress: {i+1}/{len(all_rows)} rows — passed so far: {len(passed)}")
 
     meta["passed"] = len(passed)
+    # Persist the exact market-cap evidence used to admit each symbol.
+    # This keeps Universe and Full Scan consistent within the same run/cache fallback.
+    meta["market_caps"] = market_caps
     return passed, meta
 
 
@@ -1026,6 +1092,7 @@ def build_universe(force_refresh: bool = False) -> list[str]:
     # במקרה מיוחד בלבד אפשר להחזיר cache קודם דרך env, אבל ברירת המחדל היא לבנות חדש בכל ריצה.
     use_cache_first = (not UNIVERSE_ALWAYS_REFRESH) or os.getenv("UNIVERSE_USE_CACHE_FIRST", "False").lower() in ("1", "true", "yes")
     if use_cache_first and not force_refresh and cached_tickers:
+        _activate_universe_market_cap_hints(cached_tickers, cached_meta, "cache_first")
         log(f"📋 UNIVERSE SOURCE: cache first mode ({len(cached_tickers)} tickers)")
         return cached_tickers
 
@@ -1045,15 +1112,18 @@ def build_universe(force_refresh: bool = False) -> list[str]:
     )
 
     if healthy:
+        _activate_universe_market_cap_hints(fresh_tickers, fresh_meta, "fresh_nasdaq_screener")
         _save_universe_cache(fresh_tickers, fresh_meta)
         log(f"✅ UNIVERSE SOURCE: fresh rebuild ({len(fresh_tickers)} tickers) — cache updated")
         return fresh_tickers
 
     log(f"⚠️ Fresh universe not healthy: {reason}")
     if len(cached_tickers) >= UNIVERSE_MIN_CACHE_TICKERS:
+        _activate_universe_market_cap_hints(cached_tickers, cached_meta, "cache_fallback")
         log(f"📋 UNIVERSE SOURCE: cache fallback ({len(cached_tickers)} tickers)")
         return cached_tickers
 
+    _activate_universe_market_cap_hints(_FALLBACK_TICKERS, {}, "emergency_fallback")
     log("⚠️ Cache fallback missing or too small — using emergency fallback tickers")
     log(f"📋 UNIVERSE SOURCE: emergency fallback ({len(_FALLBACK_TICKERS)} tickers)")
     return _FALLBACK_TICKERS
@@ -1744,22 +1814,40 @@ def fetch_data_yfinance(ticker: str, period: str = "500d", max_retries: int = 3)
 def fetch_market_cap(ticker: str) -> float | None:
     """
     מחזיר market cap עם cache.
-    עקבי עם build_universe — info['marketCap'] + fallback shares×price.
+    V9.1.2: ערך ידוע מ-NASDAQ screener כבר מוזן ל-cache לפני הסריקה.
+    רק כשאין ערך ידוע פונים ל-yfinance, עם shares×price ו-fast_info כ-fallback.
     """
     t = ticker.strip().upper()
-    if t in _mc_cache:
-        return _mc_cache[t]
+    cached = _mc_cache.get(t)
+    if cached is not None and _is_finite_number(cached) and float(cached) > 0:
+        return float(cached)
     try:
         info = _get_yf_info(t)
         mc   = info.get("marketCap")
-        mc   = float(mc) if mc else None
+        mc   = float(mc) if mc and _is_finite_number(mc) and float(mc) > 0 else None
 
-        # fallback: shares × price
+        # fallback 1: shares × price
         if not mc:
             shares = info.get("sharesOutstanding") or info.get("impliedSharesOutstanding")
             price  = info.get("currentPrice") or info.get("previousClose")
-            if shares and price:
-                mc = float(shares) * float(price)
+            if shares and price and _is_finite_number(shares) and _is_finite_number(price):
+                calc = float(shares) * float(price)
+                if _is_finite_number(calc) and calc > 0:
+                    mc = calc
+
+        # fallback 2: yfinance fast_info (useful when quoteSummary/info is partial).
+        if not mc:
+            try:
+                fi = getattr(yf.Ticker(t), "fast_info", None)
+                if fi is not None:
+                    try:
+                        fast_mc = fi.get("market_cap")
+                    except Exception:
+                        fast_mc = getattr(fi, "market_cap", None)
+                    if fast_mc and _is_finite_number(fast_mc) and float(fast_mc) > 0:
+                        mc = float(fast_mc)
+            except Exception:
+                pass
 
         _mc_cache[t] = mc
         return mc
@@ -8724,8 +8812,12 @@ def send_daily_summary_email(stats: dict, filter_stats: dict, regime: dict | Non
           <h3 style="margin-bottom:8px;color:#111827;">📊 סיכום ריצה</h3>
           <table style="width:100%;border-collapse:collapse;background:white;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
             {row("מניות אחרי Universe", prefilter_stats.get("total", "N/A"))}
-            {row("עברו Pre-filter והגיעו לסריקה מלאה", prefilter_stats.get("passed", "N/A"))}
+            {row("עברו EMA28 Pre-filter", prefilter_stats.get("passed", "N/A"))}
             {row("נדחו ב־Pre-filter EMA28", prefilter_stats.get("failed", "N/A"))}
+            {row("נדחו ב־Market Cap Pre-check (<$1B)", int(prefilter_stats.get("market_cap_known_reject", 0) or 0) + int(prefilter_stats.get("market_cap_verified_reject", 0) or 0))}
+            {row("Market Cap חסר שאומת מעל $1B", prefilter_stats.get("market_cap_verified_pass", 0))}
+            {row("Market Cap עדיין לא ידוע — fail-open", prefilter_stats.get("market_cap_unresolved_pass", 0), "ניסיון נוסף מתבצע בתוך Full Scan")}
+            {row("עברו Market Cap והגיעו לסריקה מלאה", prefilter_stats.get("post_market_cap_passed", prefilter_stats.get("passed", "N/A")))}
             {row("באטצ׳ים שנכשלו והועברו הלאה", prefilter_stats.get("download_failed_batches", 0), "לא נמחקים — עוברים לסריקה מלאה")}
             {row("מניות בלי נתונים בבאטצ׳ והועברו הלאה", prefilter_stats.get("missing_tickers", 0), "לא פוסלים בגלל חוסר נתונים זמני")}
             {row("מניות שנסרקו בפועל", stats.get("scanned", 0))}
@@ -8998,13 +9090,108 @@ def prefilter_by_ema28(ticker_list: list[str]) -> tuple[list[str], list[str]]:
     return passed, failed
 
 
+def precheck_market_caps_before_full_scan(ticker_list: list[str]) -> tuple[list[str], list[str]]:
+    """
+    V9.1.2 — שער Market Cap לפני ה-Full Scan היקר.
+
+    - Market cap ידוע מה-NASDAQ screener: משתמשים באותו ערך שכבר הכניס ל-Universe.
+    - Market cap חסר: מאמתים פעם אחת דרך yfinance.
+    - אם אומת מתחת ל-$1B: דוחים כאן, לפני sleep/API/pattern scan.
+    - אם עדיין לא ידוע בגלל תקלה זמנית: fail-open ומנסים שוב בתוך Full Scan.
+
+    אין כאן הקלה בסף: $1B נשאר בדיוק אותו סף.
+    """
+    global MARKET_CAP_PRECHECK_STATS, PREFILTER_STATS
+
+    passed: list[str] = []
+    rejected: list[str] = []
+    stats = {
+        "input": len(ticker_list),
+        "known_pass": 0,
+        "known_reject": 0,
+        "unknown_to_verify": 0,
+        "verified_pass": 0,
+        "verified_reject": 0,
+        "unresolved_pass": 0,
+        "output": 0,
+    }
+
+    log(
+        f"💰 Market Cap Pre-check: validating {len(ticker_list)} EMA28 survivors "
+        f"against ${MIN_MARKET_CAP_USD/1e9:.1f}B threshold..."
+    )
+
+    for symbol in ticker_list:
+        t = str(symbol).strip().upper().replace("$", "")
+        if not t:
+            continue
+
+        hint = UNIVERSE_MARKET_CAP_HINTS.get(t)
+        if hint is not None and _is_finite_number(hint) and float(hint) > 0:
+            mc = float(hint)
+            # Safety: should normally be impossible because Universe already filtered it.
+            if mc < MIN_MARKET_CAP_USD:
+                stats["known_reject"] += 1
+                rejected.append(t)
+            else:
+                stats["known_pass"] += 1
+                _mc_cache[t] = mc
+                passed.append(t)
+            continue
+
+        stats["unknown_to_verify"] += 1
+        if MARKET_CAP_PRECHECK_SLEEP_SECONDS > 0:
+            time.sleep(MARKET_CAP_PRECHECK_SLEEP_SECONDS)
+        mc = fetch_market_cap(t)
+        if mc is not None and _is_finite_number(mc) and float(mc) > 0:
+            if float(mc) < MIN_MARKET_CAP_USD:
+                stats["verified_reject"] += 1
+                rejected.append(t)
+            else:
+                stats["verified_pass"] += 1
+                passed.append(t)
+        else:
+            # Preserve coverage: unknown is not evidence that cap is below $1B.
+            # Clear failed caches so scan_ticker gets one independent retry later.
+            stats["unresolved_pass"] += 1
+            _mc_cache.pop(t, None)
+            try:
+                _info_cache.pop(t, None)
+            except Exception:
+                pass
+            passed.append(t)
+
+    stats["output"] = len(passed)
+    MARKET_CAP_PRECHECK_STATS = stats
+
+    # Attach to the existing summary object so the daily email/log explains
+    # exactly how many candidates were removed before the expensive Full Scan.
+    PREFILTER_STATS["market_cap_precheck_input"] = stats["input"]
+    PREFILTER_STATS["market_cap_known_pass"] = stats["known_pass"]
+    PREFILTER_STATS["market_cap_known_reject"] = stats["known_reject"]
+    PREFILTER_STATS["market_cap_unknown_to_verify"] = stats["unknown_to_verify"]
+    PREFILTER_STATS["market_cap_verified_pass"] = stats["verified_pass"]
+    PREFILTER_STATS["market_cap_verified_reject"] = stats["verified_reject"]
+    PREFILTER_STATS["market_cap_unresolved_pass"] = stats["unresolved_pass"]
+    PREFILTER_STATS["post_market_cap_passed"] = stats["output"]
+
+    log(
+        "💰 Market Cap Pre-check done: "
+        f"input={stats['input']}, known_pass={stats['known_pass']}, "
+        f"unknown_checked={stats['unknown_to_verify']}, verified_pass={stats['verified_pass']}, "
+        f"rejected_below_$1B={stats['known_reject'] + stats['verified_reject']}, "
+        f"unresolved_fail_open={stats['unresolved_pass']}, full_scan={stats['output']}"
+    )
+    return passed, rejected
+
+
 def main() -> None:
     global tickers
 
     log("=" * 60)
     log("Stock Scanner Unified — START")
     log(f"Code version: {CODE_VERSION}")
-    log(f"Market cap threshold: ${MIN_MARKET_CAP_USD/1e9:.1f}B | Unknown MC behavior: PASS")
+    log(f"Market cap threshold: ${MIN_MARKET_CAP_USD/1e9:.1f}B | Pipeline: screener cache → precheck unknowns → fail-open only if unresolved")
     log(f"Entry Ready threshold: quality>={ENTRY_READY_MIN_SCORE:.1f} | candidate_score>={ENTRY_CANDIDATE_MIN_SCORE:.1f}")
     log("RESET VERIFIED FIX FILE")
     log("=" * 60)
@@ -9145,9 +9332,18 @@ def main() -> None:
         ticker_list, prefilter_failed = prefilter_by_ema28(ticker_list)
         # חשוב: לא מערבבים את דחיות ה-Pre-filter בתוך סטטיסטיקת ה-Full scan.
         # אחרת מתקבל אחוז לא הגיוני כמו EMA28 311% מתוך המניות שנסרקו בפועל.
-        log(f"⚡ Pre-filter: {len(ticker_list)} מניות ממשיכות לסריקה מלאה")
+        log(f"⚡ EMA28 Pre-filter: {len(ticker_list)} מניות נשארו לפני Market Cap Pre-check")
     except Exception as e:
         log(f"Pre-filter error — ממשיך בלעדיו: {e}")
+
+    # ── V9.1.2 Market Cap Pre-check ─────────────────────────
+    # מסלק מניות < $1B לפני sleep/TwelveData/pattern scan, ורק עבור MC חסר
+    # מבצע yfinance verification. ערכי screener ידועים כבר נמצאים ב-_mc_cache.
+    try:
+        ticker_list, market_cap_pre_rejected = precheck_market_caps_before_full_scan(ticker_list)
+        log(f"💰 אחרי Market Cap Pre-check: {len(ticker_list)} מניות ממשיכות לסריקה מלאה")
+    except Exception as e:
+        log(f"Market Cap Pre-check error — fail-open, continuing candidates unchanged: {e}")
 
     total = len(ticker_list)
 
@@ -9268,8 +9464,13 @@ def main() -> None:
     log("📊 FILTER BREAKDOWN:")
     log("   --- Pre-filter / Universe ---")
     log(f"   {'מניות אחרי Universe':<28} {int(PREFILTER_STATS.get('total', 0) or 0):>6,}")
-    log(f"   {'עברו Pre-filter':<28} {int(PREFILTER_STATS.get('passed', 0) or 0):>6,}")
+    log(f"   {'עברו EMA28 Pre-filter':<28} {int(PREFILTER_STATS.get('passed', 0) or 0):>6,}")
     log(f"   {'נדחו ב-Pre-filter EMA28':<28} {int(PREFILTER_STATS.get('failed', 0) or 0):>6,}")
+    mc_pre_reject = int(PREFILTER_STATS.get('market_cap_known_reject', 0) or 0) + int(PREFILTER_STATS.get('market_cap_verified_reject', 0) or 0)
+    log(f"   {'נדחו Market Cap לפני Full':<28} {mc_pre_reject:>6,}")
+    log(f"   {'MC חסר שאומת מעל $1B':<28} {int(PREFILTER_STATS.get('market_cap_verified_pass', 0) or 0):>6,}")
+    log(f"   {'MC לא ידוע — fail-open':<28} {int(PREFILTER_STATS.get('market_cap_unresolved_pass', 0) or 0):>6,}")
+    log(f"   {'הגיעו ל-Full Scan אחרי MC':<28} {int(PREFILTER_STATS.get('post_market_cap_passed', PREFILTER_STATS.get('passed', 0)) or 0):>6,}")
     log(f"   {'בעיות Data שהועברו הלאה':<28} {int(PREFILTER_STATS.get('missing_tickers', 0) or 0) + int(PREFILTER_STATS.get('ticker_errors', 0) or 0):>6,}")
     log("   --- Full scan only ---")
     log(f"   {'מניות נסרקו בפועל':<28} {total_scanned:>6,}")
