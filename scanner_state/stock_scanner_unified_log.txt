@@ -187985,3 +187985,12 @@ requests.exceptions.ConnectionError: HTTPSConnectionPool(host='api.twelvedata.co
 [2026-09-22 06:11:02] 💾 Market scan date saved: 2026-09-21
 [2026-09-22 06:11:02] Stock Scanner Unified — DONE
 [2026-09-22 06:11:02] ============================================================
+[2026-09-23 06:47:56] ============================================================
+[2026-09-23 06:47:56] Stock Scanner Unified — START
+[2026-09-23 06:47:56] Code version: 2026-09-20-v9.1-professional-trade-quality-engine
+[2026-09-23 06:47:56] Market cap threshold: $1.0B | Unknown MC behavior: PASS
+[2026-09-23 06:47:56] Entry Ready threshold: quality>=60.0 | candidate_score>=35.0
+[2026-09-23 06:47:56] RESET VERIFIED FIX FILE
+[2026-09-23 06:47:56] ============================================================
+[2026-09-23 06:47:57] 🗓️ Market Day Guard: אין נר מסחר חדש מאז הסריקה האחרונה (2026-09-21)
+[2026-09-23 06:47:57] ⏸️ No new market session — exiting before scan to prevent duplicate alerts.
