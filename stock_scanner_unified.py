@@ -28,10 +28,10 @@ stock_scanner_unified.py
 """
 
 # ============================================================
-# RESET VERIFIED FIX FILE — 2026-09-23 V9.1.2
+# RESET VERIFIED FIX FILE — 2026-09-23 V9.1.3
 # This marker proves this is the rebuilt fixed file, not an old download copy.
 # ============================================================
-CODE_VERSION = "2026-09-23-v9.1.2-universe-marketcap-precheck"
+CODE_VERSION = "2026-09-23-v9.1.3-one-month-history-retention"
 RESET_VERIFIED_FIX_FILE = True
 
 
@@ -42,6 +42,7 @@ import os
 import re
 import json
 import csv
+import calendar
 import time
 import random
 import traceback
@@ -1244,6 +1245,274 @@ def _save_json(path: str, data) -> None:
             json.dump(data, f, ensure_ascii=False, indent=2, default=str)
     except Exception as e:
         log(f"_save_json error {path}: {e}")
+
+
+# ============================================================
+#  V9.1.3 — ONE-MONTH HISTORY RETENTION
+#  בסוף סריקה מלאה: משאיר רק היסטוריה מהחודש הקלנדרי האחרון.
+#  State חי (פוזיציות פתוחות / תאריך סריקה / cache / blocklist) לא נמחק.
+# ============================================================
+def _israel_today_date():
+    """Today's date in Israel; safe fallback to runner-local date."""
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo("Asia/Jerusalem")).date()
+    except Exception:
+        return datetime.now().date()
+
+
+def _one_calendar_month_ago(day):
+    """Same day one calendar month earlier; clamps to the previous month's last day."""
+    year = int(day.year)
+    month = int(day.month) - 1
+    if month == 0:
+        month = 12
+        year -= 1
+    last_day = calendar.monthrange(year, month)[1]
+    return datetime(year, month, min(int(day.day), last_day)).date()
+
+
+def _atomic_write_text(path: str, text: str) -> None:
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    tmp = f"{path}.tmp"
+    with open(tmp, "w", encoding="utf-8", newline="") as f:
+        f.write(text)
+    os.replace(tmp, path)
+
+
+def _atomic_write_json(path: str, data) -> None:
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    tmp = f"{path}.tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2, default=str)
+    os.replace(tmp, path)
+
+
+def _prune_csv_by_date(path: str, date_column: str, cutoff_date) -> dict:
+    result = {"file": os.path.basename(path), "before": 0, "after": 0, "removed": 0, "status": "missing"}
+    if not path or not os.path.exists(path):
+        return result
+    try:
+        df = pd.read_csv(path)
+        result["before"] = int(len(df))
+        if df.empty:
+            result.update({"after": 0, "removed": 0, "status": "ok"})
+            return result
+        if date_column not in df.columns:
+            result["status"] = f"skipped:no_column:{date_column}"
+            result["after"] = result["before"]
+            return result
+
+        parsed = pd.to_datetime(df[date_column], errors="coerce")
+        # Fail-safe: invalid/unparseable rows are retained rather than deleted blindly.
+        valid_dates = parsed.dt.date
+        keep = parsed.isna() | (valid_dates >= cutoff_date)
+        out = df.loc[keep].copy()
+
+        tmp = f"{path}.tmp"
+        out.to_csv(tmp, index=False)
+        os.replace(tmp, path)
+        result["after"] = int(len(out))
+        result["removed"] = result["before"] - result["after"]
+        result["status"] = "ok"
+        return result
+    except Exception as e:
+        result["status"] = f"error:{type(e).__name__}"
+        result["after"] = result["before"]
+        return result
+
+
+def _prune_alert_history_json(path: str, cutoff_date) -> dict:
+    result = {"file": os.path.basename(path), "before": 0, "after": 0, "removed": 0, "status": "missing"}
+    if not path or not os.path.exists(path):
+        return result
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            result["status"] = "skipped:not_dict"
+            return result
+
+        result["before"] = len(data)
+        kept = {}
+        for key, rec in data.items():
+            # Current nested style: ticker -> {time, patterns:[{time,...}]}
+            if isinstance(rec, dict) and isinstance(rec.get("patterns"), list):
+                new_patterns = []
+                for item in rec.get("patterns", []):
+                    if not isinstance(item, dict):
+                        continue
+                    try:
+                        ts = float(item.get("time", 0) or 0)
+                        if ts <= 0:
+                            continue
+                        try:
+                            from zoneinfo import ZoneInfo
+                            event_date = datetime.fromtimestamp(ts, ZoneInfo("Asia/Jerusalem")).date()
+                        except Exception:
+                            event_date = datetime.fromtimestamp(ts).date()
+                        if event_date >= cutoff_date:
+                            new_patterns.append(item)
+                    except Exception:
+                        continue
+                if new_patterns:
+                    newest_ts = max(float(x.get("time", 0) or 0) for x in new_patterns)
+                    new_rec = dict(rec)
+                    new_rec["patterns"] = new_patterns
+                    new_rec["time"] = newest_ts
+                    kept[key] = new_rec
+                continue
+
+            # Compatibility style: key -> ISO datetime string.
+            if isinstance(rec, str):
+                try:
+                    event_date = datetime.fromisoformat(rec.replace("Z", "+00:00")).date()
+                    if event_date >= cutoff_date:
+                        kept[key] = rec
+                except Exception:
+                    # Preserve unknown formats rather than destroy data blindly.
+                    kept[key] = rec
+                continue
+
+            # Unknown legacy shape: preserve as fail-safe.
+            kept[key] = rec
+
+        _atomic_write_json(path, kept)
+        result["after"] = len(kept)
+        result["removed"] = result["before"] - result["after"]
+        result["status"] = "ok"
+        return result
+    except Exception as e:
+        result["status"] = f"error:{type(e).__name__}"
+        result["after"] = result["before"]
+        return result
+
+
+def _prune_watchlist_log(path: str, cutoff_date) -> dict:
+    """Keep only dated watchlist sections whose 📅 date is within the retention window."""
+    result = {"file": os.path.basename(path), "before": 0, "after": 0, "removed": 0, "status": "missing"}
+    if not path or not os.path.exists(path):
+        return result
+    try:
+        content = open(path, "r", encoding="utf-8").read()
+        marker_re = re.compile(r"(?m)^📅\s*(\d{4}-\d{2}-\d{2})\s*$")
+        matches = list(marker_re.finditer(content))
+        result["before"] = len(matches)
+        if not matches:
+            result["status"] = "ok:no_dated_sections"
+            result["after"] = 0
+            return result
+
+        kept_sections = []
+        for idx, m in enumerate(matches):
+            try:
+                section_date = datetime.strptime(m.group(1), "%Y-%m-%d").date()
+            except Exception:
+                continue
+            if section_date < cutoff_date:
+                continue
+
+            # Include the separator line immediately before the 📅 marker when present.
+            start = m.start()
+            prev_nl = content.rfind("\n", 0, max(0, start - 1))
+            prev_prev_nl = content.rfind("\n", 0, max(0, prev_nl)) if prev_nl >= 0 else -1
+            candidate_start = prev_prev_nl + 1 if prev_prev_nl >= 0 else 0
+            prior_line = content[candidate_start:prev_nl].strip() if prev_nl >= 0 else ""
+            if prior_line and set(prior_line) == {"═"}:
+                start = candidate_start
+
+            if idx + 1 < len(matches):
+                next_marker_start = matches[idx + 1].start()
+                # Exclude the separator that belongs to the next date block.
+                next_prev_nl = content.rfind("\n", 0, max(0, next_marker_start - 1))
+                next_prev_prev_nl = content.rfind("\n", 0, max(0, next_prev_nl)) if next_prev_nl >= 0 else -1
+                end = next_prev_prev_nl + 1 if next_prev_prev_nl >= 0 else next_marker_start
+            else:
+                end = len(content)
+            kept_sections.append(content[start:end].strip("\n"))
+
+        new_content = ("\n\n".join(kept_sections).strip() + "\n") if kept_sections else ""
+        _atomic_write_text(path, new_content)
+        result["after"] = len(kept_sections)
+        result["removed"] = result["before"] - result["after"]
+        result["status"] = "ok"
+        return result
+    except Exception as e:
+        result["status"] = f"error:{type(e).__name__}"
+        result["after"] = result["before"]
+        return result
+
+
+def _prune_scanner_log(path: str, cutoff_date) -> dict:
+    """Keep dated log lines from cutoff onward; keep continuation lines only for kept dated entries."""
+    result = {"file": os.path.basename(path), "before": 0, "after": 0, "removed": 0, "status": "missing"}
+    if not path or not os.path.exists(path):
+        return result
+    try:
+        lines = open(path, "r", encoding="utf-8").readlines()
+        date_re = re.compile(r"^\[(\d{4}-\d{2}-\d{2})\s")
+        result["before"] = len(lines)
+        out = []
+        keep_continuation = False
+        for line in lines:
+            m = date_re.match(line)
+            if m:
+                try:
+                    d = datetime.strptime(m.group(1), "%Y-%m-%d").date()
+                    keep_continuation = d >= cutoff_date
+                except Exception:
+                    keep_continuation = True
+                if keep_continuation:
+                    out.append(line)
+            elif keep_continuation:
+                out.append(line)
+        _atomic_write_text(path, "".join(out))
+        result["after"] = len(out)
+        result["removed"] = result["before"] - result["after"]
+        result["status"] = "ok"
+        return result
+    except Exception as e:
+        result["status"] = f"error:{type(e).__name__}"
+        result["after"] = result["before"]
+        return result
+
+
+def cleanup_history_older_than_one_month() -> list[dict]:
+    """
+    Rolling calendar-month retention for historical files only.
+
+    Example: if today is 2026-09-23, cutoff is 2026-08-23 (inclusive).
+    Intentionally NOT touched: open_positions.json, last_market_scan_date.txt,
+    last_run_date.txt, universe_cache.json, twelvedata_blocklist.json, progress.json,
+    or learned-parameter state.
+    """
+    today = _israel_today_date()
+    cutoff = _one_calendar_month_ago(today)
+    results = []
+
+    results.append(_prune_csv_by_date(ENTRY_QUALITY_LOG, "date", cutoff))
+    results.append(_prune_csv_by_date(PRO_QUALITY_LOG, "timestamp", cutoff))
+    results.append(_prune_csv_by_date(SIGNALS_CSV, "Time", cutoff))
+    results.append(_prune_csv_by_date(PERFORMANCE_CSV, "date_sent", cutoff))
+    results.append(_prune_alert_history_json(ALERT_HISTORY_FILE, cutoff))
+    results.append(_prune_watchlist_log(WATCHLIST_LOG, cutoff))
+    # Prune the main log last, then emit the cleanup summary so current-run lines remain.
+    results.append(_prune_scanner_log(LOGFILE, cutoff))
+
+    log(f"🧹 History retention: today={today.isoformat()} | cutoff={cutoff.isoformat()} (inclusive, one calendar month)")
+    for item in results:
+        status = item.get("status", "unknown")
+        if status == "missing":
+            continue
+        log(
+            f"   🧹 {item.get('file','?')}: {item.get('before',0)} → {item.get('after',0)} "
+            f"(removed {item.get('removed',0)}) | {status}"
+        )
+    return results
 
 
 def _is_israel_weekend_now() -> bool:
@@ -9508,6 +9777,12 @@ def main() -> None:
         save_last_market_scan_date(market_session_date)
     except Exception as e:
         log(f"Market scan date save error: {e}")
+
+    # ── V9.1.3 Rolling history retention — רק היסטוריה, לא state חי ──
+    try:
+        cleanup_history_older_than_one_month()
+    except Exception as e:
+        log(f"History retention cleanup error: {type(e).__name__}: {e}")
 
     log("Stock Scanner Unified — DONE")
     log("=" * 60)
