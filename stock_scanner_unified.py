@@ -31,7 +31,7 @@ stock_scanner_unified.py
 # RESET VERIFIED FIX FILE — 2026-09-23 V9.1.3
 # This marker proves this is the rebuilt fixed file, not an old download copy.
 # ============================================================
-CODE_VERSION = "2026-09-23-v9.1.3-one-month-history-retention"
+CODE_VERSION = "2026-09-24-v9.1.4-candle-change-market-guard"
 RESET_VERIFIED_FIX_FILE = True
 
 
@@ -194,9 +194,13 @@ MARKET_DAY_GUARD_ENABLED = os.getenv("MARKET_DAY_GUARD_ENABLED", "True").lower()
 SKIP_ISRAEL_WEEKENDS = os.getenv("SKIP_ISRAEL_WEEKENDS", "True").lower() in ("1", "true", "yes")
 MARKET_SCAN_SYMBOL = os.getenv("MARKET_SCAN_SYMBOL", "SPY")
 MARKET_SCAN_STATE_FILE = _state_path(os.getenv("MARKET_SCAN_STATE_FILE", "last_market_scan_date.txt"))
+# V9.1.4: keep a richer guard state alongside the legacy date file.
+# The JSON stores the last observed OHLCV candle per provider so an intraday/manual
+# scan cannot suppress the next scan after that same daily candle changes/finalizes.
+MARKET_CANDLE_STATE_FILE = _state_path(os.getenv("MARKET_CANDLE_STATE_FILE", "last_market_scan_state.json"))
 FORCE_SCAN = os.getenv("FORCE_SCAN", "False").lower() in ("1", "true", "yes")
 
-# --- V9.1.1 Market Day Guard fail-safe ---
+# --- V9.1.4 Market Day Guard: date + candle-change fail-safe ---
 # Yahoo occasionally serves a stale last daily candle in early-morning GitHub runs.
 # The guard now retries Yahoo, cross-checks a second liquid ETF, and then uses
 # TwelveData as an independent fallback before deciding that no new session exists.
@@ -1487,8 +1491,8 @@ def cleanup_history_older_than_one_month() -> list[dict]:
 
     Example: if today is 2026-09-23, cutoff is 2026-08-23 (inclusive).
     Intentionally NOT touched: open_positions.json, last_market_scan_date.txt,
-    last_run_date.txt, universe_cache.json, twelvedata_blocklist.json, progress.json,
-    or learned-parameter state.
+    last_market_scan_state.json, last_run_date.txt, universe_cache.json,
+    twelvedata_blocklist.json, progress.json, or learned-parameter state.
     """
     today = _israel_today_date()
     cutoff = _one_calendar_month_ago(today)
@@ -1539,49 +1543,108 @@ def _market_date_from_index(index) -> str | None:
         return None
 
 
-def _get_yahoo_market_session_date_once(symbol: str) -> str | None:
-    """One Yahoo/yfinance attempt. Only a row with a finite Close can become a session date."""
+def _normalize_market_candle(source: str, symbol: str, date_value, row) -> dict | None:
+    """Build a stable JSON-safe daily OHLCV snapshot for Market Day Guard comparisons."""
     try:
+        dt = pd.to_datetime(date_value, errors="coerce")
+        if pd.isna(dt):
+            return None
+        date_str = dt.date().isoformat()
+
+        def _field(name: str):
+            value = None
+            if isinstance(row, dict):
+                value = row.get(name)
+                if value is None:
+                    value = row.get(name.lower())
+                if value is None:
+                    value = row.get(name.capitalize())
+            else:
+                try:
+                    value = row.get(name.lower())
+                except Exception:
+                    value = None
+                if value is None:
+                    try:
+                        value = row.get(name.capitalize())
+                    except Exception:
+                        value = None
+            return value
+
+        close = _field("close")
+        if not _is_finite_number(close) or float(close) <= 0:
+            return None
+
+        snap = {
+            "source": str(source or "unknown"),
+            "symbol": str(symbol or "").strip().upper(),
+            "date": date_str,
+        }
+        for key in ("open", "high", "low", "close"):
+            value = _field(key)
+            snap[key] = round(float(value), 6) if _is_finite_number(value) else None
+        volume = _field("volume")
+        snap["volume"] = int(round(float(volume))) if _is_finite_number(volume) and float(volume) >= 0 else None
+        return snap
+    except Exception:
+        return None
+
+
+def _get_yahoo_market_candle_once(symbol: str) -> dict | None:
+    """One Yahoo attempt returning the latest usable daily OHLCV candle."""
+    try:
+        # Raw/unadjusted prices are more stable for fingerprinting than auto-adjusted history.
         df = _normalize_yfinance_df(yf.download(
             symbol,
             period="15d",
             interval="1d",
             progress=False,
-            auto_adjust=True,
+            auto_adjust=False,
             threads=False,
             timeout=15,
         ))
         if df is None or df.empty:
             return None
-        return _market_date_from_index(df.index)
+        row = df.iloc[-1]
+        return _normalize_market_candle(f"Yahoo:{str(symbol).strip().upper()}", symbol, df.index[-1], row)
     except Exception as e:
         log(f"Market day guard Yahoo error for {symbol}: {e}")
         return None
 
 
-def _get_yahoo_market_session_date(symbol: str) -> str | None:
-    """Retry Yahoo because its daily history can be stale for a short time after a US close."""
-    best_date = None
+def _get_yahoo_market_candle(symbol: str) -> dict | None:
+    """Retry Yahoo and keep the newest/latest observed candle."""
+    best = None
     for attempt in range(1, MARKET_GUARD_YAHOO_RETRIES + 1):
-        date_value = _get_yahoo_market_session_date_once(symbol)
-        if date_value and (best_date is None or date_value > best_date):
-            best_date = date_value
+        candle = _get_yahoo_market_candle_once(symbol)
+        if candle:
+            if best is None or str(candle.get("date", "")) > str(best.get("date", "")):
+                best = candle
+            elif str(candle.get("date", "")) == str(best.get("date", "")):
+                # On an open session Yahoo can update OHLCV between retries. Keep the latest attempt.
+                best = candle
         if attempt < MARKET_GUARD_YAHOO_RETRIES and MARKET_GUARD_RETRY_DELAY_SEC > 0:
-            # A tiny jitter avoids repeatedly hitting the exact same cached edge response.
             time.sleep(MARKET_GUARD_RETRY_DELAY_SEC + random.uniform(0.0, 0.35))
-    return best_date
+    return best
 
 
-def _get_twelvedata_market_session_date(symbol: str) -> str | None:
-    """
-    Independent market-session fallback using TwelveData.
-    Tries a few configured keys without printing/leaking any key and without blocking the scan.
-    """
+def _get_yahoo_market_session_date_once(symbol: str) -> str | None:
+    """Compatibility wrapper: one Yahoo attempt -> YYYY-MM-DD."""
+    candle = _get_yahoo_market_candle_once(symbol)
+    return str(candle.get("date")) if candle and candle.get("date") else None
+
+
+def _get_yahoo_market_session_date(symbol: str) -> str | None:
+    """Compatibility wrapper: retried Yahoo candle -> YYYY-MM-DD."""
+    candle = _get_yahoo_market_candle(symbol)
+    return str(candle.get("date")) if candle and candle.get("date") else None
+
+
+def _get_twelvedata_market_candle(symbol: str) -> dict | None:
+    """Independent latest daily OHLCV candle from TwelveData, without exposing API keys."""
     if not MARKET_GUARD_TWELVEDATA_ENABLED or not API_KEYS:
         return None
 
-    # The guard needs only a handful of rows. Try at most 3 keys so a bad/rate-limited key
-    # cannot prevent the scanner from reaching the remaining data pipeline.
     keys_to_try = API_KEYS[: min(3, len(API_KEYS))]
     for key in keys_to_try:
         params = {
@@ -1603,62 +1666,61 @@ def _get_twelvedata_market_session_date(symbol: str) -> str | None:
             if not values:
                 continue
 
-            valid_dates = []
+            best = None
             for row in values:
-                try:
-                    close = float(row.get("close"))
-                    if not _is_finite_number(close):
-                        continue
-                    dt = pd.to_datetime(row.get("datetime"), errors="coerce")
-                    if pd.isna(dt):
-                        continue
-                    valid_dates.append(dt.date().isoformat())
-                except Exception:
-                    continue
-
-            if valid_dates:
+                candle = _normalize_market_candle(
+                    f"TwelveData:{str(symbol).strip().upper()}", symbol, row.get("datetime"), row
+                )
+                if candle and (best is None or candle["date"] > best["date"]):
+                    best = candle
+            if best:
                 update_api_usage(key)
-                return max(valid_dates)
+                return best
         except Exception as e:
             log(f"Market day guard TwelveData error for {symbol}: {e}")
             continue
     return None
 
 
-def get_market_session_evidence(symbol: str = MARKET_SCAN_SYMBOL) -> dict:
-    """
-    Collect session dates from multiple sources.
+def _get_twelvedata_market_session_date(symbol: str) -> str | None:
+    """Compatibility wrapper: TwelveData candle -> YYYY-MM-DD."""
+    candle = _get_twelvedata_market_candle(symbol)
+    return str(candle.get("date")) if candle and candle.get("date") else None
 
-    Decision rule intentionally favors not missing a real trading day:
-      * if ANY reliable source sees a date newer than state -> scan it;
-      * only skip when every available source is not newer than state;
-      * if every source fails -> fail open and scan without advancing the state date.
-    """
+
+def get_market_candle_evidence(symbol: str = MARKET_SCAN_SYMBOL) -> dict:
+    """Collect latest daily-candle snapshots from independent/redundant sources."""
     primary = str(symbol or MARKET_SCAN_SYMBOL).strip().upper() or "SPY"
     secondary = MARKET_GUARD_SECONDARY_SYMBOL
-    evidence = {}
+    evidence: dict[str, dict | None] = {}
 
-    evidence[f"Yahoo:{primary}"] = _get_yahoo_market_session_date(primary)
+    primary_yahoo = _get_yahoo_market_candle(primary)
+    evidence[f"Yahoo:{primary}"] = primary_yahoo
 
-    # A second ETF helps detect a symbol-specific stale response, even though it is still Yahoo.
+    # Secondary ETF is mainly date evidence. Its own candle is stored so the same source
+    # can also reveal that the US session is still updating.
     if secondary and secondary != primary:
-        evidence[f"Yahoo:{secondary}"] = _get_yahoo_market_session_date(secondary)
+        evidence[f"Yahoo:{secondary}"] = _get_yahoo_market_candle(secondary)
 
-    # Independent provider is the critical stale-Yahoo fail-safe.
-    td_date = _get_twelvedata_market_session_date(primary)
-    evidence[f"TwelveData:{primary}"] = td_date
-
+    evidence[f"TwelveData:{primary}"] = _get_twelvedata_market_candle(primary)
     return evidence
 
 
+def get_market_session_evidence(symbol: str = MARKET_SCAN_SYMBOL) -> dict:
+    """Compatibility API: return only source -> date while using the richer candle evidence."""
+    candles = get_market_candle_evidence(symbol)
+    return {
+        source: (str(candle.get("date")) if candle and candle.get("date") else None)
+        for source, candle in candles.items()
+    }
+
+
 def get_latest_market_session_date(symbol: str = MARKET_SCAN_SYMBOL) -> str | None:
-    """
-    Return the newest valid market-session date seen by any configured source.
-    Kept as a compatibility wrapper for the rest of the scanner.
-    """
+    """Return the newest valid market-session date seen by any configured source."""
     evidence = get_market_session_evidence(symbol)
     dates = [d for d in evidence.values() if d]
     return max(dates) if dates else None
+
 
 def load_last_market_scan_date() -> str:
     try:
@@ -1669,7 +1731,63 @@ def load_last_market_scan_date() -> str:
     return ""
 
 
+def _load_market_scan_guard_state() -> dict:
+    """Load V9.1.4 candle state, falling back to the legacy date-only state."""
+    legacy_date = load_last_market_scan_date()
+    state = {}
+    try:
+        if os.path.exists(MARKET_CANDLE_STATE_FILE):
+            with open(MARKET_CANDLE_STATE_FILE, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+            if isinstance(loaded, dict):
+                state = loaded
+    except Exception as e:
+        log(f"market candle state read error: {e}")
+        state = {}
+
+    market_date = str(state.get("market_date") or legacy_date or "").strip()
+    candles = state.get("candles") if isinstance(state.get("candles"), dict) else {}
+    return {"market_date": market_date, "candles": candles}
+
+
+_MARKET_GUARD_PENDING_EVIDENCE: dict[str, dict | None] = {}
+
+
+def _market_candle_changes(previous: dict, current: dict) -> list[str]:
+    """Return changed OHLCV fields. Tiny real price changes count; float noise does not."""
+    try:
+        if not isinstance(previous, dict) or not isinstance(current, dict):
+            return []
+        if str(previous.get("date") or "") != str(current.get("date") or ""):
+            return [f"date {previous.get('date')}→{current.get('date')}"]
+
+        changes: list[str] = []
+        for key in ("open", "high", "low", "close"):
+            old = previous.get(key)
+            new = current.get(key)
+            if not (_is_finite_number(old) and _is_finite_number(new)):
+                continue
+            old_f = float(old); new_f = float(new)
+            # 1e-6 absolute / 1e-8 relative ignores serialization noise but catches sub-cent moves.
+            tol = max(1e-6, abs(old_f) * 1e-8)
+            if abs(new_f - old_f) > tol:
+                changes.append(f"{key} {old_f:.6f}→{new_f:.6f}")
+
+        old_v = previous.get("volume")
+        new_v = current.get("volume")
+        if _is_finite_number(old_v) and _is_finite_number(new_v):
+            if int(round(float(old_v))) != int(round(float(new_v))):
+                changes.append(f"volume {int(round(float(old_v))):,}→{int(round(float(new_v))):,}")
+        return changes
+    except Exception:
+        return []
+
+
 def save_last_market_scan_date(market_date: str | None) -> None:
+    """
+    Save legacy date plus V9.1.4 candle fingerprints captured by the guard.
+    This is written only after the scan/BEAR handling reaches the existing save point.
+    """
     if not market_date:
         return
     try:
@@ -1682,16 +1800,42 @@ def save_last_market_scan_date(market_date: str | None) -> None:
     except Exception as e:
         log(f"save_last_market_scan_date error: {e}")
 
+    try:
+        candles = {}
+        for source, candle in (_MARKET_GUARD_PENDING_EVIDENCE or {}).items():
+            if not isinstance(candle, dict):
+                continue
+            # Preserve all observed provider candles; comparisons are same-source on next run.
+            candles[str(source)] = candle
+        state = {
+            "market_date": str(market_date).strip(),
+            "saved_at": datetime.now().isoformat(timespec="seconds"),
+            "candles": candles,
+        }
+        parent = os.path.dirname(MARKET_CANDLE_STATE_FILE)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        with open(MARKET_CANDLE_STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False, indent=2)
+        log(f"💾 Market candle fingerprint saved: {len(candles)} source(s) → {MARKET_CANDLE_STATE_FILE}")
+    except Exception as e:
+        log(f"save market candle fingerprint error: {e}")
+
 
 def should_run_for_new_market_session() -> tuple[bool, str | None, str]:
     """
-    Decide whether to start a scan.
-    Returns: (should_run, market_date, reason)
+    V9.1.4 Market Day Guard.
 
-    V9.1.1 fail-safe:
-    a stale Yahoo candle can no longer veto a scan by itself. We cross-check all
-    available sources and use the newest valid session date.
+    Scan when either:
+      1) a provider sees a newer market-session date, OR
+      2) the same daily candle changed since the prior completed scan (OHLC or Volume).
+
+    This specifically handles a manual/intraday scan: the next run after the US close sees
+    the finalized candle changed and scans again, even though the calendar date is identical.
     """
+    global _MARKET_GUARD_PENDING_EVIDENCE
+    _MARKET_GUARD_PENDING_EVIDENCE = {}
+
     if FORCE_SCAN:
         return True, None, "FORCE_SCAN=True — bypass market day guard"
 
@@ -1701,49 +1845,88 @@ def should_run_for_new_market_session() -> tuple[bool, str | None, str]:
     if SKIP_ISRAEL_WEEKENDS and _is_israel_weekend_now():
         return False, None, "שבת/ראשון לפי שעון ישראל — מדלג כדי לא לסרוק ביום בלי מסחר"
 
-    last_scanned = load_last_market_scan_date()
-    evidence = get_market_session_evidence(MARKET_SCAN_SYMBOL)
-    valid = {source: date_value for source, date_value in evidence.items() if date_value}
+    previous_state = _load_market_scan_guard_state()
+    last_scanned = str(previous_state.get("market_date") or "").strip()
+    previous_candles = previous_state.get("candles") if isinstance(previous_state.get("candles"), dict) else {}
+
+    evidence = get_market_candle_evidence(MARKET_SCAN_SYMBOL)
+    _MARKET_GUARD_PENDING_EVIDENCE = evidence
+    valid = {
+        source: candle for source, candle in evidence.items()
+        if isinstance(candle, dict) and candle.get("date")
+    }
 
     evidence_text = ", ".join(
-        f"{source}={date_value or 'N/A'}" for source, date_value in evidence.items()
+        f"{source}={candle.get('date')} close={candle.get('close')} vol={candle.get('volume')}"
+        if isinstance(candle, dict) else f"{source}=N/A"
+        for source, candle in evidence.items()
     )
     if evidence_text:
-        log(f"🛡️ Market Day Guard sources: {evidence_text}")
+        log(f"🛡️ Market Day Guard candles: {evidence_text}")
 
     if not valid:
-        # Fail open: a total provider outage must not cause a missed trading day.
-        # market_date=None means we do NOT advance last_market_scan_date blindly.
-        return True, None, "כל מקורות יום-המסחר לא זמינים — ממשיך Fail-Open ולא מעדכן state בלי תאריך מאומת"
+        return True, None, "כל מקורות נר-המסחר לא זמינים — ממשיך Fail-Open ולא מעדכן state בלי תאריך מאומת"
 
-    latest_market_date = max(valid.values())
-    newer_sources = {src: d for src, d in valid.items() if (not last_scanned or d > last_scanned)}
-
+    latest_market_date = max(str(candle.get("date")) for candle in valid.values())
+    newer_sources = {
+        src: candle for src, candle in valid.items()
+        if (not last_scanned or str(candle.get("date")) > last_scanned)
+    }
     if newer_sources:
-        source_summary = ", ".join(f"{src}={d}" for src, d in newer_sources.items())
-        stale_sources = {src: d for src, d in valid.items() if last_scanned and d <= last_scanned}
-        stale_note = ""
-        if stale_sources:
-            stale_note = " | stale/older: " + ", ".join(f"{src}={d}" for src, d in stale_sources.items())
+        source_summary = ", ".join(f"{src}={c.get('date')}" for src, c in newer_sources.items())
         return (
             True,
             latest_market_date,
-            f"נר מסחר חדש אומת: {latest_market_date} | source(s): {source_summary}{stale_note} "
+            f"נר מסחר בתאריך חדש אומת: {latest_market_date} | source(s): {source_summary} "
             f"(נסרק קודם: {last_scanned or 'אף פעם'})",
         )
 
-    # No available source sees anything newer than state. This is the only normal skip path.
-    unique_dates = sorted(set(valid.values()))
-    if len(unique_dates) > 1:
-        # Sources disagree, but none is newer than state. Do not invent a new session.
-        return False, latest_market_date, (
-            f"אין מקור שמציג נר חדש מעבר ל-{last_scanned}; מקורות לא מסונכרנים "
-            f"({evidence_text})"
+    # Migration from V9.1.3/date-only state: run once so we can establish fingerprints.
+    if last_scanned and not previous_candles:
+        return (
+            True,
+            latest_market_date,
+            f"state ישן מכיל תאריך בלבד ({last_scanned}) ללא fingerprint — מריץ פעם אחת כדי לקלוט OHLCV עדכני",
         )
 
-    return False, latest_market_date, (
-        f"אין נר מסחר חדש מאז הסריקה האחרונה ({last_scanned or latest_market_date}); "
-        f"אומת מול {len(valid)} מקור/ות"
+    # Same market date: compare only the same provider/symbol to avoid cross-provider noise.
+    changed_sources: list[str] = []
+    comparable_sources = 0
+    for source, current in valid.items():
+        # Same-date price-change re-scan is keyed to the primary market symbol (SPY by default).
+        # QQQ remains useful for detecting a newer session date but does not independently trigger
+        # a same-date re-scan due to provider revisions in a different instrument.
+        if str(current.get("symbol") or "").strip().upper() != str(MARKET_SCAN_SYMBOL).strip().upper():
+            continue
+        previous = previous_candles.get(source)
+        if not isinstance(previous, dict):
+            continue
+        if str(current.get("date") or "") != last_scanned or str(previous.get("date") or "") != last_scanned:
+            continue
+        comparable_sources += 1
+        changes = _market_candle_changes(previous, current)
+        if changes:
+            changed_sources.append(f"{source}: " + ", ".join(changes[:5]))
+
+    if changed_sources:
+        detail = " | ".join(changed_sources[:3])
+        return (
+            True,
+            latest_market_date,
+            f"אותו נר מסחר ({latest_market_date}) השתנה מאז הסריקה האחרונה — מריץ שוב | {detail}",
+        )
+
+    if comparable_sources > 0:
+        return False, latest_market_date, (
+            f"אין תאריך חדש ואין שינוי ב-OHLCV מאז הסריקה האחרונה ({last_scanned}); "
+            f"אומת מול {comparable_sources} מקור/ות זהים"
+        )
+
+    # Providers changed/temporarily disappeared. Favor not missing a finalized candle.
+    return (
+        True,
+        latest_market_date,
+        f"אין מקור OHLCV בר-השוואה מול הסריקה הקודמת ({last_scanned}) — ממשיך Fail-Open פעם זו כדי לא לפספס שינוי בנר",
     )
 
 def load_progress() -> dict:
