@@ -194999,3 +194999,13 @@ requests.exceptions.ConnectionError: HTTPSConnectionPool(host='api.twelvedata.co
 [2026-09-23 14:29:22] 💾 Market scan date saved: 2026-09-23
 [2026-09-23 14:29:22] Stock Scanner Unified — DONE
 [2026-09-23 14:29:22] ============================================================
+[2026-09-24 06:14:41] ============================================================
+[2026-09-24 06:14:41] Stock Scanner Unified — START
+[2026-09-24 06:14:41] Code version: 2026-09-23-v9.1.3-one-month-history-retention
+[2026-09-24 06:14:41] Market cap threshold: $1.0B | Pipeline: screener cache → precheck unknowns → fail-open only if unresolved
+[2026-09-24 06:14:41] Entry Ready threshold: quality>=60.0 | candidate_score>=35.0
+[2026-09-24 06:14:41] RESET VERIFIED FIX FILE
+[2026-09-24 06:14:41] ============================================================
+[2026-09-24 06:14:50] 🛡️ Market Day Guard sources: Yahoo:SPY=2026-09-23, Yahoo:QQQ=2026-09-23, TwelveData:SPY=2026-09-23
+[2026-09-24 06:14:50] 🗓️ Market Day Guard: אין נר מסחר חדש מאז הסריקה האחרונה (2026-09-23); אומת מול 3 מקור/ות
+[2026-09-24 06:14:50] ⏸️ No new market session — exiting before scan to prevent duplicate alerts.
