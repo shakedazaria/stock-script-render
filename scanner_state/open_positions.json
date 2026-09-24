@@ -2520,19 +2520,17 @@
     "close_date": null,
     "pnl_pct": null,
     "data_status": "ok",
-    "soft_warnings": [
-      "\ud83d\udcc9 \u05de\u05ea\u05d7\u05ea \u05dc-Low \u05d0\u05ea\u05de\u05d5\u05dc (79.01 < 79.88)"
-    ]
+    "soft_warnings": []
   },
   {
     "ticker": "BIO",
     "pattern": "EMA21/MA50 Pullback Bounce",
     "entry": 370.51999,
     "stop_initial": 363.8317,
-    "stop_current": 363.8317,
+    "stop_current": 364.85,
     "target": 413.42075,
     "date_open": "2026-09-16",
-    "highest_price": 385.7099914550781,
+    "highest_price": 388.739990234375,
     "stop_method": "smart_atr_support",
     "trailing_status": "active",
     "closed": false,
@@ -2554,14 +2552,14 @@
     "highest_price": 69.47000122070312,
     "stop_method": "smart_atr_support",
     "trailing_status": "waiting",
-    "closed": false,
-    "close_reason": null,
-    "close_price": null,
-    "close_date": null,
-    "pnl_pct": null,
+    "closed": true,
+    "close_reason": "\ud83d\uded1 \u05e4\u05d2\u05e2 \u05d1-Stop Loss (65.78 \u2264 66.29)",
+    "close_price": 65.7750015258789,
+    "close_date": "2026-09-24",
+    "pnl_pct": -4.91,
     "data_status": "ok",
     "soft_warnings": [
-      "\u26a0\ufe0f \u05de\u05ea\u05d7\u05ea \u05dc-EMA28 (66.57)"
+      "\u26a0\ufe0f \u05de\u05ea\u05d7\u05ea \u05dc-EMA28 (65.78)"
     ]
   },
   {
@@ -2569,10 +2567,10 @@
     "pattern": "VCP Breakout",
     "entry": 82.55,
     "stop_initial": 76.16725,
-    "stop_current": 83.23,
+    "stop_current": 88.09,
     "target": 104.45824999999999,
     "date_open": "2026-09-17",
-    "highest_price": 90.04000091552734,
+    "highest_price": 95.98629760742188,
     "stop_method": "smart_atr_support",
     "trailing_status": "active",
     "closed": false,
@@ -2591,7 +2589,7 @@
     "stop_current": 36.22795,
     "target": 46.87512500000001,
     "date_open": "2026-09-18",
-    "highest_price": 39.560001373291016,
+    "highest_price": 39.599998474121094,
     "stop_method": "smart_atr_support",
     "trailing_status": "waiting",
     "closed": false,
@@ -2610,7 +2608,7 @@
     "stop_current": 426.21,
     "target": 491.45776012500005,
     "date_open": "2026-09-18",
-    "highest_price": 450.87249755859375,
+    "highest_price": 452.5400085449219,
     "stop_method": "smart_atr_support",
     "trailing_status": "active",
     "closed": false,
@@ -2629,7 +2627,7 @@
     "stop_current": 21.492,
     "target": 27.015,
     "date_open": "2026-09-21",
-    "highest_price": 23.860000610351562,
+    "highest_price": 24.06999969482422,
     "stop_method": "smart_atr_support",
     "trailing_status": "active",
     "closed": false,
