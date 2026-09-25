@@ -108,5 +108,16 @@
   },
   "TSM_EMA21/MA50 Pullback Bounce_66": "2026-09-18T04:56:18.681631",
   "WT_EMA21/MA50 Pullback Bounce_66": "2026-09-21T06:35:23.512903",
-  "VOYA_EMA21/MA50 Pullback Bounce_66": "2026-09-21T06:47:50.031992"
+  "VOYA_EMA21/MA50 Pullback Bounce_66": "2026-09-21T06:47:50.031992",
+  "MQ": {
+    "time": 1790318531.043067,
+    "patterns": [
+      {
+        "name": "EMA21/MA50 Pullback Bounce",
+        "level": 16.14,
+        "time": 1790318531.043067
+      }
+    ]
+  },
+  "MQ_EMA21/MA50 Pullback Bounce_66": "2026-09-25T06:42:11.043069"
 }

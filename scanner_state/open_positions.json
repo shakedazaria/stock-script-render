@@ -2527,10 +2527,10 @@
     "pattern": "EMA21/MA50 Pullback Bounce",
     "entry": 370.51999,
     "stop_initial": 363.8317,
-    "stop_current": 364.85,
+    "stop_current": 364.94,
     "target": 413.42075,
     "date_open": "2026-09-16",
-    "highest_price": 388.739990234375,
+    "highest_price": 389.3800048828125,
     "stop_method": "smart_atr_support",
     "trailing_status": "active",
     "closed": false,
@@ -2570,7 +2570,7 @@
     "stop_current": 88.09,
     "target": 104.45824999999999,
     "date_open": "2026-09-17",
-    "highest_price": 95.98629760742188,
+    "highest_price": 95.98999786376953,
     "stop_method": "smart_atr_support",
     "trailing_status": "active",
     "closed": false,
@@ -2608,7 +2608,7 @@
     "stop_current": 426.21,
     "target": 491.45776012500005,
     "date_open": "2026-09-18",
-    "highest_price": 452.5400085449219,
+    "highest_price": 452.55999755859375,
     "stop_method": "smart_atr_support",
     "trailing_status": "active",
     "closed": false,
@@ -2627,7 +2627,7 @@
     "stop_current": 21.492,
     "target": 27.015,
     "date_open": "2026-09-21",
-    "highest_price": 24.06999969482422,
+    "highest_price": 24.079999923706055,
     "stop_method": "smart_atr_support",
     "trailing_status": "active",
     "closed": false,
@@ -2658,5 +2658,22 @@
     "soft_warnings": [
       "\u26a0\ufe0f \u05de\u05ea\u05d7\u05ea \u05dc-EMA28 (97.68)"
     ]
+  },
+  {
+    "ticker": "MQ",
+    "pattern": "EMA21/MA50 Pullback Bounce",
+    "entry": 16.14,
+    "stop_initial": 15.41255,
+    "stop_current": 15.41255,
+    "target": 19.008625000000006,
+    "date_open": "2026-09-25",
+    "highest_price": 16.14,
+    "stop_method": "smart_atr_support",
+    "trailing_status": "waiting",
+    "closed": false,
+    "close_reason": null,
+    "close_price": null,
+    "close_date": null,
+    "pnl_pct": null
   }
 ]
