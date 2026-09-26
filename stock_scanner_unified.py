@@ -25,13 +25,15 @@ stock_scanner_unified.py
   מועמד שלא עבר את שכבת האיכות נשמר כ-Watchlist בלבד.
   V9.1 מוסיף Professional Trade Quality Engine מעל התבניות הקיימות — בלי לשנות את
   זיהוי התבניות: Trend/RS/Sector/Accumulation/Execution/Risk/Market Context.
+  V9.2 מוסיף Exit Intelligence Engine: Stop מקורי קבוע, Profit Protection אחרי +5%,
+  Target כיעד ייחוס, וזיהוי שינוי כיוון רב-סיגנלי על נרות יומיים סגורים.
 """
 
 # ============================================================
-# RESET VERIFIED FIX FILE — 2026-09-23 V9.1.3
+# RESET VERIFIED FIX FILE — 2026-09-26 V9.2
 # This marker proves this is the rebuilt fixed file, not an old download copy.
 # ============================================================
-CODE_VERSION = "2026-09-26-v9.1.5-log-safety-unique-stats"
+CODE_VERSION = "2026-09-26-v9.2-exit-intelligence-engine"
 RESET_VERIFIED_FIX_FILE = True
 
 
@@ -7094,17 +7096,26 @@ def get_sector_rotation_adjustment(ticker: str, rotation_map: dict) -> tuple[flo
 
 
 # ============================================================
-#  DYNAMIC STOP LOSS — מעקב אחרי פוזיציות פתוחות
-#  רץ בכל ריצה, בודק כל סטאפ שנשלח ועדיין פתוח
+#  V9.2 EXIT INTELLIGENCE ENGINE — מעקב אחרי פוזיציות פתוחות
+#  עקרונות:
+#  • Stop Loss המקורי נשאר קבוע ואינו נגרר כלפי מעלה.
+#  • רק אחרי שהעסקה הגיעה לפחות ל-+5% מופעל Profit Protection נפרד.
+#  • Target הוא יעד ייחוס בלבד; הגעה אליו אינה סוגרת אוטומטית עסקה חזקה.
+#  • יציאת Reversal דורשת צירוף של כמה סימנים, ולא Doji/Volume בודד.
+#  • אותות Candlestick/Volume/Reversal מחושבים רק על נר יומי סגור.
 # ============================================================
 
-POSITIONS_FILE      = _state_path(os.getenv("POSITIONS_FILE",      "open_positions.json"))
-TRAILING_ATR_MULT   = 2.5   # FIXED: wider trailing stop, ATR × 2.5 below high
-TRAILING_START_PROFIT_PCT = 4.0  # trailing starts only after +4% profit
-TRAILING_START_DAYS = 5          # or after 5 days, only if profitable
-TRAILING_START_DAYS_PROFIT_PCT = 1.0
-POSITION_MAX_DAYS   = int(os.getenv("POSITION_MAX_DAYS",     "30"))    # סגור פוזיציה אחרי 30 יום
+POSITIONS_FILE = _state_path(os.getenv("POSITIONS_FILE", "open_positions.json"))
+POSITION_MAX_DAYS = int(os.getenv("POSITION_MAX_DAYS", "30"))  # review בלבד, לא יציאה אוטומטית
 SEND_POSITIONS_STATUS_EMAIL = os.getenv("SEND_POSITIONS_STATUS_EMAIL", "True").lower() in ("1", "true", "yes")
+
+EXIT_PROFIT_ACTIVATE_PCT = float(os.getenv("EXIT_PROFIT_ACTIVATE_PCT", "5.0"))
+EXIT_CHANDELIER_ATR_MULT = float(os.getenv("EXIT_CHANDELIER_ATR_MULT", "3.0"))
+EXIT_WATCH_SCORE = float(os.getenv("EXIT_WATCH_SCORE", "25.0"))
+EXIT_CONFIRM_SCORE = float(os.getenv("EXIT_CONFIRM_SCORE", "55.0"))
+EXIT_DISTRIBUTION_VOL_MULT = float(os.getenv("EXIT_DISTRIBUTION_VOL_MULT", "1.5"))
+EXIT_CLIMAX_VOL_MULT = float(os.getenv("EXIT_CLIMAX_VOL_MULT", "2.0"))
+EXIT_DOJI_BODY_MAX = float(os.getenv("EXIT_DOJI_BODY_MAX", "0.10"))
 
 
 def _load_positions() -> list[dict]:
@@ -7112,11 +7123,11 @@ def _load_positions() -> list[dict]:
     try:
         if os.path.exists(POSITIONS_FILE):
             with open(POSITIONS_FILE) as f:
-                return json.load(f)
+                data = json.load(f)
+            return data if isinstance(data, list) else []
     except Exception:
         pass
     return []
-
 
 
 def is_position_open(ticker: str) -> bool:
@@ -7137,7 +7148,7 @@ def is_position_open(ticker: str) -> bool:
 
 
 def _save_positions(positions: list[dict]) -> None:
-    """שומר פוזיציות פתוחות ל-JSON."""
+    """שומר פוזיציות ל-JSON."""
     try:
         parent = os.path.dirname(POSITIONS_FILE)
         if parent:
@@ -7148,383 +7159,700 @@ def _save_positions(positions: list[dict]) -> None:
         log(f"save_positions error: {e}")
 
 
+def _ensure_exit_plan(alert: dict) -> dict:
+    """
+    בונה תוכנית יציאה עוד לפני שליחת הסטאפ.
+    אין כאן ניסיון לנחש מחיר שיא עתידי; התוכנית מגדירה איך לרכב על המגמה
+    ואיך לזהות כשהראיות משתנות.
+    """
+    existing = alert.get("exit_plan") if isinstance(alert, dict) else None
+    if isinstance(existing, dict) and existing:
+        return existing
+    try:
+        entry = float(alert.get("breakout_level", 0) or 0)
+        stop = float(alert.get("stop_loss", 0) or 0)
+        target = float(alert.get("target", 0) or 0)
+    except Exception:
+        entry = stop = target = 0.0
+    trigger = entry * (1.0 + EXIT_PROFIT_ACTIVATE_PCT / 100.0) if entry > 0 else None
+    plan = {
+        "engine": "V9.2_EXIT_INTELLIGENCE",
+        "stop_initial": stop if stop > 0 else None,
+        "stop_policy": "FIXED_INITIAL",
+        "profit_protection_trigger_pct": EXIT_PROFIT_ACTIVATE_PCT,
+        "profit_protection_trigger_price": round(trigger, 4) if trigger else None,
+        "chandelier_atr_mult": EXIT_CHANDELIER_ATR_MULT,
+        "target_reference": target if target > 0 else None,
+        "target_policy": "REFERENCE_NOT_AUTO_EXIT",
+        "reversal_watch_score": EXIT_WATCH_SCORE,
+        "reversal_exit_score": EXIT_CONFIRM_SCORE,
+        "reversal_requires_multiple_categories": True,
+        "daily_reversal_uses_closed_candles_only": True,
+    }
+    if isinstance(alert, dict):
+        alert["exit_plan"] = plan
+    return plan
+
+
+def _closed_daily_frame(df: pd.DataFrame | None) -> pd.DataFrame | None:
+    """מחזיר רק נרות יומיים סגורים. בזמן המסחר האמריקאי מסיר את הנר של היום."""
+    try:
+        if df is None or df.empty:
+            return None
+        out = df.copy()
+        if len(out) < 2:
+            return out
+        from zoneinfo import ZoneInfo
+        now_ny = datetime.now(ZoneInfo("America/New_York"))
+        last_ts = pd.Timestamp(out.index[-1])
+        try:
+            if last_ts.tzinfo is not None:
+                last_date = last_ts.tz_convert("America/New_York").date()
+            else:
+                last_date = last_ts.date()
+        except Exception:
+            last_date = last_ts.date()
+        # 16:15 נותן מרווח לעדכון הנר הסופי אצל ספק הנתונים.
+        before_settlement = (now_ny.hour, now_ny.minute) < (16, 15)
+        if last_date == now_ny.date() and before_settlement:
+            out = out.iloc[:-1].copy()
+        return out if not out.empty else None
+    except Exception:
+        return df.copy() if df is not None and not df.empty else None
+
+
+def _doji_flag(row: pd.Series) -> bool:
+    try:
+        o, h, l, c = map(float, (row["open"], row["high"], row["low"], row["close"]))
+        rng = max(h - l, 1e-9)
+        return abs(c - o) / rng <= EXIT_DOJI_BODY_MAX
+    except Exception:
+        return False
+
+
+def _distribution_bar(row: pd.Series, avg_vol20: float, atr: float) -> bool:
+    try:
+        o, h, l, c, v = map(float, (row["open"], row["high"], row["low"], row["close"], row["volume"]))
+        rng = max(h - l, 1e-9)
+        close_loc = (c - l) / rng
+        body = abs(c - o)
+        return bool(
+            c < o
+            and avg_vol20 > 0
+            and v >= EXIT_DISTRIBUTION_VOL_MULT * avg_vol20
+            and close_loc <= 0.25
+            and body >= 0.60 * max(atr, 1e-9)
+        )
+    except Exception:
+        return False
+
+
+def _compute_cmf20(df: pd.DataFrame) -> pd.Series:
+    try:
+        high = pd.to_numeric(df["high"], errors="coerce")
+        low = pd.to_numeric(df["low"], errors="coerce")
+        close = pd.to_numeric(df["close"], errors="coerce")
+        volume = pd.to_numeric(df["volume"], errors="coerce").fillna(0.0)
+        span = (high - low).replace(0, np.nan)
+        mf_mult = (((close - low) - (high - close)) / span).fillna(0.0)
+        mf_vol = mf_mult * volume
+        vol_sum = volume.rolling(20, min_periods=10).sum().replace(0, np.nan)
+        return (mf_vol.rolling(20, min_periods=10).sum() / vol_sum).replace([np.inf, -np.inf], np.nan)
+    except Exception:
+        return pd.Series(index=df.index, dtype=float)
+
+
+def _aligned_rs_ratio(stock_df: pd.DataFrame, spy_df: pd.DataFrame | None) -> pd.Series | None:
+    """קו RS פשוט = מחיר המניה / SPY על תאריכים משותפים."""
+    try:
+        if spy_df is None or spy_df.empty:
+            return None
+        a = stock_df[["close"]].rename(columns={"close": "stock"})
+        b = spy_df[["close"]].rename(columns={"close": "spy"})
+        joined = a.join(b, how="inner").dropna()
+        if len(joined) < 10:
+            return None
+        return (joined["stock"] / joined["spy"].replace(0, np.nan)).dropna()
+    except Exception:
+        return None
+
+
+def _evaluate_exit_intelligence(df: pd.DataFrame, position: dict, spy_df: pd.DataFrame | None = None) -> dict:
+    """
+    מנוע יציאה רב-סיגנלי. Doji לבדו לעולם אינו סוגר פוזיציה.
+    EXIT מתקבל רק משבירת Profit Floor או מקונפלואנס של כמה קטגוריות
+    עם אישור מחיר/ווליום אמיתי.
+    """
+    result = {
+        "status": "BUILDING",
+        "score": 0.0,
+        "signals": [],
+        "categories": [],
+        "profit_protection_active": False,
+        "profit_exit_floor": None,
+        "max_profit_pct": 0.0,
+        "closed_bar_date": None,
+        "target_reached": bool(position.get("target_reached", False)),
+        "exit_confirmed": False,
+        "exit_reason": None,
+    }
+    try:
+        entry = float(position.get("entry", 0) or 0)
+        target = float(position.get("target", 0) or 0)
+        if entry <= 0:
+            return result
+
+        closed = _closed_daily_frame(df)
+        if closed is None or len(closed) < 25:
+            result["status"] = "DATA_LIMITED"
+            return result
+
+        work = closed.copy()
+        add_technical_indicators(work)
+        close = pd.to_numeric(work["close"], errors="coerce")
+        high = pd.to_numeric(work["high"], errors="coerce")
+        low = pd.to_numeric(work["low"], errors="coerce")
+        open_ = pd.to_numeric(work["open"], errors="coerce")
+        volume = pd.to_numeric(work["volume"], errors="coerce").fillna(0.0)
+        work["ema10"] = close.ewm(span=10, adjust=False).mean()
+        work["ema21"] = close.ewm(span=21, adjust=False).mean()
+        work["avg_vol20"] = volume.rolling(20, min_periods=10).mean()
+        work["cmf20"] = _compute_cmf20(work)
+
+        last = work.iloc[-1]
+        prev = work.iloc[-2]
+        c = float(last["close"])
+        h = float(last["high"])
+        l = float(last["low"])
+        o = float(last["open"])
+        v = float(last.get("volume", 0) or 0)
+        atr = float(last.get("atr14", np.nan))
+        if not np.isfinite(atr) or atr <= 0:
+            atr = max(c * 0.02, 1e-9)
+        avg_vol20 = float(last.get("avg_vol20", 0) or 0)
+        ema10 = float(last.get("ema10", c))
+        ema21 = float(last.get("ema21", c))
+        result["closed_bar_date"] = str(pd.Timestamp(work.index[-1]).date())
+
+        # Profit Protection itself is based only on CLOSED daily highs, so an intraday spike
+        # cannot raise the floor and immediately force an exit against yesterday's close.
+        # highest_price remains a display field; highest_closed_price drives all V9.2 decisions.
+        raw_high = _last_finite(df["high"] if "high" in df.columns else df["close"], default=h)
+        prior_display_high = float(position.get("highest_price", entry) or entry)
+        position["highest_price"] = max(prior_display_high, raw_high if _is_finite_number(raw_high) else h, h)
+        prior_closed_high = position.get("highest_closed_price", position.get("highest_price", entry))
+        prior_closed_high = float(prior_closed_high) if _is_finite_number(prior_closed_high) else entry
+        highest = max(prior_closed_high, h)
+        position["highest_closed_price"] = highest
+        max_profit_pct = (highest - entry) / max(entry, 1e-9) * 100.0
+        result["max_profit_pct"] = round(max_profit_pct, 2)
+
+        active_before = bool(position.get("profit_protection_active", False))
+        active = active_before or max_profit_pct >= EXIT_PROFIT_ACTIVATE_PCT
+        result["profit_protection_active"] = active
+        position["profit_protection_active"] = active
+
+        if target > 0 and highest >= target:
+            result["target_reached"] = True
+            position["target_reached"] = True
+
+        if not active:
+            result["status"] = "BUILDING"
+            result["signals"] = [f"Profit Protection ממתין ל-+{EXIT_PROFIT_ACTIVATE_PCT:.1f}% (שיא כרגע {max_profit_pct:+.1f}%)"]
+            return result
+
+        # Profit floor נפרד מה-Stop המקורי. הוא רק עולה, ולעולם לא משנה stop_initial.
+        chandelier_raw = highest - EXIT_CHANDELIER_ATR_MULT * atr
+        old_floor = position.get("profit_exit_floor")
+        old_floor = float(old_floor) if _is_finite_number(old_floor) else entry
+        floor = max(entry, old_floor, chandelier_raw)
+        floor = round(float(floor), 4)
+        position["profit_exit_floor"] = floor
+        result["profit_exit_floor"] = floor
+
+        score = 0.0
+        signals: list[str] = []
+        categories: set[str] = set()
+        price_confirmation = False
+
+        rng = max(h - l, 1e-9)
+        body = abs(c - o)
+        close_loc = (c - l) / rng
+        upper_wick = h - max(o, c)
+
+        # 1) Candlestick reversal — warning first, confirmation second.
+        if _doji_flag(last) and h >= highest * 0.98:
+            score += 8
+            categories.add("candle")
+            signals.append("Doji / indecision ליד השיא — אזהרה בלבד")
+
+        prev_near_high = float(prev["high"]) >= highest * 0.98
+        if _doji_flag(prev) and prev_near_high and c < float(prev["low"]):
+            score += 25
+            categories.update(("candle", "price"))
+            price_confirmation = True
+            signals.append("אישור דובי אחרי Doji: סגירה מתחת ל-Low של ה-Doji")
+
+        prev_o = float(prev["open"]); prev_c = float(prev["close"])
+        bearish_engulfing = (prev_c > prev_o and c < o and o >= prev_c and c <= prev_o)
+        if bearish_engulfing:
+            score += 20
+            categories.update(("candle", "price"))
+            price_confirmation = True
+            signals.append("Bearish Engulfing מאושר")
+
+        shooting_star = (h >= highest * 0.98 and upper_wick >= max(2.0 * body, 0.45 * rng) and close_loc <= 0.45)
+        if shooting_star:
+            score += 15
+            categories.add("candle")
+            signals.append("Shooting Star / upper-wick rejection")
+
+        # 2) Institutional-looking distribution.
+        distribution_today = _distribution_bar(last, avg_vol20, atr)
+        if distribution_today:
+            score += 25
+            categories.update(("volume", "price"))
+            price_confirmation = True
+            vr = v / max(avg_vol20, 1e-9)
+            signals.append(f"High-volume distribution: נר אדום חזק, Volume ×{vr:.2f}")
+
+        dist_count = 0
+        tail5 = work.tail(5)
+        for _, row in tail5.iterrows():
+            try:
+                row_atr = float(row.get("atr14", atr) or atr)
+                row_avg = float(row.get("avg_vol20", avg_vol20) or avg_vol20)
+                if _distribution_bar(row, row_avg, row_atr):
+                    dist_count += 1
+            except Exception:
+                pass
+        if dist_count >= 2:
+            score += 15
+            categories.add("volume")
+            signals.append(f"{dist_count} ימי Distribution ב-5 ימי מסחר")
+
+        # 3) Short trend support. EMA10 alone is warning; EMA21 is confirmation.
+        if c < ema10:
+            score += 10
+            categories.add("price")
+            signals.append(f"סגירה מתחת EMA10 ({c:.2f} < {ema10:.2f})")
+        if c < ema21:
+            score += 25
+            categories.add("price")
+            price_confirmation = True
+            signals.append(f"סגירה מתחת EMA21 ({c:.2f} < {ema21:.2f})")
+
+        # 4) Hidden money-flow divergences near a price high.
+        recent_high = float(high.tail(20).max()) if len(high) >= 20 else h
+        near_high = h >= recent_high * 0.995
+        cmf = work["cmf20"]
+        if near_high and len(cmf.dropna()) >= 6:
+            cmf_now = float(cmf.iloc[-1]) if _is_finite_number(cmf.iloc[-1]) else None
+            cmf_5 = float(cmf.iloc[-6]) if _is_finite_number(cmf.iloc[-6]) else None
+            if cmf_now is not None and cmf_5 is not None and cmf_now <= cmf_5 - 0.08:
+                score += 15
+                categories.add("flow")
+                signals.append(f"CMF divergence: מחיר ליד שיא אבל CMF נחלש ({cmf_5:+.2f}→{cmf_now:+.2f})")
+
+        if "obv" in work.columns and len(work) >= 12 and near_high:
+            obv = pd.to_numeric(work["obv"], errors="coerce")
+            if _is_finite_number(obv.iloc[-1]) and _is_finite_number(obv.iloc[-6]):
+                if float(obv.iloc[-1]) < float(obv.iloc[-6]) and h >= float(high.iloc[-11:-1].max()) * 0.995:
+                    score += 15
+                    categories.add("flow")
+                    signals.append("OBV divergence: המחיר ליד/בשיא חדש אך OBV נחלש")
+
+        # 5) Momentum rollover.
+        if "macd_hist" in work.columns and len(work) >= 2:
+            mh0, mh1 = work["macd_hist"].iloc[-1], work["macd_hist"].iloc[-2]
+            if _is_finite_number(mh0) and _is_finite_number(mh1) and float(mh1) >= 0 > float(mh0):
+                score += 10
+                categories.add("momentum")
+                signals.append("MACD histogram חצה מתחת לאפס — Momentum נחלש")
+
+        # 6) Relative Strength vs SPY deterioration.
+        rs_line = _aligned_rs_ratio(work, _closed_daily_frame(spy_df) if spy_df is not None else None)
+        if rs_line is not None and len(rs_line) >= 6:
+            rs_now = float(rs_line.iloc[-1])
+            rs_5 = float(rs_line.iloc[-6])
+            rs_ema5 = float(rs_line.ewm(span=5, adjust=False).mean().iloc[-1])
+            if rs_now < rs_ema5 and (rs_now / max(rs_5, 1e-9) - 1.0) <= -0.02:
+                score += 10
+                categories.add("relative")
+                signals.append("RS vs SPY נחלש ביותר מ-2% ב-5 ימים ונמצא מתחת EMA5 של קו ה-RS")
+
+        # 7) Climax / exhaustion — self-relative rather than fixed-price target.
+        if len(work) >= 80:
+            ret10 = close.pct_change(10) * 100.0
+            hist = ret10.dropna()
+            if len(hist) >= 50 and _is_finite_number(hist.iloc[-1]):
+                threshold95 = float(hist.iloc[:-1].quantile(0.95)) if len(hist) > 1 else np.inf
+                current_ret10 = float(hist.iloc[-1])
+                vr = v / max(avg_vol20, 1e-9) if avg_vol20 > 0 else 0.0
+                if current_ret10 >= threshold95 and vr >= EXIT_CLIMAX_VOL_MULT and rng >= 1.5 * atr and close_loc < 0.50:
+                    score += 20
+                    categories.update(("climax", "volume"))
+                    signals.append(f"Climax risk: 10d return בקצה העליון של ההיסטוריה, Volume ×{vr:.2f}, סגירה חלשה")
+
+        score = min(100.0, round(score, 1))
+        result["score"] = score
+        result["signals"] = signals
+        result["categories"] = sorted(categories)
+
+        # Exit rule A: closed candle breaks the independent profit floor.
+        if c <= floor:
+            result["status"] = "EXIT"
+            result["exit_confirmed"] = True
+            result["exit_reason"] = f"Profit Protection נשבר בסגירה ({c:.2f} ≤ {floor:.2f})"
+            return result
+
+        # Exit rule B: multi-signal confirmed reversal. A Doji alone can never satisfy this.
+        if score >= EXIT_CONFIRM_SCORE and len(categories) >= 2 and price_confirmation:
+            result["status"] = "EXIT"
+            result["exit_confirmed"] = True
+            top = "; ".join(signals[:4]) if signals else "multiple reversal signals"
+            result["exit_reason"] = f"Confirmed reversal score {score:.0f}/100 — {top}"
+        elif score >= EXIT_WATCH_SCORE:
+            result["status"] = "WATCH"
+        elif result["target_reached"]:
+            result["status"] = "RIDE_WINNER"
+        else:
+            result["status"] = "HOLD"
+        return result
+    except Exception as e:
+        result["status"] = "DATA_LIMITED"
+        result["signals"] = [f"Exit Intelligence error: {e}"]
+        return result
+
+
 def open_position(alert: dict) -> None:
-    """
-    פותח פוזיציה חדשה כשנשלחת התראה.
-    שומר: ticker, entry, stop_initial, target, date_open, highest_price
-    """
+    """פותח פוזיציה חדשה ושומר מראש את תוכנית היציאה של V9.2."""
     try:
         positions = _load_positions()
         ticker = alert.get("ticker", "")
-
-        # אל תפתח כפול
-        if any(p["ticker"] == ticker and not p.get("closed") for p in positions):
+        if any(p.get("ticker") == ticker and not p.get("closed") for p in positions if isinstance(p, dict)):
             return
 
-        entry   = float(alert.get("breakout_level", 0) or 0)
-        stop    = float(alert.get("stop_loss", 0) or 0)
-        target  = float(alert.get("target", 0) or 0)
-        if entry <= 0:
+        entry = float(alert.get("breakout_level", 0) or 0)
+        stop = float(alert.get("stop_loss", 0) or 0)
+        target = float(alert.get("target", 0) or 0)
+        if entry <= 0 or stop <= 0:
             return
 
+        plan = _ensure_exit_plan(alert)
         positions.append({
-            "ticker":        ticker,
-            "pattern":       alert.get("pattern_type", ""),
-            "entry":         entry,
-            "stop_initial":  stop,
-            "stop_current":  stop,       # מתעדכן עם trailing
-            "target":        target,
-            "date_open":     datetime.now().strftime("%Y-%m-%d"),
-            "highest_price": entry,      # שיא מאז הכניסה
-            "stop_method":    "smart_atr_support",
-            "trailing_status":"waiting",
-            "closed":        False,
-            "close_reason":  None,
-            "close_price":   None,
-            "close_date":    None,
-            "pnl_pct":       None,
+            "ticker": ticker,
+            "pattern": alert.get("pattern_type", ""),
+            "entry": entry,
+            "stop_initial": stop,
+            "stop_current": stop,  # compatibility: V9.2 keeps this equal to stop_initial
+            "target": target,
+            "target_reference": target,
+            "date_open": datetime.now().strftime("%Y-%m-%d"),
+            "highest_price": entry,
+            "highest_closed_price": entry,
+            "max_profit_pct": 0.0,
+            "stop_method": "fixed_initial_plus_exit_intelligence",
+            "trailing_status": "disabled_v9.2",
+            "profit_protection_active": False,
+            "profit_exit_floor": None,
+            "target_reached": False,
+            "exit_plan": plan,
+            "exit_intelligence": {"status": "BUILDING", "score": 0.0, "signals": []},
+            "closed": False,
+            "close_reason": None,
+            "close_price": None,
+            "close_date": None,
+            "pnl_pct": None,
         })
         _save_positions(positions)
-        log(f"📂 Position opened: {ticker} @ {entry:.2f} | stop={stop:.2f} | target={target:.2f} | SMART: smart_atr_support")
+        trigger = plan.get("profit_protection_trigger_price")
+        trigger_txt = f"${trigger:.2f}" if _is_finite_number(trigger) else "+5%"
+        log(f"📂 Position opened: {ticker} @ {entry:.2f} | initial_stop={stop:.2f} FIXED | target_ref={target:.2f} | profit protection starts {trigger_txt}")
     except Exception as e:
         log(f"open_position error: {e}")
 
 
 def run_position_tracker(send_exit_email_fn=None) -> list[dict]:
     """
-    בודק כל פוזיציה פתוחה:
-    1. מעדכן Trailing Stop לפי שיא חדש
-    2. בודק אם פגעה ב-stop → שולח התראת יציאה
-    3. בודק אם הגיעה ל-target → שולח התראת רווח
-    4. בודק אם EMA28 עדיין תומך
-    5. סוגר אחרי POSITION_MAX_DAYS
-
-    מחזיר רשימת התראות יציאה שנשלחו.
+    V9.2 position tracker:
+    1. Stop Loss המקורי נשאר קבוע.
+    2. Profit Protection מופעל רק אחרי +5% בשיא.
+    3. בודק Reversal רב-סיגנלי על נרות סגורים בלבד.
+    4. Target הוא reference בלבד ואינו סוגר אוטומטית.
+    5. POSITION_MAX_DAYS הפך ל-review warning בלבד.
     """
-    positions  = _load_positions()
-    open_pos   = [p for p in positions if not p.get("closed")]
+    positions = _load_positions()
+    open_pos = [p for p in positions if isinstance(p, dict) and not p.get("closed")]
     exit_alerts = []
-
     if not open_pos:
         return []
 
-    log(f"📊 Position Tracker: checking {len(open_pos)} open positions...")
-
+    log(f"📊 Position Tracker V9.2: checking {len(open_pos)} open positions with Exit Intelligence...")
     today = datetime.now().date()
 
+    # SPY once per tracker run for relative-strength deterioration.
+    try:
+        spy_df = _normalize_yfinance_df(yf.download("SPY", period="1y", interval="1d", progress=False, auto_adjust=True))
+    except Exception:
+        spy_df = None
+
     for p in open_pos:
-        ticker = p["ticker"]
+        ticker = str(p.get("ticker", "")).strip().upper()
         try:
-            # הורד נתונים עדכניים
-            df = _normalize_yfinance_df(yf.download(ticker, period="60d", interval="1d",
-                                                    progress=False, auto_adjust=True))
+            df = _normalize_yfinance_df(yf.download(ticker, period="1y", interval="1d", progress=False, auto_adjust=True))
             if df is None or df.empty:
                 p["data_status"] = "price_unavailable"
-                log(f"   ⚠️ {ticker}: price data unavailable — keeping position open, no P&L update")
+                log(f"   ⚠️ {ticker}: price data unavailable — keeping position open")
                 continue
 
             price_now = _last_finite(df["close"])
-            high_now = _last_finite(df["high"] if "high" in df.columns else df["close"], default=price_now)
-            entry     = float(p["entry"])
-            stop_curr = float(p["stop_current"])
-            target    = float(p["target"])
-            if not all(_is_finite_number(v) for v in (price_now, high_now, entry, stop_curr, target)):
+            entry = float(p.get("entry", 0) or 0)
+            stop_initial = float(p.get("stop_initial", p.get("stop_current", 0)) or 0)
+            target = float(p.get("target", p.get("target_reference", 0)) or 0)
+            if not all(_is_finite_number(v) for v in (price_now, entry, stop_initial)) or entry <= 0 or stop_initial <= 0:
                 p["data_status"] = "price_unavailable"
-                log(f"   ⚠️ {ticker}: invalid price data — keeping position open, no P&L update")
+                log(f"   ⚠️ {ticker}: invalid position/price data — keeping position open")
                 continue
+
             p["data_status"] = "ok"
-            date_open = pd.Timestamp(p["date_open"]).date()
+            p["stop_current"] = stop_initial  # V9.2: never trail the original stop.
+            p["stop_method"] = "fixed_initial_plus_exit_intelligence"
+            p["trailing_status"] = "disabled_v9.2"
+            date_open = pd.Timestamp(p.get("date_open", today.isoformat())).date()
             days_open = (today - date_open).days
-
-            # ── Trailing Stop חכם ─────────────────────────────
-            add_technical_indicators(df)
-            atr = float(df["atr14"].iloc[-1]) if "atr14" in df.columns and not pd.isna(df["atr14"].iloc[-1]) else price_now * 0.02
-
             pnl_pct = round((price_now - entry) / max(entry, 1e-9) * 100, 2)
 
-            # עדכן שיא
-            new_high = max(float(p.get("highest_price", entry) or entry), high_now, price_now)
-            p["highest_price"] = new_high
+            intel = _evaluate_exit_intelligence(df, p, spy_df=spy_df)
+            p["exit_intelligence"] = intel
+            p["max_profit_pct"] = intel.get("max_profit_pct", p.get("max_profit_pct", 0.0))
+            p["profit_protection_active"] = bool(intel.get("profit_protection_active", False))
+            if _is_finite_number(intel.get("profit_exit_floor")):
+                p["profit_exit_floor"] = float(intel["profit_exit_floor"])
+            p["target_reached"] = bool(intel.get("target_reached", p.get("target_reached", False)))
+            p["last_tracker_price"] = price_now
+            p["last_tracker_date"] = today.isoformat()
 
-            trailing_active = (pnl_pct >= TRAILING_START_PROFIT_PCT) or (days_open >= TRAILING_START_DAYS and pnl_pct >= TRAILING_START_DAYS_PROFIT_PCT)
-            new_stop = stop_curr
-            if trailing_active:
-                p["trailing_status"] = "active"
-                trailing = round(new_high - TRAILING_ATR_MULT * atr, 2)
-                new_stop = max(stop_curr, trailing)  # רק מעלה — לא מורידים stop
-                if new_stop > stop_curr:
-                    log(f"   🔼 {ticker}: Trailing stop {stop_curr:.2f} → {new_stop:.2f} (high={new_high:.2f})")
-                    p["stop_current"] = new_stop
-            else:
-                p["trailing_status"] = "waiting"
-
-            # ── EMA28 / Low אתמול = אזהרות בלבד, לא יציאה ─────
             soft_warnings = []
-            if "ema28" in df.columns:
-                try:
-                    ema28 = float(df["ema28"].iloc[-1])
-                    if price_now < ema28 * 0.99:
-                        soft_warnings.append(f"⚠️ מתחת ל-EMA28 ({price_now:.2f})")
-                except Exception:
-                    pass
-            try:
-                if days_open >= 3 and len(df) >= 2:
-                    prev_low = float(df["low"].iloc[-2])
-                    if price_now < prev_low:
-                        soft_warnings.append(f"📉 מתחת ל-Low אתמול ({price_now:.2f} < {prev_low:.2f})")
-            except Exception:
-                pass
+            if days_open >= POSITION_MAX_DAYS:
+                soft_warnings.append(f"⏰ פתוח {days_open} ימים — review בלבד, לא יציאה אוטומטית")
             p["soft_warnings"] = soft_warnings
 
-            # ── בדוק תנאי יציאה אמיתיים בלבד ─────────────────
             close_reason = None
-            close_emoji  = ""
+            close_emoji = ""
+            exit_kind = None
 
-            if price_now <= new_stop:
-                close_reason = f"🛑 פגע ב-Stop Loss ({price_now:.2f} ≤ {new_stop:.2f})"
-                close_emoji  = "🛑"
-            elif price_now >= target:
-                close_reason = f"🎯 הגיע ליעד! ({price_now:.2f} ≥ {target:.2f})"
-                close_emoji  = "🎯"
-            elif days_open >= POSITION_MAX_DAYS:
-                close_reason = f"⏰ פג זמן ({days_open} ימים)"
-                close_emoji  = "⏰"
+            # Original stop remains the only downside stop before profit protection.
+            if price_now <= stop_initial:
+                close_reason = f"🛑 פגע ב-Stop Loss המקורי ({price_now:.2f} ≤ {stop_initial:.2f})"
+                close_emoji = "🛑"
+                exit_kind = "INITIAL_STOP"
+            elif intel.get("exit_confirmed"):
+                close_reason = f"🔄 שינוי כיוון מאושר — {intel.get('exit_reason', 'Exit Intelligence')}"
+                close_emoji = "🔄"
+                exit_kind = "REVERSAL_EXIT"
 
             if close_reason:
-                # סגור פוזיציה
-                p["closed"]       = True
+                p["closed"] = True
                 p["close_reason"] = close_reason
-                p["close_price"]  = price_now
-                p["close_date"]   = today.isoformat()
-                p["pnl_pct"]      = pnl_pct
-
-                log(f"   {close_emoji} {ticker} CLOSED: {close_reason} | P&L: {pnl_pct:+.1f}%")
-
+                p["close_price"] = price_now
+                p["close_date"] = today.isoformat()
+                p["pnl_pct"] = pnl_pct
+                p["exit_kind"] = exit_kind
+                log(f"   {close_emoji} {ticker} CLOSED: {close_reason} | P&L={pnl_pct:+.1f}% | max_profit={float(p.get('max_profit_pct',0) or 0):+.1f}%")
                 exit_alerts.append({
-                    "ticker":       ticker,
-                    "pattern":      p.get("pattern", ""),
-                    "entry":        entry,
-                    "exit_price":   price_now,
-                    "stop":         new_stop,
-                    "target":       target,
-                    "pnl_pct":      pnl_pct,
-                    "days_open":    days_open,
-                    "reason":       close_reason,
-                    "emoji":        close_emoji,
+                    "ticker": ticker,
+                    "pattern": p.get("pattern", ""),
+                    "entry": entry,
+                    "exit_price": price_now,
+                    "stop": stop_initial,
+                    "target": target,
+                    "pnl_pct": pnl_pct,
+                    "days_open": days_open,
+                    "reason": close_reason,
+                    "emoji": close_emoji,
+                    "exit_kind": exit_kind,
+                    "profit_floor": p.get("profit_exit_floor"),
+                    "max_profit_pct": p.get("max_profit_pct", 0.0),
+                    "exit_score": intel.get("score", 0.0),
+                    "exit_signals": intel.get("signals", []),
                 })
             else:
-                # פוזיציה פתוחה — לוג סטטוס
-                pct_to_target = round((target - price_now) / max(price_now, 1e-9) * 100, 1)
-                pct_to_stop   = round((price_now - new_stop) / max(price_now, 1e-9) * 100, 1)
-                warn_txt = " | ".join(p.get("soft_warnings", []))
-                warn_part = f" | warnings: {warn_txt}" if warn_txt else ""
-                log(f"   📈 {ticker}: {price_now:.2f} | P&L={pnl_pct:+.1f}% | "
-                    f"to_target={pct_to_target:.1f}% | to_stop={pct_to_stop:.1f}% | {days_open}d open | trailing={p.get('trailing_status', 'waiting')}{warn_part}")
+                status = str(intel.get("status", "BUILDING"))
+                floor = intel.get("profit_exit_floor")
+                floor_txt = f"{float(floor):.2f}" if _is_finite_number(floor) else "—"
+                target_flag = " | target_ref=REACHED" if p.get("target_reached") else ""
+                signals = intel.get("signals", []) or []
+                sig_txt = "; ".join(signals[:3]) if signals else "none"
+                log(
+                    f"   📈 {ticker}: {price_now:.2f} | P&L={pnl_pct:+.1f}% | max={float(p.get('max_profit_pct',0) or 0):+.1f}% | "
+                    f"initial_stop={stop_initial:.2f} | profit_floor={floor_txt} | exit={status} score={float(intel.get('score',0) or 0):.0f}{target_flag} | signals={sig_txt}"
+                )
 
         except Exception as e:
             log(f"   position_tracker error for {ticker}: {e}")
             continue
 
     _save_positions(positions)
-
-    # שלח מייל יציאה אם יש
     if exit_alerts and send_exit_email_fn:
         try:
             send_exit_email_fn(exit_alerts)
         except Exception as e:
             log(f"send_exit_email error: {e}")
-
     return exit_alerts
 
 
 def send_exit_email(exit_alerts: list[dict]) -> None:
-    """
-    שולח מייל התראת יציאה לכל פוזיציה שנסגרה.
-    """
+    """שולח מייל כאשר Stop המקורי או Exit Intelligence אישרו יציאה."""
     if not exit_alerts:
         return
     try:
         cards = []
         for a in exit_alerts:
-            pnl     = a["pnl_pct"]
+            pnl = float(a.get("pnl_pct", 0) or 0)
             pnl_col = "#15803d" if pnl >= 0 else "#b91c1c"
-            pnl_bg  = "#f0fdf4" if pnl >= 0 else "#fef2f2"
+            pnl_bg = "#f0fdf4" if pnl >= 0 else "#fef2f2"
+            floor = a.get("profit_floor")
+            floor_txt = f"${float(floor):.2f}" if _is_finite_number(floor) else "—"
+            sigs = a.get("exit_signals", []) or []
+            sig_html = "".join(f"<li>{x}</li>" for x in sigs[:6]) or "<li>Stop Loss מקורי</li>"
             cards.append(f"""
-<div dir="rtl" style="font-family:Arial,sans-serif;max-width:500px;margin:12px auto;
-     border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;background:#fff;">
+<div dir="rtl" style="font-family:Arial,sans-serif;max-width:560px;margin:12px auto;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;background:#fff;">
   <div style="padding:14px 16px;background:{pnl_bg};border-bottom:1px solid #e5e7eb;">
-    <div style="font-size:18px;font-weight:700;color:{pnl_col};">
-      {a['emoji']} {a['ticker']} — {'+' if pnl>=0 else ''}{pnl:.1f}%
-    </div>
+    <div style="font-size:18px;font-weight:700;color:{pnl_col};">{a['emoji']} {a['ticker']} — {'+' if pnl>=0 else ''}{pnl:.1f}%</div>
     <div style="font-size:12px;color:#374151;margin-top:4px;">{a['reason']}</div>
   </div>
   <div style="padding:12px 16px;font-size:12px;color:#374151;">
     <table style="width:100%;border-collapse:collapse;">
-      <tr><td style="padding:3px 0;font-weight:600;">כניסה</td><td>${a['entry']:.2f}</td>
-          <td style="font-weight:600;">יציאה</td><td>${a['exit_price']:.2f}</td></tr>
-      <tr><td style="padding:3px 0;font-weight:600;">Stop</td><td>${a['stop']:.2f}</td>
-          <td style="font-weight:600;">יעד</td><td>${a['target']:.2f}</td></tr>
-      <tr><td style="padding:3px 0;font-weight:600;">תבנית</td><td colspan="3">{a['pattern']}</td></tr>
-      <tr><td style="padding:3px 0;font-weight:600;">זמן פתוח</td><td colspan="3">{a['days_open']} ימים</td></tr>
+      <tr><td style="padding:3px 0;font-weight:600;">כניסה</td><td>${a['entry']:.2f}</td><td style="font-weight:600;">יציאה</td><td>${a['exit_price']:.2f}</td></tr>
+      <tr><td style="padding:3px 0;font-weight:600;">Stop מקורי</td><td>${a['stop']:.2f}</td><td style="font-weight:600;">Profit Floor</td><td>{floor_txt}</td></tr>
+      <tr><td style="padding:3px 0;font-weight:600;">Target 1 (ייחוס)</td><td>${float(a.get('target',0) or 0):.2f}</td><td style="font-weight:600;">Max profit</td><td>{float(a.get('max_profit_pct',0) or 0):+.1f}%</td></tr>
+      <tr><td style="padding:3px 0;font-weight:600;">Reversal score</td><td>{float(a.get('exit_score',0) or 0):.0f}/100</td><td style="font-weight:600;">זמן פתוח</td><td>{a['days_open']} ימים</td></tr>
     </table>
+    <div style="margin-top:8px;font-weight:700;">אותות יציאה:</div><ul style="margin-top:4px;">{sig_html}</ul>
   </div>
 </div>""")
 
         html_body = "\n".join(cards)
-        subject   = f"🔔 יציאה מ-{len(exit_alerts)} פוזיציה/ות — Stock Scanner"
-
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"]    = FROM_EMAIL
-        msg["To"]      = ", ".join(TO_EMAILS) if isinstance(TO_EMAILS, list) else TO_EMAILS
-        msg.attach(MIMEText(html_body, "html", "utf-8"))
-
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as s:
-            s.login(FROM_EMAIL, APP_PASSWORD)
-            s.send_message(msg)
-
-        log(f"📧 Exit email sent: {len(exit_alerts)} positions closed")
-    except Exception as e:
-        log(f"send_exit_email error: {e}")
-
-
-def send_positions_status_email() -> None:
-    """
-    שולח מייל יומי על פוזיציות פתוחות:
-    האם עדיין להישאר, איפה המחיר מול הסטופ/יעד, ומה ה-P&L.
-    """
-    if not SEND_POSITIONS_STATUS_EMAIL:
-        return
-    if not APP_PASSWORD:
-        log("APP_PASSWORD not set — positions status email disabled.")
-        return
-
-    try:
-        positions = _load_positions()
-        open_pos = [p for p in positions if not p.get("closed")]
-        if not open_pos:
-            log("📭 Positions status: no open positions.")
-            return
-
-        cards = []
-        today = datetime.now().strftime("%d/%m/%Y")
-
-        for p in open_pos:
-            ticker = str(p.get("ticker", "")).strip().upper()
-            if not ticker:
-                continue
-
-            try:
-                df = _normalize_yfinance_df(yf.download(ticker, period="60d", interval="1d", progress=False, auto_adjust=True))
-                if df is None or df.empty:
-                    p["data_status"] = "price_unavailable"
-                    cards.append(f"""
-<div dir="rtl" style="font-family:Arial,sans-serif;max-width:560px;margin:12px auto;border:1px solid #e5e7eb;border-radius:10px;background:#fff;padding:14px 16px;">
-  <div style="font-size:19px;font-weight:700;color:#374151;">⚠️ {ticker}</div>
-  <div style="font-size:13px;color:#6b7280;margin-top:6px;">לא הצלחתי לקבל מחיר עדכני תקין. הפוזיציה נשארת פתוחה ולא מחושב P&L כדי לא להציג nan.</div>
-</div>""")
-                    continue
-
-                price_now = _last_finite(df["close"])
-                entry = float(p.get("entry", 0) or 0)
-                stop = float(p.get("stop_current", p.get("stop_initial", 0)) or 0)
-                target = float(p.get("target", 0) or 0)
-                if not all(_is_finite_number(v) for v in (price_now, entry, stop, target)):
-                    p["data_status"] = "price_unavailable"
-                    cards.append(f"""
-<div dir="rtl" style="font-family:Arial,sans-serif;max-width:560px;margin:12px auto;border:1px solid #e5e7eb;border-radius:10px;background:#fff;padding:14px 16px;">
-  <div style="font-size:19px;font-weight:700;color:#374151;">⚠️ {ticker}</div>
-  <div style="font-size:13px;color:#6b7280;margin-top:6px;">התקבלו נתונים לא תקינים מ-Yahoo. לא מוצג P&L ולא מתבצעת החלטת יציאה אוטומטית.</div>
-</div>""")
-                    continue
-                p["data_status"] = "ok"
-                highest = max(float(p.get("highest_price", entry) or entry), price_now)
-
-                # עדכון highest_price גם אם אין יציאה — כדי שהמעקב יישמר בקובץ state.
-                p["highest_price"] = highest
-
-                pnl_pct = ((price_now - entry) / max(entry, 1e-9)) * 100 if entry > 0 else 0.0
-                to_stop_pct = ((price_now - stop) / max(price_now, 1e-9)) * 100 if stop > 0 else 0.0
-                to_target_pct = ((target - price_now) / max(price_now, 1e-9)) * 100 if target > 0 else 0.0
-
-                # החלטת סטטוס ברורה למייל
-                if stop > 0 and price_now <= stop:
-                    status_emoji = "🛑"
-                    status_text = "יציאה — המחיר הגיע/ירד מתחת לסטופ"
-                    status_color = "#b91c1c"
-                    status_bg = "#fef2f2"
-                elif target > 0 and price_now >= target:
-                    status_emoji = "🎯"
-                    status_text = "יציאה/מימוש — המחיר הגיע ליעד"
-                    status_color = "#15803d"
-                    status_bg = "#f0fdf4"
-                else:
-                    status_emoji = "✅"
-                    status_text = "להישאר — לא הופעל סטופ ולא הגיע יעד"
-                    status_color = "#1d4ed8"
-                    status_bg = "#eff6ff"
-
-                pnl_color = "#15803d" if pnl_pct >= 0 else "#b91c1c"
-                date_open = p.get("date_open", "")
-                try:
-                    days_open = (datetime.now().date() - pd.Timestamp(date_open).date()).days if date_open else "N/A"
-                except Exception:
-                    days_open = "N/A"
-
-                cards.append(f"""
-<div dir="rtl" style="font-family:Arial,sans-serif;max-width:560px;margin:12px auto;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;background:#fff;">
-  <div style="padding:14px 16px;background:{status_bg};border-bottom:1px solid #e5e7eb;">
-    <div style="font-size:20px;font-weight:700;color:{status_color};">{status_emoji} {ticker} — {status_text}</div>
-    <div style="font-size:13px;color:#374151;margin-top:4px;">{p.get('pattern', '')} | פתוח {days_open} ימים</div>
-  </div>
-  <div style="padding:12px 16px;font-size:13px;color:#374151;">
-    <table style="width:100%;border-collapse:collapse;">
-      <tr><td style="padding:4px 0;font-weight:600;">מחיר כניסה</td><td>${entry:.2f}</td><td style="font-weight:600;">מחיר עכשיו</td><td>${price_now:.2f}</td></tr>
-      <tr><td style="padding:4px 0;font-weight:600;">Stop נוכחי</td><td>${stop:.2f}</td><td style="font-weight:600;">יעד</td><td>${target:.2f}</td></tr>
-      <tr><td style="padding:4px 0;font-weight:600;">רווח/הפסד</td><td style="color:{pnl_color};font-weight:700;">{pnl_pct:+.1f}%</td><td style="font-weight:600;">מרחק מהסטופ</td><td>{to_stop_pct:.1f}%</td></tr>
-      <tr><td style="padding:4px 0;font-weight:600;">מרחק מהיעד</td><td>{to_target_pct:.1f}%</td><td style="font-weight:600;">שיא מאז כניסה</td><td>${highest:.2f}</td></tr>
-    </table>
-  </div>
-</div>""")
-
-            except Exception as e:
-                cards.append(f"""
-<div dir="rtl" style="font-family:Arial,sans-serif;max-width:560px;margin:12px auto;border:1px solid #e5e7eb;border-radius:10px;background:#fff;padding:14px 16px;">
-  <div style="font-size:19px;font-weight:700;color:#b91c1c;">⚠️ {ticker}</div>
-  <div style="font-size:13px;color:#6b7280;margin-top:6px;">שגיאה בבדיקת פוזיציה: {e}</div>
-</div>""")
-
-        _save_positions(positions)
-
-        if not cards:
-            return
-
-        html_body = f"""
-<html><body style="background:#f8fafc;padding:18px;">
-  <div dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:auto;">
-    <h2 style="text-align:center;color:#111827;margin:0 0 14px;">📊 דוח פוזיציות פתוחות — {today}</h2>
-    <p style="text-align:center;color:#6b7280;margin:0 0 16px;">זה דוח מעקב יומי: להישאר / לצאת לפי stop, יעד ונתוני מחיר עדכניים.</p>
-    {''.join(cards)}
-  </div>
-</body></html>
-"""
-
-        subject = f"📊 דוח פוזיציות פתוחות — {len(open_pos)} מניות — {today}"
+        subject = f"🔔 Exit Intelligence — יציאה מ-{len(exit_alerts)} פוזיציה/ות"
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
         msg["From"] = FROM_EMAIL
         msg["To"] = ", ".join(TO_EMAILS) if isinstance(TO_EMAILS, list) else TO_EMAILS
         msg.attach(MIMEText(html_body, "html", "utf-8"))
-
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as s:
             s.login(FROM_EMAIL, APP_PASSWORD)
             s.send_message(msg)
+        log(f"📧 Exit Intelligence email sent: {len(exit_alerts)} positions closed")
+    except Exception as e:
+        log(f"send_exit_email error: {e}")
 
-        log(f"📧 Positions status email sent: {len(open_pos)} open positions")
 
+def send_positions_status_email() -> None:
+    """דוח יומי: סטופ מקורי, Profit Floor, Reversal Score והאם להמשיך לרכב על המגמה."""
+    if not SEND_POSITIONS_STATUS_EMAIL:
+        return
+    if not APP_PASSWORD:
+        log("APP_PASSWORD not set — positions status email disabled.")
+        return
+    try:
+        positions = _load_positions()
+        open_pos = [p for p in positions if isinstance(p, dict) and not p.get("closed")]
+        if not open_pos:
+            log("📭 Positions status: no open positions.")
+            return
+
+        cards = []
+        today_str = datetime.now().strftime("%d/%m/%Y")
+        for p in open_pos:
+            ticker = str(p.get("ticker", "")).strip().upper()
+            if not ticker:
+                continue
+            try:
+                price_now = float(p.get("last_tracker_price", 0) or 0)
+                if not _is_finite_number(price_now) or price_now <= 0:
+                    df = _normalize_yfinance_df(yf.download(ticker, period="5d", interval="1d", progress=False, auto_adjust=True))
+                    price_now = _last_finite(df["close"]) if df is not None and not df.empty else float("nan")
+                entry = float(p.get("entry", 0) or 0)
+                stop = float(p.get("stop_initial", p.get("stop_current", 0)) or 0)
+                target = float(p.get("target", p.get("target_reference", 0)) or 0)
+                if not all(_is_finite_number(v) for v in (price_now, entry, stop)):
+                    cards.append(f"<div dir='rtl' style='font-family:Arial;padding:14px;border:1px solid #e5e7eb;border-radius:10px;margin:10px;'>⚠️ {ticker} — אין נתוני מחיר תקינים.</div>")
+                    continue
+
+                pnl_pct = ((price_now - entry) / max(entry, 1e-9)) * 100.0
+                highest = float(p.get("highest_price", entry) or entry)
+                max_profit = float(p.get("max_profit_pct", (highest-entry)/max(entry,1e-9)*100) or 0)
+                intel = p.get("exit_intelligence", {}) if isinstance(p.get("exit_intelligence", {}), dict) else {}
+                status = str(intel.get("status", "BUILDING"))
+                score = float(intel.get("score", 0) or 0)
+                signals = intel.get("signals", []) or []
+                floor = p.get("profit_exit_floor")
+                floor_txt = f"${float(floor):.2f}" if _is_finite_number(floor) else "ממתין ל-+5%"
+                target_reached = bool(p.get("target_reached", False))
+
+                if status == "WATCH":
+                    status_emoji, status_text, status_color, status_bg = "⚠️", "להישאר בזהירות — יש סימני שינוי כיוון שעדיין אינם מאושרים", "#92400e", "#fffbeb"
+                elif status == "RIDE_WINNER":
+                    status_emoji, status_text, status_color, status_bg = "🏄", "Target 1 הושג — המגמה עדיין בריאה, ממשיכים לרכב", "#15803d", "#f0fdf4"
+                elif status == "HOLD":
+                    status_emoji, status_text, status_color, status_bg = "✅", "להישאר — Profit Protection פעיל ואין שינוי כיוון מאושר", "#1d4ed8", "#eff6ff"
+                elif status == "DATA_LIMITED":
+                    status_emoji, status_text, status_color, status_bg = "⚠️", "להישאר — אין מספיק נתונים לאישור שינוי כיוון", "#6b7280", "#f9fafb"
+                else:
+                    status_emoji, status_text, status_color, status_bg = "🟦", f"להישאר — Stop המקורי נשאר קבוע; Profit Protection יופעל ב-+{EXIT_PROFIT_ACTIVATE_PCT:.0f}%", "#1d4ed8", "#eff6ff"
+
+                sig_html = "".join(f"<li>{x}</li>" for x in signals[:6]) or "<li>אין אותות Reversal משמעותיים</li>"
+                target_note = "✅ הושג — אינו גורם ליציאה אוטומטית" if target_reached else "טרם הושג"
+                date_open = p.get("date_open", "")
+                try:
+                    days_open = (datetime.now().date() - pd.Timestamp(date_open).date()).days if date_open else "N/A"
+                except Exception:
+                    days_open = "N/A"
+                pnl_color = "#15803d" if pnl_pct >= 0 else "#b91c1c"
+
+                cards.append(f"""
+<div dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:12px auto;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;background:#fff;">
+  <div style="padding:14px 16px;background:{status_bg};border-bottom:1px solid #e5e7eb;">
+    <div style="font-size:19px;font-weight:700;color:{status_color};">{status_emoji} {ticker} — {status_text}</div>
+    <div style="font-size:12px;color:#374151;margin-top:4px;">{p.get('pattern','')} | פתוח {days_open} ימים | Exit score {score:.0f}/100</div>
+  </div>
+  <div style="padding:12px 16px;font-size:13px;color:#374151;">
+    <table style="width:100%;border-collapse:collapse;">
+      <tr><td style="padding:4px 0;font-weight:600;">כניסה</td><td>${entry:.2f}</td><td style="font-weight:600;">מחיר עכשיו</td><td>${price_now:.2f}</td></tr>
+      <tr><td style="padding:4px 0;font-weight:600;">Stop מקורי וקבוע</td><td>${stop:.2f}</td><td style="font-weight:600;">Profit Floor</td><td>{floor_txt}</td></tr>
+      <tr><td style="padding:4px 0;font-weight:600;">רווח/הפסד</td><td style="color:{pnl_color};font-weight:700;">{pnl_pct:+.1f}%</td><td style="font-weight:600;">Max profit</td><td>{max_profit:+.1f}%</td></tr>
+      <tr><td style="padding:4px 0;font-weight:600;">Target 1 (ייחוס)</td><td>${target:.2f}</td><td style="font-weight:600;">סטטוס יעד</td><td>{target_note}</td></tr>
+    </table>
+    <div style="margin-top:8px;font-weight:700;">Exit Intelligence:</div><ul style="margin-top:4px;">{sig_html}</ul>
+  </div>
+</div>""")
+            except Exception as e:
+                cards.append(f"<div dir='rtl' style='font-family:Arial;padding:14px;border:1px solid #e5e7eb;border-radius:10px;margin:10px;'>⚠️ {ticker} — שגיאה בדוח: {e}</div>")
+
+        _save_positions(positions)
+        if not cards:
+            return
+        html_body = f"""
+<html><body style="background:#f8fafc;padding:18px;">
+  <div dir="rtl" style="font-family:Arial,sans-serif;max-width:680px;margin:auto;">
+    <h2 style="text-align:center;color:#111827;margin:0 0 14px;">📊 Exit Intelligence — פוזיציות פתוחות — {today_str}</h2>
+    <p style="text-align:center;color:#6b7280;margin:0 0 16px;">Target הוא יעד ייחוס. Stop המקורי נשאר קבוע; אחרי +5% מופעל Profit Protection והיציאה מתבססת על שינוי כיוון מאושר.</p>
+    {''.join(cards)}
+  </div>
+</body></html>"""
+        subject = f"📊 Exit Intelligence — {len(open_pos)} פוזיציות — {today_str}"
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = FROM_EMAIL
+        msg["To"] = ", ".join(TO_EMAILS) if isinstance(TO_EMAILS, list) else TO_EMAILS
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as s:
+            s.login(FROM_EMAIL, APP_PASSWORD)
+            s.send_message(msg)
+        log(f"📧 Exit Intelligence status email sent: {len(open_pos)} open positions")
     except Exception as e:
         log(f"send_positions_status_email error: {e}")
-
 
 def _load_learned_params() -> dict:
     """טוען פרמטרים שנלמדו מקובץ JSON. אם לא קיים — מחזיר ריק."""
@@ -8860,6 +9188,7 @@ def _build_html_card(alert: dict, company: dict, send_date: str, sector: dict | 
     entry   = float(alert.get("breakout_level", 0))
     stop    = float(alert.get("stop_loss", 0))
     target  = float(alert.get("target", 0))
+    exit_plan = _ensure_exit_plan(alert)
     meta    = alert.get("meta", {}) or {}
     reasons = meta.get("score_reasons", []) or []
     fails   = meta.get("fail_reasons", []) or []
@@ -9106,11 +9435,22 @@ def _build_html_card(alert: dict, company: dict, send_date: str, sector: dict | 
         <td style="padding:6px;border-bottom:1px solid #f3f4f6;">סיכון/מניה: <b>${risk_ps:.2f}</b></td>
       </tr>
       <tr>
-        <td style="padding:6px;">יעד</td>
+        <td style="padding:6px;">Target 1 (יעד ייחוס)</td>
         <td style="padding:6px;font-weight:800;color:#166534;">${target:.2f}</td>
         <td style="padding:6px;">גודל פוזיציה: <b>{size:,}</b></td>
       </tr>
     </table>
+  </div>
+  <div style="padding:14px;border-bottom:1px solid #e5e7eb;background:#f8fafc;">
+    <h3 style="margin:0 0 8px;color:#0f766e;">🧭 Exit Intelligence Plan</h3>
+    <ul style="margin:0;padding-right:16px;font-size:12px;line-height:1.7;">
+      <li>🛑 Stop Loss המקורי נשאר קבוע: <b>${stop:.2f}</b></li>
+      <li>🛡️ Profit Protection מתחיל רק ב-<b>+{float(exit_plan.get('profit_protection_trigger_pct',5)):.0f}%</b> (סביב ${float(exit_plan.get('profit_protection_trigger_price') or 0):.2f})</li>
+      <li>📏 לאחר ההפעלה: Profit Floor = Highest High − <b>{float(exit_plan.get('chandelier_atr_mult',3)):.1f}×ATR14</b>, ורק עולה</li>
+      <li>🎯 Target 1 (${target:.2f}) הוא יעד ייחוס בלבד — אינו סוגר אוטומטית מניה שהמגמה שלה עדיין בריאה</li>
+      <li>🔄 יציאה על שינוי כיוון דורשת כמה אישורים יחד; Doji לבדו הוא אזהרה ולא SELL</li>
+      <li>🕯️ אותות Reversal יומיים נבדקים רק על נר סגור</li>
+    </ul>
   </div>
   <div style="padding:14px;border-bottom:1px solid #e5e7eb;">
     <h3 style="margin:0 0 8px;color:#1d4ed8;">קריטריונים שאומתו</h3>
@@ -9754,7 +10094,7 @@ def main() -> None:
     except Exception as e:
         log(f"update_performance_log error: {e}")
 
-    # ── בדוק פוזיציות פתוחות — Trailing Stop + יציאות ──────
+    # ── בדוק פוזיציות פתוחות — V9.2 Exit Intelligence ──────
     try:
         exit_alerts = run_position_tracker(send_exit_email_fn=send_exit_email)
         if exit_alerts:
@@ -9822,6 +10162,7 @@ def main() -> None:
     log(f"🚀 V8 Entry Ready Engine: min_quality={ENTRY_READY_MIN_SCORE:.1f}, volume×{ENTRY_MIN_VOLUME_RATIO:.2f}, RS>={ENTRY_MIN_RS_SCORE:.0f}, breakout>={ENTRY_MIN_BREAKOUT_PCT*100:.1f}%")
     log(f"🧩 V9 Pattern Expansion: enabled={V9_PATTERN_ENGINE_ENABLED}, max_per_ticker={V9_MAX_CANDIDATES_PER_TICKER}, patterns=FlatBase/Darvas/VCP/EMA-Pullback/Retest")
     log(f"🧠 V9.1 Professional Quality: enabled={PRO_ENGINE_ENABLED}, min={PRO_MIN_SCORE:.1f}, trend>={PRO_MIN_TREND_SCORE:.0f}, multi-RS>={PRO_MIN_RS_PROFILE_SCORE:.0f}, max_stop={PRO_MAX_STOP_RISK_PCT*100:.0f}%")
+    log(f"🧭 V9.2 Exit Intelligence: fixed_initial_stop=True, profit_protection=+{EXIT_PROFIT_ACTIVATE_PCT:.1f}%, chandelier={EXIT_CHANDELIER_ATR_MULT:.1f}ATR, watch>={EXIT_WATCH_SCORE:.0f}, exit>={EXIT_CONFIRM_SCORE:.0f}, target=reference-only")
 
     # ── Market Reversal Detector ──────────────────────────────
     try:
