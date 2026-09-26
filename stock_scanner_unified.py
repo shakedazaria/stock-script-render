@@ -31,7 +31,7 @@ stock_scanner_unified.py
 # RESET VERIFIED FIX FILE — 2026-09-23 V9.1.3
 # This marker proves this is the rebuilt fixed file, not an old download copy.
 # ============================================================
-CODE_VERSION = "2026-09-24-v9.1.4-candle-change-market-guard"
+CODE_VERSION = "2026-09-26-v9.1.5-log-safety-unique-stats"
 RESET_VERIFIED_FIX_FILE = True
 
 
@@ -3428,6 +3428,50 @@ def _entry_quality_metrics(df: pd.DataFrame, ticker: str, breakout_level: float,
         return metrics
 
 
+def _validate_long_trade_levels(alert: dict) -> tuple[bool, list[str], dict]:
+    """
+    Hard safety validation for a long setup before Entry Ready scoring.
+    Uses breakout_level as the actual planned trigger/entry. A detector's internal
+    reference price is not treated as the trade entry. No score can override this.
+    """
+    problems: list[str] = []
+    values: dict[str, float | None] = {}
+
+    def finite_positive(name: str, raw) -> float | None:
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            problems.append(f"{name} חסר/לא מספר")
+            return None
+        if not math.isfinite(value) or value <= 0:
+            problems.append(f"{name} לא תקין")
+            return None
+        return value
+
+    entry = finite_positive("Entry", alert.get("breakout_level"))
+    stop = finite_positive("Stop", alert.get("stop_loss"))
+    target = finite_positive("Target", alert.get("target"))
+    rr = finite_positive("R:R", alert.get("rr_ratio"))
+    values.update({"entry": entry, "stop": stop, "target": target, "rr": rr})
+
+    if entry is not None and stop is not None and stop >= entry:
+        problems.append(f"Stop חייב להיות מתחת ל-Entry ({stop:.4f} >= {entry:.4f})")
+    if entry is not None and target is not None and target <= entry:
+        problems.append(f"Target חייב להיות מעל Entry ({target:.4f} <= {entry:.4f})")
+
+    if entry is not None and stop is not None and target is not None and stop < entry < target:
+        risk = entry - stop
+        reward = target - entry
+        calc_rr = reward / risk if risk > 0 else None
+        values["calculated_rr"] = calc_rr
+        if calc_rr is None or not math.isfinite(calc_rr) or calc_rr <= 0:
+            problems.append("R:R מחושב לא תקין")
+    else:
+        values["calculated_rr"] = None
+
+    return (not problems), list(dict.fromkeys(problems)), values
+
+
 def evaluate_entry_quality(df: pd.DataFrame, ticker: str, breakout_level: float,
                            pattern_meta: dict | None = None, base_score: float = 0.0,
                            rr: float | None = None, regime: dict | None = None) -> dict:
@@ -3767,8 +3811,10 @@ class PatternCandidate:
         return asdict(self)
 
     def short_reason(self) -> str:
+        # This is only the V9 detector's own checklist. The final V8 Entry Ready
+        # gate is stricter and runs later, so do not claim final confirmation here.
         if not self.missing_confirmations:
-            return "all confirmations passed"
+            return "detector checks passed; final Entry Ready pending"
         return "; ".join(self.missing_confirmations[:6])
 
 
@@ -4974,13 +5020,14 @@ def candidates_to_dataframe(candidates: Sequence[PatternCandidate]) -> pd.DataFr
 
 
 def format_candidate_for_log(candidate: PatternCandidate) -> str:
-    """One-line log text that can be used later in the big scanner."""
+    """One-line V9 detector log. Labels are intentionally distinct from final Entry Ready."""
+    display_status = "DETECTOR_READY" if candidate.status == ENTRY_READY else candidate.status
     return (
-        f"{candidate.ticker}: {candidate.status} {candidate.pattern_name} | "
-        f"quality={candidate.entry_quality:.1f} | "
-        f"pivot={candidate.pivot} entry={candidate.entry} stop={candidate.stop} "
+        f"{candidate.ticker}: {display_status} {candidate.pattern_name} | "
+        f"detector_quality={candidate.entry_quality:.1f} | "
+        f"pivot={candidate.pivot} ref_price={candidate.entry} stop={candidate.stop} "
         f"target={candidate.target} rr={candidate.rr} | "
-        f"missing={candidate.short_reason()}"
+        f"detector_missing={candidate.short_reason()}"
     )
 
 
@@ -6250,7 +6297,8 @@ def record_alert_sent(ticker: str, pattern_name: str, break_level,
 # ============================================================
 #  CORE SCAN
 # ============================================================
-def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = None, min_score: float | None = None) -> list[dict]:
+def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = None, min_score: float | None = None,
+                filter_ticker_sets: dict[str, set[str]] | None = None) -> list[dict]:
     """
     מבצע את שתי הפאזות על טיקר אחד ומחזיר רשימת התראות חדשות.
     Phase 1: Cup&Handle / Bullish-Triangle / Double Bottom (+ EMA28 global filter)
@@ -6262,9 +6310,11 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
 
     candidates: list[dict] = []   # כל הסטאפים שנמצאו
     def _fs(key: str):
-        """עדכון counter ב-filter_stats."""
+        """עדכון counter גולמי + סט טיקרים ייחודיים לצורך דוח אחוזים אמיתי."""
         if filter_stats is not None and key in filter_stats:
             filter_stats[key] += 1
+        if filter_ticker_sets is not None and key in filter_ticker_sets:
+            filter_ticker_sets[key].add(symbol)
 
     # --- Market Cap ---
     mc = fetch_market_cap(symbol)
@@ -6544,6 +6594,33 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
             try:
                 meta = alert.setdefault("meta", {})
                 base_score = float(alert.get("score", 0) or 0)
+
+                # V9.1.5 hard safety: invalid long levels are rejected before any score.
+                levels_ok, level_problems, level_values = _validate_long_trade_levels(alert)
+                if not levels_ok:
+                    safety_quality = {
+                        "status": "SAFETY_REJECTED",
+                        "entry_ready": False,
+                        "quality_score": 0.0,
+                        "base_score": round(base_score, 1),
+                        "reasons": [],
+                        "fail_reasons": level_problems,
+                        "blocking_fails": level_problems,
+                        "metrics": {
+                            "rr": level_values.get("rr"),
+                            "regime": "UNKNOWN",
+                        },
+                    }
+                    alert["base_score"] = base_score
+                    alert["entry_quality"] = safety_quality
+                    alert["quality_score"] = 0.0
+                    meta["entry_quality"] = safety_quality
+                    meta["fail_reasons"] = list(dict.fromkeys((meta.get("fail_reasons", []) or []) + level_problems))
+                    log_entry_quality_decision(alert, safety_quality)
+                    log(f"{symbol}: 🛑 SAFETY REJECT {alert.get('pattern_type','')} — {'; '.join(level_problems[:4])}")
+                    _fs("entry_quality")
+                    continue
+
                 quality = evaluate_entry_quality(
                     df=df,
                     ticker=symbol,
@@ -9284,8 +9361,8 @@ def send_daily_summary_email(stats: dict, filter_stats: dict, regime: dict | Non
             {row("EMA28", filter_stats.get("ema28",0))}
             {row("MA150 רחוק", filter_stats.get("ma150_dist",0))}
             {row("MA לא קרוב ל־neckline", filter_stats.get("ma_neckline",0))}
-            {row("תבנית קיימת אבל לא Entry Ready", filter_stats.get("entry_quality",0))}
-            {row("עבר Entry Ready אך נפסל ב-Professional Quality", filter_stats.get("professional_quality",0))}
+            {row("תבנית קיימת אבל לא Entry Ready — טיקרים", filter_stats.get("entry_quality_unique", filter_stats.get("entry_quality",0)), f"{filter_stats.get('entry_quality',0)} מועמדי תבנית נפסלו") }
+            {row("עבר Entry Ready אך נפסל ב-Professional — טיקרים", filter_stats.get("professional_quality_unique", filter_stats.get("professional_quality",0)), f"{filter_stats.get('professional_quality',0)} מועמדי תבנית נפסלו") }
             {row("לא נמצאה תבנית", filter_stats.get("no_pattern",0))}
             {row("Reverse Scanner", filter_stats.get("reverse_scan",0))}
           </table>
@@ -9774,6 +9851,9 @@ def main() -> None:
         "reverse_scan":  0,
         "passed":        0,
     }
+    # Candidate counters can exceed the number of scanned tickers because one ticker
+    # may match several patterns. These sets provide correct ticker-level reporting.
+    filter_ticker_sets: dict[str, set[str]] = {key: set() for key in filter_stats}
 
     ticker_list = list(tickers)
     random.shuffle(ticker_list)
@@ -9819,7 +9899,8 @@ def main() -> None:
         time.sleep(SCAN_DELAY_SECONDS)
 
         try:
-            new = scan_ticker(symbol, alert_history, filter_stats, min_score=dynamic_score) or []
+            new = scan_ticker(symbol, alert_history, filter_stats, min_score=dynamic_score,
+                              filter_ticker_sets=filter_ticker_sets) or []
             if not new:
                 stats["no_alert"] += 1
                 continue
@@ -9865,6 +9946,10 @@ def main() -> None:
         except Exception as e:
             stats["errors"] += 1
             log(f"Critical error {symbol}: {type(e).__name__}: {e}")
+
+    # V9.1.5: expose ticker-level counts separately from raw candidate counts.
+    filter_stats["entry_quality_unique"] = len(filter_ticker_sets.get("entry_quality", set()))
+    filter_stats["professional_quality_unique"] = len(filter_ticker_sets.get("professional_quality", set()))
 
     # שומר היסטוריית התראות. את _df מנקים רק אחרי שליחת המייל,
     # כדי שהגרפים וה-RS במייל לא יצטרכו להוריד נתונים מחדש.
@@ -9935,8 +10020,10 @@ def main() -> None:
     log(f"   {'❌ MA150 רחוק (> 5%)':<28} {filter_stats['ma150_dist']:>6,}  ({filter_stats['ma150_dist']/max(total_scanned,1)*100:.0f}%)")
     log(f"   {'❌ MA לא קרוב ל-neckline':<28} {filter_stats['ma_neckline']:>6,}  ({filter_stats['ma_neckline']/max(total_scanned,1)*100:.0f}%)")
     log(f"   {'❌ ציון נמוך מהסף':<28} {filter_stats['score_low']:>6,}  ({filter_stats['score_low']/max(total_scanned,1)*100:.0f}%)")
-    log(f"   {'👀 תבנית קיימת אבל לא Entry Ready':<28} {filter_stats['entry_quality']:>6,}  ({filter_stats['entry_quality']/max(total_scanned,1)*100:.0f}%)")
-    log(f"   {'🧠 עבר Entry Ready, נפסל Professional':<28} {filter_stats['professional_quality']:>6,}  ({filter_stats['professional_quality']/max(total_scanned,1)*100:.0f}%)")
+    entry_unique = int(filter_stats.get("entry_quality_unique", filter_stats.get("entry_quality", 0)) or 0)
+    pro_unique = int(filter_stats.get("professional_quality_unique", filter_stats.get("professional_quality", 0)) or 0)
+    log(f"   {'👀 לא Entry Ready — טיקרים':<28} {entry_unique:>6,}  ({entry_unique/max(total_scanned,1)*100:.0f}%) | candidate rejects={filter_stats['entry_quality']:,}")
+    log(f"   {'🧠 נפסל Professional — טיקרים':<28} {pro_unique:>6,}  ({pro_unique/max(total_scanned,1)*100:.0f}%) | candidate rejects={filter_stats['professional_quality']:,}")
     log(f"   {'❌ Reverse Scanner / מכירה מוסדית':<28} {filter_stats['reverse_scan']:>6,}  ({filter_stats['reverse_scan']/max(total_scanned,1)*100:.0f}%)")
     log(f"   {'❌ לא נמצאה תבנית':<28} {filter_stats['no_pattern']:>6,}  ({filter_stats['no_pattern']/max(total_scanned,1)*100:.0f}%)")
     log(f"   {'✅ עברו הכל ונשלחו':<28} {stats.get('sent',0):>6,}")
