@@ -89845,3 +89845,12 @@ requests.exceptions.ConnectionError: HTTPSConnectionPool(host='api.twelvedata.co
 [2026-09-25 06:49:05]    🧹 stock_scanner_unified_log.txt: 92586 → 89837 (removed 2749) | ok
 [2026-09-25 06:49:05] Stock Scanner Unified — DONE
 [2026-09-25 06:49:05] ============================================================
+[2026-09-26 06:39:03] ============================================================
+[2026-09-26 06:39:03] Stock Scanner Unified — START
+[2026-09-26 06:39:03] Code version: 2026-09-24-v9.1.4-candle-change-market-guard
+[2026-09-26 06:39:03] Market cap threshold: $1.0B | Pipeline: screener cache → precheck unknowns → fail-open only if unresolved
+[2026-09-26 06:39:03] Entry Ready threshold: quality>=60.0 | candidate_score>=35.0
+[2026-09-26 06:39:03] RESET VERIFIED FIX FILE
+[2026-09-26 06:39:03] ============================================================
+[2026-09-26 06:39:03] 🗓️ Market Day Guard: שבת/ראשון לפי שעון ישראל — מדלג כדי לא לסרוק ביום בלי מסחר
+[2026-09-26 06:39:03] ⏸️ No new market session — exiting before scan to prevent duplicate alerts.
