@@ -27,13 +27,15 @@ stock_scanner_unified.py
   זיהוי התבניות: Trend/RS/Sector/Accumulation/Execution/Risk/Market Context.
   V9.2 מוסיף Exit Intelligence Engine: Stop מקורי קבוע, Profit Protection אחרי +5%,
   Target כיעד ייחוס, וזיהוי שינוי כיוון רב-סיגנלי על נרות יומיים סגורים.
+  V9.3 מוסיף Pattern-Aware Entry: אישור כניסה מותאם לסוג הסטאפ (Breakout / Pullback / Retest),
+  תיקון דיוק R:R, עקביות טובה יותר ב-EMA28 Pre-filter ובדיקת Earnings עתידית בלבד.
 """
 
 # ============================================================
-# RESET VERIFIED FIX FILE — 2026-09-26 V9.2
+# RESET VERIFIED FIX FILE — 2026-09-30 V9.3
 # This marker proves this is the rebuilt fixed file, not an old download copy.
 # ============================================================
-CODE_VERSION = "2026-09-26-v9.2-exit-intelligence-engine"
+CODE_VERSION = "2026-09-30-v9.3-pattern-aware-entry-data-integrity"
 RESET_VERIFIED_FIX_FILE = True
 
 
@@ -263,6 +265,9 @@ ENTRY_MIN_RS_SCORE            = float(os.getenv("ENTRY_MIN_RS_SCORE", "70.0"))
 ENTRY_MIN_52W_HIGH_PROX       = float(os.getenv("ENTRY_MIN_52W_HIGH_PROX", "0.75"))
 ENTRY_MIN_DOLLAR_VOLUME       = float(os.getenv("ENTRY_MIN_DOLLAR_VOLUME", "5000000"))
 ENTRY_MIN_RR                  = float(os.getenv("ENTRY_MIN_RR", "2.50"))
+RR_COMPARE_EPS               = float(os.getenv("RR_COMPARE_EPS", "0.000001"))  # מונע פסילה של 2.499999999 במקום 2.50
+ENTRY_PULLBACK_MIN_VOLUME_RATIO = float(os.getenv("ENTRY_PULLBACK_MIN_VOLUME_RATIO", "1.00"))
+ENTRY_RETEST_MIN_VOLUME_RATIO   = float(os.getenv("ENTRY_RETEST_MIN_VOLUME_RATIO", "1.00"))
 ENTRY_MAX_ATR_PCT             = float(os.getenv("ENTRY_MAX_ATR_PCT", "0.08"))
 ENTRY_MA150_MIN_ABOVE_PCT     = float(os.getenv("ENTRY_MA150_MIN_ABOVE_PCT", "0.000"))
 ENTRY_REQUIRE_MA150_RISING    = os.getenv("ENTRY_REQUIRE_MA150_RISING", "True").lower() in ("1", "true", "yes")
@@ -2347,19 +2352,8 @@ def get_company_card(ticker: str) -> dict:
     mc    = info.get("marketCap")
     mc_b  = round(mc / 1e9, 1) if mc else None
 
-    # תאריך הדוח הבא
-    edate = None
-    try:
-        cal = yf.Ticker(ticker).calendar
-        if cal is not None:
-            if isinstance(cal, dict):
-                ed = cal.get("Earnings Date")
-                if ed:
-                    edate = pd.to_datetime(ed[0] if isinstance(ed, list) else ed).date()
-            elif hasattr(cal, "columns") and "Earnings Date" in cal.columns:
-                edate = pd.to_datetime(cal["Earnings Date"].iloc[0]).date()
-    except Exception:
-        pass
+    # תאריך הדוח הבא — V9.3: רק תאריך עתידי; תאריך עבר נחשב stale ולא "next earnings".
+    edate, _earn_status = _get_next_earnings_date(ticker)
 
     return {
         "name":          name,
@@ -2370,25 +2364,101 @@ def get_company_card(ticker: str) -> dict:
         "earnings_date": edate,
     }
 
-def earnings_filter_ok(ticker: str) -> tuple[bool, str]:
-    """
-    מחזיר (True, "") אם אין דוח ב-EARNINGS_FILTER_DAYS הקרובים.
-    אם תאריך לא ידוע — מחזיר (True, "unknown") כדי לא לחסום.
-    """
+_earnings_date_cache: dict[str, tuple[object, str]] = {}
+
+def _coerce_earnings_dates(raw) -> list:
+    """מחלץ רשימת תאריכים מכל מבנה נפוץ של yfinance בלי להניח שהראשון הוא העתידי."""
+    values = []
+    if raw is None:
+        return values
     try:
-        cal = yf.Ticker(ticker).calendar
-        edate = None
-        if cal is not None:
-            if isinstance(cal, dict):
-                ed = cal.get("Earnings Date")
-                if ed:
-                    edate = pd.to_datetime(ed[0] if isinstance(ed, list) else ed).date()
-            elif hasattr(cal, "columns") and "Earnings Date" in cal.columns:
-                edate = pd.to_datetime(cal["Earnings Date"].iloc[0]).date()
+        if isinstance(raw, dict):
+            for v in raw.values():
+                values.extend(_coerce_earnings_dates(v))
+            return values
+        if isinstance(raw, pd.DataFrame):
+            values.extend(list(raw.index))
+            for col in raw.columns:
+                if "earning" in str(col).lower() or "date" in str(col).lower():
+                    values.extend(list(raw[col].dropna()))
+            return values
+        if isinstance(raw, (pd.Series, list, tuple, set, np.ndarray)):
+            for v in list(raw):
+                values.extend(_coerce_earnings_dates(v))
+            return values
+        ts = pd.to_datetime(raw, errors="coerce", utc=True)
+        if not pd.isna(ts):
+            values.append(ts.date())
+    except Exception:
+        pass
+    return values
 
+def _get_next_earnings_date(ticker: str, today=None) -> tuple[object, str]:
+    """מחזיר רק earnings עתידי; past-only מסומן stale ולא מוצג כ-next earnings."""
+    t = str(ticker or "").strip().upper()
+    today = today or datetime.now().date()
+    cache_key = f"{t}|{today.isoformat()}"
+    if cache_key in _earnings_date_cache:
+        return _earnings_date_cache[cache_key]
+    candidates = []
+    saw_past = False
+    try:
+        obj = yf.Ticker(t)
+        try:
+            candidates.extend(_coerce_earnings_dates(obj.calendar))
+        except Exception:
+            pass
+        try:
+            info = _get_yf_info(t)
+            for key in ("earningsTimestamp", "earningsTimestampStart", "earningsTimestampEnd"):
+                raw = info.get(key)
+                if raw:
+                    try:
+                        candidates.append(datetime.fromtimestamp(float(raw)).date())
+                    except Exception:
+                        candidates.extend(_coerce_earnings_dates(raw))
+        except Exception:
+            pass
+        clean = []
+        for d in candidates:
+            try:
+                dd = pd.Timestamp(d).date()
+                if dd < today:
+                    saw_past = True
+                else:
+                    clean.append(dd)
+            except Exception:
+                continue
+        if not clean:
+            try:
+                hist = obj.get_earnings_dates(limit=8)
+                for d in _coerce_earnings_dates(hist):
+                    dd = pd.Timestamp(d).date()
+                    if dd < today:
+                        saw_past = True
+                    else:
+                        clean.append(dd)
+            except Exception:
+                pass
+        if clean:
+            result = (min(clean), "verified_future")
+        elif saw_past:
+            result = (None, "stale_past_only")
+        else:
+            result = (None, "unknown")
+    except Exception as e:
+        result = (None, f"error:{type(e).__name__}")
+    _earnings_date_cache[cache_key] = result
+    return result
+
+def earnings_filter_ok(ticker: str) -> tuple[bool, str]:
+    """מסנן דוח קרוב; מידע stale/unknown לא מוצג כתאריך עתידי תקין."""
+    try:
+        edate, status = _get_next_earnings_date(ticker)
         if edate is None:
+            if status == "stale_past_only":
+                return True, "earnings data stale (past dates only) — allowing as UNKNOWN"
             return True, "earnings date unknown — allowing"
-
         days_until = (edate - datetime.now().date()).days
         if 0 <= days_until <= EARNINGS_FILTER_DAYS:
             return False, f"earnings in {days_until} days ({edate})"
@@ -3209,6 +3279,126 @@ def _to_float_or_none(value) -> float | None:
         return None
 
 
+def _rr_at_least(value, threshold: float) -> bool:
+    """השוואת R:R עם tolerance קטן כדי למנוע false reject בגלל floating point."""
+    try:
+        v = float(value)
+        t = float(threshold)
+        return math.isfinite(v) and v + RR_COMPARE_EPS >= t
+    except Exception:
+        return False
+
+
+def _entry_pattern_family(pattern: str, meta: dict | None = None) -> str:
+    """מסווג רק את לוגיקת אישור הכניסה; אינו משנה את זיהוי התבנית עצמה."""
+    p = str(pattern or "").lower()
+    m = meta or {}
+    source = str(m.get("pattern_source") or "")
+    if source == "V9_PATTERN_EXPANSION":
+        if "pullback" in p or m.get("pullback_days") is not None:
+            return "PULLBACK"
+        if "retest" in p or m.get("retest_low") is not None:
+            return "RETEST"
+    return "BREAKOUT"
+
+
+def _entry_confirmation_profile(pattern: str, meta: dict, metrics: dict) -> dict:
+    """
+    V9.3: אישור כניסה מותאם לסוג הסטאפ.
+    Breakout ממשיך לדרוש פריצה + 1.30x volume.
+    Pullback דורש bounce אמיתי; 1.00x volume מותר רק יחד עם volume contraction ב-pullback.
+    Retest דורש retest נקי + bounce; volume מאומת ע"י הנר הנוכחי או הפריצה המקורית.
+    """
+    family = _entry_pattern_family(pattern, meta)
+    vr = _to_float_or_none(metrics.get("volume_ratio"))
+    bp = _to_float_or_none(metrics.get("breakout_pct"))
+    max_extension_ok = (bp is None) or (bp <= ENTRY_MAX_EXTENSION_PCT + 1e-12)
+    out = {
+        "family": family,
+        "confirmation_ok": False,
+        "volume_ok": False,
+        "confirmation_points": 0.0,
+        "volume_points": 0.0,
+        "confirmation_reason": "",
+        "volume_reason": "",
+        "blockers": [],
+        "max_extension_ok": max_extension_ok,
+    }
+
+    if family == "PULLBACK":
+        bounce_ok = bool(meta.get("bounce_confirmed", False))
+        quiet_pullback = bool(meta.get("pullback_volume_quiet", False))
+        out["confirmation_ok"] = bounce_ok
+        if bounce_ok:
+            out["confirmation_points"] = 8.0
+            out["confirmation_reason"] = "Bounce מאושר מעל ה-High הקודם עם נר חיובי (+8)"
+        else:
+            out["blockers"].append("אין Bounce מאושר מעל ה-High הקודם")
+        if vr is not None and vr >= ENTRY_MIN_VOLUME_RATIO:
+            out["volume_ok"] = True
+            out["volume_points"] = 6.0 if vr < 2.0 else 8.0
+            out["volume_reason"] = f"ווליום Bounce חזק ×{vr:.2f}"
+        elif vr is not None and vr + 1e-12 >= ENTRY_PULLBACK_MIN_VOLUME_RATIO and quiet_pullback:
+            out["volume_ok"] = True
+            out["volume_points"] = 5.0
+            out["volume_reason"] = f"Pullback שקט + ווליום Bounce ×{vr:.2f}"
+        else:
+            out["blockers"].append("ווליום Bounce לא מאשר / אין contraction ב-Pullback")
+        out["pullback_volume_quiet"] = quiet_pullback
+
+    elif family == "RETEST":
+        bounce_ok = bool(meta.get("bounce_confirmed", False))
+        touched = bool(meta.get("touched_retest_zone", False))
+        held = bool(meta.get("no_failed_breakout", False))
+        out["confirmation_ok"] = bool(bounce_ok and touched and held)
+        if out["confirmation_ok"]:
+            out["confirmation_points"] = 8.0
+            out["confirmation_reason"] = "Retest נקי + Pivot hold + Bounce מאושר (+8)"
+        else:
+            if not touched:
+                out["blockers"].append("Retest לא נגע באזור ה-Pivot")
+            if not held:
+                out["blockers"].append("ה-Pivot לא נשמר בצורה נקייה")
+            if not bounce_ok:
+                out["blockers"].append("אין Bounce מאושר לאחר ה-Retest")
+        original_vr = _to_float_or_none(meta.get("breakout_volume_ratio"))
+        if vr is not None and vr >= ENTRY_MIN_VOLUME_RATIO:
+            out["volume_ok"] = True
+            out["volume_points"] = 6.0 if vr < 2.0 else 8.0
+            out["volume_reason"] = f"ווליום Bounce חזק ×{vr:.2f}"
+        elif (vr is not None and vr + 1e-12 >= ENTRY_RETEST_MIN_VOLUME_RATIO
+              and original_vr is not None and original_vr + 1e-12 >= ENTRY_MIN_VOLUME_RATIO):
+            out["volume_ok"] = True
+            out["volume_points"] = 5.0
+            out["volume_reason"] = f"פריצה מקורית ×{original_vr:.2f} + Bounce ×{vr:.2f}"
+        else:
+            out["blockers"].append("ווליום Retest/Bounce לא מאשר")
+        out["original_breakout_volume_ratio"] = original_vr
+
+    else:
+        breakout_ok = bool(metrics.get("breakout_confirmed", False))
+        out["confirmation_ok"] = breakout_ok
+        if breakout_ok:
+            out["confirmation_points"] = 8.0
+            out["confirmation_reason"] = f"פריצה מאושרת מעל הרמה ({(bp or 0)*100:.2f}%) (+8)"
+        else:
+            out["blockers"].append("אין פריצה מאושרת מעל הרמה")
+        if vr is not None and vr >= 2.0:
+            out["volume_ok"] = True
+            out["volume_points"] = 8.0
+            out["volume_reason"] = f"ווליום פריצה חזק מאוד ×{vr:.2f}"
+        elif vr is not None and vr >= ENTRY_MIN_VOLUME_RATIO:
+            out["volume_ok"] = True
+            out["volume_points"] = 6.0
+            out["volume_reason"] = f"ווליום פריצה מאשר ×{vr:.2f}"
+        else:
+            out["blockers"].append("ווליום לא מאשר")
+
+    if not max_extension_ok:
+        out["blockers"].append("המחיר כבר רחוק מדי מהכניסה")
+    return out
+
+
 def _series_last_finite(series, default=None):
     try:
         return _last_finite(series, default=default)
@@ -3424,6 +3614,11 @@ def _entry_quality_metrics(df: pd.DataFrame, ticker: str, breakout_level: float,
                 pass
         metrics["depth_pct"] = _to_float_or_none(meta.get("depth_pct"))
         metrics["vol_declining"] = bool(meta.get("vol_declining", False))
+        metrics["bounce_confirmed"] = bool(meta.get("bounce_confirmed", False))
+        metrics["pullback_volume_quiet"] = bool(meta.get("pullback_volume_quiet", False))
+        metrics["touched_retest_zone"] = bool(meta.get("touched_retest_zone", False))
+        metrics["no_failed_breakout"] = bool(meta.get("no_failed_breakout", False))
+        metrics["original_breakout_volume_ratio"] = _to_float_or_none(meta.get("breakout_volume_ratio"))
         return metrics
     except Exception as e:
         metrics["error"] = str(e)
@@ -3474,6 +3669,24 @@ def _validate_long_trade_levels(alert: dict) -> tuple[bool, list[str], dict]:
     return (not problems), list(dict.fromkeys(problems)), values
 
 
+ENTRY_DIAGNOSTICS = {"patterns": {}, "blockers": {}}
+
+def _record_entry_diagnostics(pattern: str, quality: dict) -> None:
+    """אוסף funnel לפי Pattern וסיבת חסימה כדי לכייל לפי נתונים אמיתיים."""
+    try:
+        p = str(pattern or "UNKNOWN")
+        bucket = ENTRY_DIAGNOSTICS["patterns"].setdefault(p, {"ready": 0, "watchlist": 0})
+        if quality.get("entry_ready"):
+            bucket["ready"] += 1
+        else:
+            bucket["watchlist"] += 1
+            for reason in quality.get("blocking_fails", []) or []:
+                key = str(reason)
+                ENTRY_DIAGNOSTICS["blockers"][key] = int(ENTRY_DIAGNOSTICS["blockers"].get(key, 0)) + 1
+    except Exception:
+        pass
+
+
 def evaluate_entry_quality(df: pd.DataFrame, ticker: str, breakout_level: float,
                            pattern_meta: dict | None = None, base_score: float = 0.0,
                            rr: float | None = None, regime: dict | None = None) -> dict:
@@ -3487,6 +3700,10 @@ def evaluate_entry_quality(df: pd.DataFrame, ticker: str, breakout_level: float,
     meta = pattern_meta or {}
     pattern = str(meta.get("pattern_type") or meta.get("pattern") or "")
     m = _entry_quality_metrics(df, ticker, breakout_level, meta, rr, regime)
+    confirmation = _entry_confirmation_profile(pattern, meta, m)
+    m["entry_confirmation_family"] = confirmation.get("family")
+    m["entry_confirmation_ok"] = bool(confirmation.get("confirmation_ok"))
+    m["entry_volume_ok"] = bool(confirmation.get("volume_ok"))
 
     def pct(x):
         return "N/A" if x is None else f"{x*100:.1f}%"
@@ -3570,21 +3787,22 @@ def evaluate_entry_quality(df: pd.DataFrame, ticker: str, breakout_level: float,
         points += 3; reasons.append("Volume dry-up לפני הפריצה (+3)")
 
     bp = m.get("breakout_pct")
-    if bp is not None and ENTRY_MIN_BREAKOUT_PCT <= bp <= ENTRY_MAX_EXTENSION_PCT:
-        points += 8; reasons.append(f"פריצה מאושרת מעל הרמה ({bp*100:.2f}%) (+8)")
-    elif bp is not None and bp < ENTRY_MIN_BREAKOUT_PCT:
-        fails.append(f"אין פריצה מאושרת — רק {bp*100:.2f}% מעל הרמה")
-    elif bp is not None:
-        fails.append(f"רחוק מדי מנקודת הכניסה — {bp*100:.1f}% מעל הפריצה")
-    else:
-        fails.append("אין רמת פריצה תקינה")
     vr = m.get("volume_ratio")
-    if vr is not None and vr >= 2.0:
-        points += 8; reasons.append(f"ווליום פריצה חזק מאוד ×{vr:.2f} (+8)")
-    elif vr is not None and vr >= ENTRY_MIN_VOLUME_RATIO:
-        points += 6; reasons.append(f"ווליום פריצה מאשר ×{vr:.2f} (+6)")
+    if confirmation.get("confirmation_ok"):
+        points += float(confirmation.get("confirmation_points", 0) or 0)
+        if confirmation.get("confirmation_reason"):
+            reasons.append(str(confirmation.get("confirmation_reason")))
     else:
-        fails.append(f"ווליום לא מאשר פריצה ({'N/A' if vr is None else f'×{vr:.2f}'})")
+        fails.extend([x for x in confirmation.get("blockers", []) if "ווליום" not in x and "רחוק מדי" not in x])
+    if confirmation.get("volume_ok"):
+        points += float(confirmation.get("volume_points", 0) or 0)
+        if confirmation.get("volume_reason"):
+            reasons.append(str(confirmation.get("volume_reason")) + f" (+{float(confirmation.get('volume_points',0) or 0):.0f})")
+    else:
+        vol_blockers = [x for x in confirmation.get("blockers", []) if "ווליום" in x]
+        fails.extend(vol_blockers or [f"ווליום לא מאשר ({'N/A' if vr is None else f'×{vr:.2f}'})"])
+    if not confirmation.get("max_extension_ok", True):
+        fails.append(f"רחוק מדי מנקודת הכניסה — {bp*100:.1f}% מעל ה-Pivot" if bp is not None else "המחיר רחוק מדי מהכניסה")
     cp = m.get("close_position")
     if cp is not None and cp >= 0.80:
         points += 6; reasons.append(f"סגירה חזקה מאוד בחלק העליון של הנר ({cp*100:.0f}%) (+6)")
@@ -3605,9 +3823,9 @@ def evaluate_entry_quality(df: pd.DataFrame, ticker: str, breakout_level: float,
         points += 2; reasons.append("לא רודפים אחרי מחיר רחוק מדי (+2)")
 
     rr_val = m.get("rr")
-    if rr_val is not None and rr_val >= 3.0:
+    if _rr_at_least(rr_val, 3.0):
         points += 7; reasons.append(f"R:R חזק {rr_val:.2f}:1 (+7)")
-    elif rr_val is not None and rr_val >= ENTRY_MIN_RR:
+    elif _rr_at_least(rr_val, ENTRY_MIN_RR):
         points += 5; reasons.append(f"R:R תקין {rr_val:.2f}:1 (+5)")
     else:
         fails.append(f"R:R נמוך מדי ({'N/A' if rr_val is None else f'{rr_val:.2f}:1'})")
@@ -3633,12 +3851,13 @@ def evaluate_entry_quality(df: pd.DataFrame, ticker: str, breakout_level: float,
         blocking_fails.append("MA150 לא עולה")
     if ENTRY_REQUIRE_MA200_ABOVE and m.get("above_ma200") is False:
         blocking_fails.append("מתחת ל-MA200")
-    if not m.get("breakout_confirmed"):
-        blocking_fails.append("אין פריצה מאושרת מעל הרמה")
-    if m.get("breakout_pct") is not None and m.get("breakout_pct") > ENTRY_MAX_EXTENSION_PCT:
+    if not confirmation.get("confirmation_ok"):
+        blocking_fails.extend([x for x in confirmation.get("blockers", []) if "ווליום" not in x and "רחוק מדי" not in x])
+    if not confirmation.get("max_extension_ok", True):
         blocking_fails.append("המחיר כבר רחוק מדי מהכניסה")
-    if (m.get("volume_ratio") is None) or (m.get("volume_ratio") < ENTRY_MIN_VOLUME_RATIO):
-        blocking_fails.append("ווליום לא מאשר")
+    if not confirmation.get("volume_ok"):
+        vol_blockers = [x for x in confirmation.get("blockers", []) if "ווליום" in x]
+        blocking_fails.extend(vol_blockers or ["ווליום לא מאשר"])
     if (m.get("close_position") is None) or (m.get("close_position") < ENTRY_MIN_CLOSE_POS):
         blocking_fails.append("סגירת נר לא חזקה")
     if (m.get("body_ratio") is None) or (m.get("body_ratio") < ENTRY_MIN_BODY_RATIO):
@@ -3649,7 +3868,7 @@ def evaluate_entry_quality(df: pd.DataFrame, ticker: str, breakout_level: float,
         blocking_fails.append("רחוק מדי משיא 52 שבועות")
     if (adv is None) or (adv < ENTRY_MIN_DOLLAR_VOLUME):
         blocking_fails.append("נזילות דולרית נמוכה")
-    if (rr_val is None) or (rr_val < ENTRY_MIN_RR):
+    if not _rr_at_least(rr_val, ENTRY_MIN_RR):
         blocking_fails.append("R:R נמוך מדי")
     if ENTRY_REQUIRE_REGIME_DATA_OK and not m.get("regime_data_ok"):
         blocking_fails.append("נתוני SPY/Regime לא תקינים")
@@ -4150,9 +4369,9 @@ def common_quality_checks(
         missing.append("daily close not strong enough")
 
     # Risk / reward
-    if rr is not None and rr >= 3.0:
+    if _rr_at_least(rr, 3.0):
         score += 10
-    elif rr is not None and rr >= config.min_rr:
+    elif _rr_at_least(rr, config.min_rr):
         score += 8
     else:
         missing.append(f"RR below {config.min_rr:.1f}")
@@ -5412,10 +5631,14 @@ def _professional_execution_profile(df: pd.DataFrame, entry_quality: dict) -> di
             upper_wick = max(0.0, high - max(open_p, close)) / (high - low)
 
         score = 0.0
+        family = str(m.get("entry_confirmation_family") or "BREAKOUT")
+        confirmation_ok = bool(m.get("entry_confirmation_ok", False))
+        volume_ok = bool(m.get("entry_volume_ok", False))
         if vr is not None:
             if vr >= 2.0: score += 25
             elif vr >= 1.5: score += 22
             elif vr >= ENTRY_MIN_VOLUME_RATIO: score += 18
+            elif family in {"PULLBACK", "RETEST"} and volume_ok and vr >= 1.0: score += 14
         if cp is not None:
             if cp >= 0.85: score += 20
             elif cp >= 0.75: score += 18
@@ -5428,18 +5651,20 @@ def _professional_execution_profile(df: pd.DataFrame, entry_quality: dict) -> di
             if upper_wick <= 0.12: score += 16
             elif upper_wick <= 0.25: score += 12
             elif upper_wick <= 0.40: score += 6
-        if bp is not None:
+        if family == "BREAKOUT" and bp is not None:
             if ENTRY_MIN_BREAKOUT_PCT <= bp <= 0.015: score += 18
-            elif bp <= ENTRY_MAX_EXTENSION_PCT: score += 10
+            elif 0 <= bp <= ENTRY_MAX_EXTENSION_PCT: score += 10
+        elif family in {"PULLBACK", "RETEST"} and confirmation_ok:
+            score += 15
         if m.get("green_candle") is True:
             score += 5
 
-        reasons = []
+        reasons = [f"Entry mode {family}"]
         if vr is not None: reasons.append(f"Volume {vr:.2f}x")
         if cp is not None: reasons.append(f"Close position {cp*100:.0f}%")
         if upper_wick is not None: reasons.append(f"Upper wick {upper_wick*100:.0f}%")
         if bp is not None: reasons.append(f"Entry extension {bp*100:.2f}%")
-        out = {"score": _pro_clamp(score), "reasons": reasons, "metrics": {"volume_ratio": vr, "close_position": cp, "body_ratio": body, "upper_wick_ratio": upper_wick, "breakout_pct": bp}}
+        out = {"score": _pro_clamp(score), "reasons": reasons, "metrics": {"entry_mode": family, "volume_ratio": vr, "close_position": cp, "body_ratio": body, "upper_wick_ratio": upper_wick, "breakout_pct": bp}}
     except Exception as e:
         out["error"] = str(e)
     return out
@@ -5474,9 +5699,9 @@ def _professional_risk_profile(alert: dict, df: pd.DataFrame, entry_quality: dic
         atr_risk = (risk / atr) if atr and atr > 0 else None
         bp = _to_float_or_none(qmetrics.get("breakout_pct"))
         score = 0.0
-        if rr_calc >= 4.0: score += 32
-        elif rr_calc >= 3.0: score += 27
-        elif rr_calc >= ENTRY_MIN_RR: score += 22
+        if _rr_at_least(rr_calc, 4.0): score += 32
+        elif _rr_at_least(rr_calc, 3.0): score += 27
+        elif _rr_at_least(rr_calc, ENTRY_MIN_RR): score += 22
         elif rr_calc >= 2.0: score += 12
         if 0.01 <= risk_pct <= 0.055: score += 32
         elif 0.005 <= risk_pct <= 0.08: score += 25
@@ -5494,7 +5719,7 @@ def _professional_risk_profile(alert: dict, df: pd.DataFrame, entry_quality: dic
 
         if risk_pct > PRO_MAX_STOP_RISK_PCT:
             blockers.append(f"סטופ רחב מדי ({risk_pct*100:.1f}% > {PRO_MAX_STOP_RISK_PCT*100:.1f}%)")
-        if rr_calc < ENTRY_MIN_RR:
+        if not _rr_at_least(rr_calc, ENTRY_MIN_RR):
             blockers.append(f"R:R מחושב נמוך ({rr_calc:.2f} < {ENTRY_MIN_RR:.2f})")
         reasons = [f"Risk {risk_pct*100:.1f}%", f"R:R calculated {rr_calc:.2f}"]
         if atr_risk is not None:
@@ -6192,9 +6417,9 @@ def check_for_consolidation_breakout(df: pd.DataFrame, ticker: str, min_score: f
         return alerts
 
     stop, target, size, atr, rr = atr_stop_and_position(best["breakout_level"], df, best)
-    if rr < 2.5:
+    if not _rr_at_least(rr, ENTRY_MIN_RR):
         if DEBUG_SCAN_REASONS:
-            log(f"{ticker}: Falling Wedge — RR too low ({rr:.2f} < 2.50)")
+            log(f"{ticker}: Falling Wedge — RR too low ({rr:.2f} < {ENTRY_MIN_RR:.2f})")
         return alerts
     if DEBUG_SCAN_REASONS:
         log(f"{ticker}: ✅ Falling Wedge candidate — base_score={score:.1f} candidate_min={ENTRY_CANDIDATE_MIN_SCORE:.1f} neck={best['breakout_level']:.2f} rr={rr:.2f}")
@@ -6357,7 +6582,7 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
                     score_e = compute_setup_score(df, symbol, neck_db_early, len(df)-1, meta_db_early)
                     if score_e >= ENTRY_CANDIDATE_MIN_SCORE:
                         stop_e, target_e, size_e, atr_e, rr_e = atr_stop_and_position(neck_db_early, df, meta_db_early)
-                        if rr_e >= 2.5:
+                        if _rr_at_least(rr_e, ENTRY_MIN_RR):
                             log(f"{symbol}: ✅ Double Bottom (early) score={score_e:.0f}")
                             candidates.append({
                                 "ticker": symbol, "phase": 1,
@@ -6619,6 +6844,7 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
                     meta["entry_quality"] = safety_quality
                     meta["fail_reasons"] = list(dict.fromkeys((meta.get("fail_reasons", []) or []) + level_problems))
                     log_entry_quality_decision(alert, safety_quality)
+                    _record_entry_diagnostics(alert.get("pattern_type", ""), safety_quality)
                     log(f"{symbol}: 🛑 SAFETY REJECT {alert.get('pattern_type','')} — {'; '.join(level_problems[:4])}")
                     _fs("entry_quality")
                     continue
@@ -6640,6 +6866,7 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
                 meta["entry_quality_reasons"] = quality.get("reasons", [])
                 meta["fail_reasons"] = list(dict.fromkeys((meta.get("fail_reasons", []) or []) + quality.get("fail_reasons", [])))
                 log_entry_quality_decision(alert, quality)
+                _record_entry_diagnostics(alert.get("pattern_type", ""), quality)
 
                 if not quality.get("entry_ready", False):
                     fails = quality.get("blocking_fails", []) or quality.get("fail_reasons", []) or []
@@ -6860,7 +7087,7 @@ def compute_rs_score(ticker: str, df: pd.DataFrame) -> dict:
 # ============================================================
 
 LEARNING_CONFIG_FILE = _state_path(os.getenv("LEARNING_CONFIG_FILE", "scanner_learned_params.json"))
-LEARNING_MIN_SAMPLES = 30    # מינימום סטאפים לניתוח
+LEARNING_MIN_SAMPLES = 50    # V9.3: דורש מדגם גדול יותר לפני שינוי פרמטרים
 LEARNING_LOOKBACK_DAYS = 90  # מנתח את 90 הימים האחרונים
 
 # ============================================================
@@ -7978,32 +8205,29 @@ def run_self_learning() -> dict:
         new_params = {}
 
         # ── ניתוח 2: ציון אופטימלי (MIN_ALERT_SCORE) ────────
-        # חפש את הציון שממנו win_rate עולה מעל 55%
+        # V9.3: הציונים כיום בסקאלה של עשרות נקודות. מנוע ישן בדק 5-7.5
+        # ועלול היה להוריד סף בצורה מסוכנת. כעת השינוי bounded ושמרני.
+        score_num = pd.to_numeric(checked["score"], errors="coerce") if "score" in checked.columns else pd.Series(np.nan, index=checked.index)
         best_score_threshold = None
-        for threshold in [5.0, 5.5, 6.0, 6.5, 7.0, 7.5]:
-            subset = checked[checked["score"] >= threshold]
-            if len(subset) < 10:
+        for threshold in [45.0, 50.0, 55.0, 60.0, 65.0]:
+            subset = checked[score_num >= threshold]
+            if len(subset) < max(15, LEARNING_MIN_SAMPLES // 3):
                 continue
             wins_s = subset["result_20d"].str.startswith("WIN").sum()
             wr = wins_s / len(subset)
             if wr >= 0.55:
                 best_score_threshold = threshold
-                break  # קח את הנמוך ביותר שעובד
+                break
 
         current_wr_all = checked["result_20d"].str.startswith("WIN").sum() / n
-        if best_score_threshold and best_score_threshold > MIN_ALERT_SCORE + 0.4:
-            new_params["MIN_ALERT_SCORE"] = best_score_threshold
-            insights.append(
-                f"📈 הגדל MIN_ALERT_SCORE ל-{best_score_threshold} "
-                f"(win rate עולה ל-55%+ לעומת {current_wr_all*100:.0f}% כיום)"
-            )
-        elif current_wr_all >= 0.60 and MIN_ALERT_SCORE > 5.0:
-            # win rate גבוה — אפשר להוריד סף כדי לקבל יותר סטאפים
-            new_params["MIN_ALERT_SCORE"] = max(5.0, MIN_ALERT_SCORE - 0.5)
-            insights.append(
-                f"📊 הורד MIN_ALERT_SCORE ל-{new_params['MIN_ALERT_SCORE']} "
-                f"(win rate {current_wr_all*100:.0f}% — יש מקום לעוד סטאפים)"
-            )
+        if best_score_threshold is not None:
+            bounded = max(40.0, min(65.0, float(best_score_threshold)))
+            if bounded > MIN_ALERT_SCORE + 4.9:
+                new_params["MIN_ALERT_SCORE"] = min(MIN_ALERT_SCORE + 5.0, bounded)
+                insights.append(f"📈 העלה MIN_ALERT_SCORE באופן מדורג ל-{new_params['MIN_ALERT_SCORE']:.1f}")
+            elif current_wr_all >= 0.65 and bounded < MIN_ALERT_SCORE - 4.9:
+                new_params["MIN_ALERT_SCORE"] = max(40.0, MIN_ALERT_SCORE - 5.0)
+                insights.append(f"📊 הורד MIN_ALERT_SCORE באופן מדורג ל-{new_params['MIN_ALERT_SCORE']:.1f} (מדגם {n}, WR={current_wr_all*100:.0f}%)")
 
         # ── ניתוח 3: BREAKOUT_TOLERANCE ─────────────────────
         # בדוק אם הרוב מרחוק הפריצה קרוב ל-0 או מגיע ל-0.5%
@@ -9749,7 +9973,9 @@ def send_daily_summary_email(stats: dict, filter_stats: dict, regime: dict | Non
 # ============================================================
 
 PREFILTER_BATCH_SIZE = int(os.getenv("PREFILTER_BATCH_SIZE", "50"))  # מניות לבקשה אחת — קטן יותר כדי להפחית חסימות Yahoo
-PREFILTER_PERIOD     = os.getenv("PREFILTER_PERIOD", "45d")          # מספיק ל-EMA28 + מרווח ביטחון
+PREFILTER_PERIOD     = os.getenv("PREFILTER_PERIOD", "6mo")          # V9.3: תקופה נתמכת + convergence טוב יותר מול Full Scan
+PREFILTER_EMA_GUARD_BAND_PCT = float(os.getenv("PREFILTER_EMA_GUARD_BAND_PCT", "0.004"))  # רק ב-prefilter; Full Scan נשאר קשיח
+PREFILTER_EMA_SLOPE_TOL_PCT  = float(os.getenv("PREFILTER_EMA_SLOPE_TOL_PCT", "0.0005"))
 PREFILTER_DOWNLOAD_RETRIES = int(os.getenv("PREFILTER_DOWNLOAD_RETRIES", "3"))
 PREFILTER_TIMEOUT_SECONDS  = int(os.getenv("PREFILTER_TIMEOUT_SECONDS", "20"))
 PREFILTER_RETRY_SLEEP_SECONDS = int(os.getenv("PREFILTER_RETRY_SLEEP_SECONDS", "10"))
@@ -9828,7 +10054,7 @@ def _extract_prefilter_ticker_frame(raw: pd.DataFrame, ticker: str) -> pd.DataFr
 
 def prefilter_by_ema28(ticker_list: list[str]) -> tuple[list[str], list[str]]:
     """
-    מוריד 45 ימים לכל המניות ב-batch ומסנן לפי EMA28.
+    מוריד כ-6 חודשי מסחר לכל המניות ב-batch ומסנן לפי EMA28.
     מחזיר (passed, failed) — passed ממשיכות לסריקה מלאה.
 
     שינוי חשוב:
@@ -9853,7 +10079,7 @@ def prefilter_by_ema28(ticker_list: list[str]) -> tuple[list[str], list[str]]:
     }
 
     log(f"⚡ Pre-filter: בודק {total} מניות לפי EMA28...")
-    log(f"⚡ Pre-filter settings: batch={PREFILTER_BATCH_SIZE}, retries={PREFILTER_DOWNLOAD_RETRIES}, threads=False")
+    log(f"⚡ Pre-filter settings: batch={PREFILTER_BATCH_SIZE}, period={PREFILTER_PERIOD}, retries={PREFILTER_DOWNLOAD_RETRIES}, guard=±{PREFILTER_EMA_GUARD_BAND_PCT*100:.1f}%, threads=False")
 
     # עבד ב-batches
     for batch_start in range(0, total, PREFILTER_BATCH_SIZE):
@@ -9916,15 +10142,16 @@ def prefilter_by_ema28(ticker_list: list[str]) -> tuple[list[str], list[str]]:
 
                 dist = (price_now - ema_now) / ema_now
 
-                # סנן: מתחת ל-EMA28 או רחוק מדי מעליו
-                if dist < 0:
+                # V9.3: ה-Pre-filter הוא coarse gate בלבד. guard-band קטן מונע false reject
+                # בגלל הבדלי מקור/adjustment; ה-Full Scan נשאר הסמכות הקשיחה.
+                if dist < -PREFILTER_EMA_GUARD_BAND_PCT:
                     failed.append(ticker)
                     continue
-                if dist > EMA28_MAX_DIST_PCT:
+                if dist > EMA28_MAX_DIST_PCT + PREFILTER_EMA_GUARD_BAND_PCT:
                     failed.append(ticker)
                     continue
-                # EMA28 חייב לעלות
-                if EMA28_REQUIRE_RISING and ema_now <= ema_prev:
+                slope_pct = (ema_now - ema_prev) / max(abs(ema_prev), 1e-9)
+                if EMA28_REQUIRE_RISING and slope_pct < -PREFILTER_EMA_SLOPE_TOL_PCT:
                     failed.append(ticker)
                     continue
 
@@ -10159,7 +10386,7 @@ def main() -> None:
     dynamic_score = get_dynamic_min_score()
     regime_name   = regime.get("regime", "NEUTRAL")
     log(f"🎯 MIN_ALERT_SCORE דינמי: {dynamic_score} (Regime={regime_name})")
-    log(f"🚀 V8 Entry Ready Engine: min_quality={ENTRY_READY_MIN_SCORE:.1f}, volume×{ENTRY_MIN_VOLUME_RATIO:.2f}, RS>={ENTRY_MIN_RS_SCORE:.0f}, breakout>={ENTRY_MIN_BREAKOUT_PCT*100:.1f}%")
+    log(f"🚀 V9.3 Pattern-Aware Entry: min_quality={ENTRY_READY_MIN_SCORE:.1f}, breakout_volume×{ENTRY_MIN_VOLUME_RATIO:.2f}, pullback/retest_volume×{ENTRY_PULLBACK_MIN_VOLUME_RATIO:.2f}+, RS>={ENTRY_MIN_RS_SCORE:.0f}")
     log(f"🧩 V9 Pattern Expansion: enabled={V9_PATTERN_ENGINE_ENABLED}, max_per_ticker={V9_MAX_CANDIDATES_PER_TICKER}, patterns=FlatBase/Darvas/VCP/EMA-Pullback/Retest")
     log(f"🧠 V9.1 Professional Quality: enabled={PRO_ENGINE_ENABLED}, min={PRO_MIN_SCORE:.1f}, trend>={PRO_MIN_TREND_SCORE:.0f}, multi-RS>={PRO_MIN_RS_PROFILE_SCORE:.0f}, max_stop={PRO_MAX_STOP_RISK_PCT*100:.0f}%")
     log(f"🧭 V9.2 Exit Intelligence: fixed_initial_stop=True, profit_protection=+{EXIT_PROFIT_ACTIVATE_PCT:.1f}%, chandelier={EXIT_CHANDELIER_ATR_MULT:.1f}ATR, watch>={EXIT_WATCH_SCORE:.0f}, exit>={EXIT_CONFIRM_SCORE:.0f}, target=reference-only")
@@ -10369,6 +10596,17 @@ def main() -> None:
     log(f"   {'❌ לא נמצאה תבנית':<28} {filter_stats['no_pattern']:>6,}  ({filter_stats['no_pattern']/max(total_scanned,1)*100:.0f}%)")
     log(f"   {'✅ עברו הכל ונשלחו':<28} {stats.get('sent',0):>6,}")
     log("=" * 60)
+    try:
+        if ENTRY_DIAGNOSTICS.get("blockers"):
+            top_blockers = sorted(ENTRY_DIAGNOSTICS["blockers"].items(), key=lambda kv: kv[1], reverse=True)[:8]
+            log("🧪 V9.3 ENTRY FUNNEL — top blockers: " + " | ".join(f"{k}={v}" for k, v in top_blockers))
+        if ENTRY_DIAGNOSTICS.get("patterns"):
+            parts = []
+            for pat, vals in sorted(ENTRY_DIAGNOSTICS["patterns"].items(), key=lambda kv: (kv[1].get("ready",0)+kv[1].get("watchlist",0)), reverse=True):
+                parts.append(f"{pat}: ready={vals.get('ready',0)}, watch={vals.get('watchlist',0)}")
+            log("🧪 V9.3 ENTRY FUNNEL — by pattern: " + " | ".join(parts[:10]))
+    except Exception as e:
+        log(f"Entry diagnostics summary error: {e}")
 
     # ── Self-Learning — רץ כל שבת ──────────────────────────
     try:
