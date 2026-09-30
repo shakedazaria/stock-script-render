@@ -2,8 +2,13 @@ name: Stock Scanner Daily
 
 on:
   schedule:
-    # GitHub בודק כל 5 דקות
-    - cron: "*/5 * * * *"
+    # שלושה ניסיונות ביום, בכל יום בשבוע, לפי שעון ישראל.
+    # ה-Python עצמו מחליט באמצעות Market Day Guard
+    # האם יש מידע חדש שמצדיק Full Scan.
+    - cron: "37 6,7,8 * * *"
+      timezone: "Asia/Jerusalem"
+
+  # מאפשר גם הפעלה ידנית מ-GitHub Actions
   workflow_dispatch:
 
 concurrency:
@@ -19,11 +24,6 @@ jobs:
       contents: write
 
     env:
-      # חלון ריצה לפי שעון ישראל:
-      # מ-05:00 בבוקר עד 09:59
-      START_HOUR_ISRAEL: "05"
-      END_HOUR_ISRAEL: "10"
-
       FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
       APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
       TWELVEDATA_API_KEYS: ${{ secrets.TWELVEDATA_API_KEYS }}
@@ -32,7 +32,7 @@ jobs:
       # תיקיית הזיכרון של הסורק
       STATE_DIR: "scanner_state"
 
-      # הגדרות יציבות כדי לא להיחסם מהר
+      # הגדרות יציבות
       PREFILTER_BATCH_SIZE: "50"
       PREFILTER_DOWNLOAD_RETRIES: "3"
       PREFILTER_TIMEOUT_SECONDS: "20"
@@ -40,50 +40,20 @@ jobs:
       SCAN_DELAY_SECONDS: "3"
 
     steps:
+
+      # ============================================================
+      # 1. הורדת הקוד
+      # ============================================================
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           persist-credentials: true
+          fetch-depth: 0
 
-      - name: Check Israel time and daily run
-        id: timecheck
-        run: |
-          mkdir -p scanner_state
-
-          ISRAEL_DATE=$(TZ="Asia/Jerusalem" date +%F)
-          ISRAEL_HOUR=$(TZ="Asia/Jerusalem" date +%H)
-          ISRAEL_MINUTE=$(TZ="Asia/Jerusalem" date +%M)
-
-          echo "Israel time now: $ISRAEL_DATE $ISRAEL_HOUR:$ISRAEL_MINUTE"
-          echo "Allowed window: $START_HOUR_ISRAEL:00 - $END_HOUR_ISRAEL:00"
-
-          LAST_RUN=""
-          if [ -f scanner_state/last_run_date.txt ]; then
-            LAST_RUN=$(cat scanner_state/last_run_date.txt)
-          fi
-
-          echo "Last run date: $LAST_RUN"
-
-          CURRENT_TOTAL=$((10#$ISRAEL_HOUR * 60 + 10#$ISRAEL_MINUTE))
-          START_TOTAL=$((10#$START_HOUR_ISRAEL * 60))
-          END_TOTAL=$((10#$END_HOUR_ISRAEL * 60))
-
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "Manual run — bypassing time check"
-            echo "should_run=true" >> $GITHUB_OUTPUT
-          elif [ "$LAST_RUN" = "$ISRAEL_DATE" ]; then
-            echo "Already ran today — skipping"
-            echo "should_run=false" >> $GITHUB_OUTPUT
-          elif [ "$CURRENT_TOTAL" -ge "$START_TOTAL" ] && [ "$CURRENT_TOTAL" -lt "$END_TOTAL" ]; then
-            echo "Inside morning window and not run today — running scanner"
-            echo "should_run=true" >> $GITHUB_OUTPUT
-          else
-            echo "Outside morning window — skipping scanner"
-            echo "should_run=false" >> $GITHUB_OUTPUT
-          fi
-
+      # ============================================================
+      # 2. שחזור הזיכרון האחרון של הסורק
+      # ============================================================
       - name: Restore scanner state
-        if: steps.timecheck.outputs.should_run == 'true'
         uses: actions/cache/restore@v4
         with:
           path: scanner_state
@@ -91,64 +61,98 @@ jobs:
           restore-keys: |
             scanner-state-
 
+      # ============================================================
+      # 3. Python
+      # ============================================================
       - name: Set up Python
-        if: steps.timecheck.outputs.should_run == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: requirements.txt
 
+      # ============================================================
+      # 4. התקנת הספריות
+      # ============================================================
       - name: Install dependencies
-        if: steps.timecheck.outputs.should_run == 'true'
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # ============================================================
+      # 5. וידוא שתיקיית ה-State קיימת
+      # ============================================================
       - name: Make sure state folder exists
-        if: steps.timecheck.outputs.should_run == 'true'
         run: mkdir -p scanner_state
 
+      # ============================================================
+      # 6. הצגת זמן ישראל לצורך הלוג
+      # ============================================================
+      - name: Show Israel time
+        run: |
+          echo "=========================================="
+          echo "GitHub triggered the stock scanner"
+          echo "Israel time:"
+          TZ="Asia/Jerusalem" date
+          echo "=========================================="
+
+      # ============================================================
+      # 7. הפעלת הסורק
+      #
+      # אין כאן יותר בדיקת שעה או last_run_date.
+      #
+      # Market Day Guard שבתוך stock_scanner_unified.py
+      # הוא היחיד שמחליט:
+      #
+      # נר חדש             -> Full Scan
+      # אותו נר השתנה      -> Full Scan
+      # אותו נר ללא שינוי  -> Exit מהיר
+      # שבת / ראשון / חג   -> Exit מהיר אם אין מידע חדש
+      # ============================================================
       - name: Run stock scanner
-        if: steps.timecheck.outputs.should_run == 'true'
         run: python stock_scanner_unified.py
 
-      - name: Mark daily run completed
-        if: steps.timecheck.outputs.should_run == 'true' && success()
-        run: |
-          mkdir -p scanner_state
-          TZ="Asia/Jerusalem" date +%F > scanner_state/last_run_date.txt
-
+      # ============================================================
+      # 8. שמירת State ב-GitHub Repository
+      # ============================================================
       - name: Commit scanner state to repository
-        if: steps.timecheck.outputs.should_run == 'true' && always()
+        if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git pull --rebase || true
-
+          mkdir -p scanner_state
           git add scanner_state/
 
           if git diff --cached --quiet; then
             echo "No scanner state changes"
           else
             git commit -m "Update scanner state"
+
+            echo "Syncing with remote repository..."
+            git pull --rebase
+
+            echo "Pushing scanner state..."
             git push
           fi
 
+      # ============================================================
+      # 9. שמירת State גם ב-Cache
+      # ============================================================
       - name: Save scanner state cache
-        if: steps.timecheck.outputs.should_run == 'true' && always()
+        if: always()
         uses: actions/cache/save@v4
         with:
           path: scanner_state
           key: scanner-state-${{ github.run_id }}
 
+      # ============================================================
+      # 10. גיבוי נוסף כ-Artifact
+      # ============================================================
       - name: Upload scanner state artifact
-        if: steps.timecheck.outputs.should_run == 'true' && always()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: scanner-state
           path: scanner_state
           retention-days: 90
-
-      - name: Skip message
-        if: steps.timecheck.outputs.should_run == 'false'
-        run: echo "Not running scanner now."
