@@ -2511,7 +2511,7 @@
     "stop_current": 74.9633,
     "target": 90.41,
     "date_open": "2026-09-14",
-    "highest_price": 83.08999633789062,
+    "highest_price": 83.58000183105469,
     "stop_method": "fixed_initial_plus_exit_intelligence",
     "trailing_status": "disabled_v9.2",
     "closed": false,
@@ -2521,7 +2521,7 @@
     "pnl_pct": null,
     "data_status": "ok",
     "soft_warnings": [],
-    "highest_closed_price": 83.08999633789062,
+    "highest_closed_price": 83.58000183105469,
     "profit_protection_active": true,
     "profit_exit_floor": 76.89,
     "exit_intelligence": {
@@ -2535,16 +2535,16 @@
       ],
       "profit_protection_active": true,
       "profit_exit_floor": 76.89,
-      "max_profit_pct": 8.06,
-      "closed_bar_date": "2026-09-29",
+      "max_profit_pct": 8.7,
+      "closed_bar_date": "2026-09-30",
       "target_reached": false,
       "exit_confirmed": false,
       "exit_reason": null
     },
-    "max_profit_pct": 8.06,
+    "max_profit_pct": 8.7,
     "target_reached": false,
-    "last_tracker_price": 81.6500015258789,
-    "last_tracker_date": "2026-09-30"
+    "last_tracker_price": 80.11000061035156,
+    "last_tracker_date": "2026-10-01"
   },
   {
     "ticker": "BIO",
@@ -2571,7 +2571,7 @@
       "status": "HOLD",
       "score": 10.0,
       "signals": [
-        "\u05e1\u05d2\u05d9\u05e8\u05d4 \u05de\u05ea\u05d7\u05ea EMA10 (379.55 < 379.58)"
+        "\u05e1\u05d2\u05d9\u05e8\u05d4 \u05de\u05ea\u05d7\u05ea EMA10 (377.71 < 379.24)"
       ],
       "categories": [
         "price"
@@ -2579,15 +2579,15 @@
       "profit_protection_active": true,
       "profit_exit_floor": 370.52,
       "max_profit_pct": 5.09,
-      "closed_bar_date": "2026-09-29",
+      "closed_bar_date": "2026-09-30",
       "target_reached": false,
       "exit_confirmed": false,
       "exit_reason": null
     },
     "max_profit_pct": 5.09,
     "target_reached": false,
-    "last_tracker_price": 379.54998779296875,
-    "last_tracker_date": "2026-09-30"
+    "last_tracker_price": 377.7099914550781,
+    "last_tracker_date": "2026-10-01"
   },
   {
     "ticker": "WHD",
@@ -2633,26 +2633,21 @@
     "profit_exit_floor": 87.9571,
     "exit_intelligence": {
       "status": "HOLD",
-      "score": 20.0,
-      "signals": [
-        "Bearish Engulfing \u05de\u05d0\u05d5\u05e9\u05e8"
-      ],
-      "categories": [
-        "candle",
-        "price"
-      ],
+      "score": 0.0,
+      "signals": [],
+      "categories": [],
       "profit_protection_active": true,
       "profit_exit_floor": 87.9571,
       "max_profit_pct": 19.32,
-      "closed_bar_date": "2026-09-29",
+      "closed_bar_date": "2026-09-30",
       "target_reached": false,
       "exit_confirmed": false,
       "exit_reason": null
     },
     "max_profit_pct": 19.32,
     "target_reached": false,
-    "last_tracker_price": 95.45999908447266,
-    "last_tracker_date": "2026-09-30"
+    "last_tracker_price": 94.8499984741211,
+    "last_tracker_date": "2026-10-01"
   },
   {
     "ticker": "NTCT",
@@ -2662,7 +2657,7 @@
     "stop_current": 36.22795,
     "target": 46.87512500000001,
     "date_open": "2026-09-18",
-    "highest_price": 39.689998626708984,
+    "highest_price": 41.150001525878906,
     "stop_method": "fixed_initial_plus_exit_intelligence",
     "trailing_status": "disabled_v9.2",
     "closed": false,
@@ -2672,27 +2667,26 @@
     "pnl_pct": null,
     "data_status": "ok",
     "soft_warnings": [],
-    "highest_closed_price": 39.689998626708984,
-    "profit_protection_active": false,
+    "highest_closed_price": 41.150001525878906,
+    "profit_protection_active": true,
     "exit_intelligence": {
-      "status": "BUILDING",
+      "status": "HOLD",
       "score": 0.0,
-      "signals": [
-        "Profit Protection \u05de\u05de\u05ea\u05d9\u05df \u05dc-+5.0% (\u05e9\u05d9\u05d0 \u05db\u05e8\u05d2\u05e2 +1.6%)"
-      ],
+      "signals": [],
       "categories": [],
-      "profit_protection_active": false,
-      "profit_exit_floor": null,
-      "max_profit_pct": 1.61,
-      "closed_bar_date": "2026-09-29",
+      "profit_protection_active": true,
+      "profit_exit_floor": 39.06,
+      "max_profit_pct": 5.35,
+      "closed_bar_date": "2026-09-30",
       "target_reached": false,
       "exit_confirmed": false,
       "exit_reason": null
     },
-    "max_profit_pct": 1.61,
+    "max_profit_pct": 5.35,
     "target_reached": false,
-    "last_tracker_price": 39.0,
-    "last_tracker_date": "2026-09-30"
+    "last_tracker_price": 40.18000030517578,
+    "last_tracker_date": "2026-10-01",
+    "profit_exit_floor": 39.06
   },
   {
     "ticker": "TSM",
@@ -2702,7 +2696,7 @@
     "stop_current": 405.78090995,
     "target": 491.45776012500005,
     "date_open": "2026-09-18",
-    "highest_price": 459.42999267578125,
+    "highest_price": 461.8699951171875,
     "stop_method": "fixed_initial_plus_exit_intelligence",
     "trailing_status": "disabled_v9.2",
     "closed": false,
@@ -2712,26 +2706,31 @@
     "pnl_pct": null,
     "data_status": "ok",
     "soft_warnings": [],
-    "highest_closed_price": 459.42999267578125,
+    "highest_closed_price": 461.8699951171875,
     "profit_protection_active": true,
-    "profit_exit_floor": 428.2802,
+    "profit_exit_floor": 431.6437,
     "exit_intelligence": {
       "status": "HOLD",
-      "score": 0.0,
-      "signals": [],
-      "categories": [],
+      "score": 23.0,
+      "signals": [
+        "Doji / indecision \u05dc\u05d9\u05d3 \u05d4\u05e9\u05d9\u05d0 \u2014 \u05d0\u05d6\u05d4\u05e8\u05d4 \u05d1\u05dc\u05d1\u05d3",
+        "Shooting Star / upper-wick rejection"
+      ],
+      "categories": [
+        "candle"
+      ],
       "profit_protection_active": true,
-      "profit_exit_floor": 428.2802,
-      "max_profit_pct": 9.43,
-      "closed_bar_date": "2026-09-29",
+      "profit_exit_floor": 431.6437,
+      "max_profit_pct": 10.01,
+      "closed_bar_date": "2026-09-30",
       "target_reached": false,
       "exit_confirmed": false,
       "exit_reason": null
     },
-    "max_profit_pct": 9.43,
+    "max_profit_pct": 10.01,
     "target_reached": false,
-    "last_tracker_price": 456.94000244140625,
-    "last_tracker_date": "2026-09-30"
+    "last_tracker_price": 456.19000244140625,
+    "last_tracker_date": "2026-10-01"
   },
   {
     "ticker": "WT",
@@ -2741,7 +2740,7 @@
     "stop_current": 21.492,
     "target": 27.015,
     "date_open": "2026-09-21",
-    "highest_price": 24.420000076293945,
+    "highest_price": 24.770000457763672,
     "stop_method": "fixed_initial_plus_exit_intelligence",
     "trailing_status": "disabled_v9.2",
     "closed": false,
@@ -2751,7 +2750,7 @@
     "pnl_pct": null,
     "data_status": "ok",
     "soft_warnings": [],
-    "highest_closed_price": 24.420000076293945,
+    "highest_closed_price": 24.770000457763672,
     "profit_protection_active": true,
     "profit_exit_floor": 22.8,
     "exit_intelligence": {
@@ -2761,16 +2760,16 @@
       "categories": [],
       "profit_protection_active": true,
       "profit_exit_floor": 22.8,
-      "max_profit_pct": 7.11,
-      "closed_bar_date": "2026-09-29",
+      "max_profit_pct": 8.64,
+      "closed_bar_date": "2026-09-30",
       "target_reached": false,
       "exit_confirmed": false,
       "exit_reason": null
     },
-    "max_profit_pct": 7.11,
+    "max_profit_pct": 8.64,
     "target_reached": false,
-    "last_tracker_price": 24.270000457763672,
-    "last_tracker_date": "2026-09-30"
+    "last_tracker_price": 24.290000915527344,
+    "last_tracker_date": "2026-10-01"
   },
   {
     "ticker": "VOYA",
@@ -2815,21 +2814,67 @@
     "profit_exit_floor": 16.14,
     "exit_intelligence": {
       "status": "HOLD",
-      "score": 0.0,
-      "signals": [],
-      "categories": [],
+      "score": 8.0,
+      "signals": [
+        "Doji / indecision \u05dc\u05d9\u05d3 \u05d4\u05e9\u05d9\u05d0 \u2014 \u05d0\u05d6\u05d4\u05e8\u05d4 \u05d1\u05dc\u05d1\u05d3"
+      ],
+      "categories": [
+        "candle"
+      ],
       "profit_protection_active": true,
       "profit_exit_floor": 16.14,
       "max_profit_pct": 6.01,
-      "closed_bar_date": "2026-09-29",
+      "closed_bar_date": "2026-09-30",
       "target_reached": false,
       "exit_confirmed": false,
       "exit_reason": null
     },
     "max_profit_pct": 6.01,
     "target_reached": false,
-    "last_tracker_price": 17.010000228881836,
-    "last_tracker_date": "2026-09-30",
+    "last_tracker_price": 16.9950008392334,
+    "last_tracker_date": "2026-10-01",
     "soft_warnings": []
+  },
+  {
+    "ticker": "SCSC",
+    "pattern": "EMA21/MA50 Pullback Bounce",
+    "entry": 58.13,
+    "stop_initial": 55.759800995,
+    "stop_current": 55.759800995,
+    "target": 66.78,
+    "target_reference": 66.78,
+    "date_open": "2026-10-01",
+    "highest_price": 58.13,
+    "highest_closed_price": 58.13,
+    "max_profit_pct": 0.0,
+    "stop_method": "fixed_initial_plus_exit_intelligence",
+    "trailing_status": "disabled_v9.2",
+    "profit_protection_active": false,
+    "profit_exit_floor": null,
+    "target_reached": false,
+    "exit_plan": {
+      "engine": "V9.2_EXIT_INTELLIGENCE",
+      "stop_initial": 55.759800995,
+      "stop_policy": "FIXED_INITIAL",
+      "profit_protection_trigger_pct": 5.0,
+      "profit_protection_trigger_price": 61.0365,
+      "chandelier_atr_mult": 3.0,
+      "target_reference": 66.78,
+      "target_policy": "REFERENCE_NOT_AUTO_EXIT",
+      "reversal_watch_score": 25.0,
+      "reversal_exit_score": 55.0,
+      "reversal_requires_multiple_categories": true,
+      "daily_reversal_uses_closed_candles_only": true
+    },
+    "exit_intelligence": {
+      "status": "BUILDING",
+      "score": 0.0,
+      "signals": []
+    },
+    "closed": false,
+    "close_reason": null,
+    "close_price": null,
+    "close_date": null,
+    "pnl_pct": null
   }
 ]

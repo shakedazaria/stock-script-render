@@ -9,4 +9,5 @@ date_sent,ticker,pattern,entry,stop,target,score,rr,price_5d,price_10d,price_20d
 2026-09-18,TSM,EMA21/MA50 Pullback Bounce,419.85,405.78,491.46,75.0,2.5,448.73,452.88,,OPEN (+6.9%),OPEN (+7.9%),,False
 2026-09-21,WT,EMA21/MA50 Pullback Bounce,22.8,21.49,27.02,76.6,2.5,24.06,,,OPEN (+5.5%),,,False
 2026-09-21,VOYA,EMA21/MA50 Pullback Bounce,101.23,98.48,109.31,84.1,2.5,95.98,,,LOSS (-5.2%),,,False
-2026-09-25,MQ,EMA21/MA50 Pullback Bounce,16.14,15.41,19.01,83.1,2.5,,,,,,,False
+2026-09-25,MQ,EMA21/MA50 Pullback Bounce,16.14,15.41,19.01,83.1,2.5,17.0,,,OPEN (+5.3%),,,False
+2026-10-01,SCSC,EMA21/MA50 Pullback Bounce,58.13,55.76,66.78,90.5,2.71,,,,,,,False
