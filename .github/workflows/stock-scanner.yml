@@ -2,9 +2,12 @@ name: Stock Scanner Daily
 
 on:
   schedule:
-    # ניסיון כל 15 דקות בין 05:00 ל-09:59 לפי שעון ישראל.
-    # 05:07, 05:22, 05:37, 05:52 ... עד 09:52
-    # בחרנו דקות שאינן :00 כדי להפחית עומס של GitHub Scheduler.
+    # ניסיונות כל 15 דקות בערך בין 05:00 ל-09:59
+    # לפי שעון ישראל.
+    #
+    # אם GitHub מעכב את ההפעלה והיא מתחילה מאוחר יותר,
+    # אנחנו עדיין מאפשרים לה לרוץ כל עוד לא הייתה היום
+    # Full Scan מוצלחת.
     - cron: "7,22,37,52 5-9 * * *"
       timezone: "Asia/Jerusalem"
 
@@ -31,6 +34,7 @@ jobs:
 
       STATE_DIR: "scanner_state"
 
+      # הגדרות יציבות
       PREFILTER_BATCH_SIZE: "50"
       PREFILTER_DOWNLOAD_RETRIES: "3"
       PREFILTER_TIMEOUT_SECONDS: "20"
@@ -40,7 +44,7 @@ jobs:
     steps:
 
       # ============================================================
-      # 1. הורדת הקוד וה-State האחרון
+      # 1. הורדת ה-Repository
       # ============================================================
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -49,13 +53,15 @@ jobs:
           fetch-depth: 0
 
       # ============================================================
-      # 2. בדיקה האם כבר בוצעה היום Full Scan מוצלחת
+      # 2. בדיקה האם כבר הייתה היום Full Scan מוצלחת
       #
-      # הפעלה ידנית:
-      # תמיד עוקפת את הנעילה.
+      # חשוב:
+      # אין יותר בדיקה של שעה נוכחית.
       #
-      # Scheduled:
-      # אם כבר הסתיימה היום Full Scan -> לא מפעילים Python שוב.
+      # אם GitHub תכנן Run ל-09:52 אבל הפעיל אותו ב-11:18,
+      # הוא עדיין יורשה לרוץ אם לא הייתה היום Full Scan.
+      #
+      # Manual Run תמיד עוקף את הנעילה.
       # ============================================================
       - name: Check daily full scan status
         id: dailycheck
@@ -64,42 +70,27 @@ jobs:
           mkdir -p scanner_state
 
           ISRAEL_DATE=$(TZ="Asia/Jerusalem" date +%F)
-          ISRAEL_HOUR=$(TZ="Asia/Jerusalem" date +%H)
-          ISRAEL_MINUTE=$(TZ="Asia/Jerusalem" date +%M)
+          ISRAEL_TIME=$(TZ="Asia/Jerusalem" date +%H:%M)
 
           MARKER_FILE="scanner_state/last_successful_full_scan_date.txt"
 
           echo "============================================================"
-          echo "Israel time: $ISRAEL_DATE $ISRAEL_HOUR:$ISRAEL_MINUTE"
+          echo "Israel date: $ISRAEL_DATE"
+          echo "Israel time: $ISRAEL_TIME"
           echo "Event: ${{ github.event_name }}"
           echo "============================================================"
 
           # --------------------------------------------------------
-          # Manual Run תמיד מותר
+          # הפעלה ידנית תמיד מותרת
           # --------------------------------------------------------
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "Manual run -> bypassing daily lock."
+            echo "✅ Manual run — bypassing daily lock."
             echo "should_run=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           # --------------------------------------------------------
-          # הגנת זמן נוספת
-          # Scheduled אמור להגיע רק בין 05:00-09:59,
-          # אבל אם GitHub עיכב Run מעבר לחלון — לא מתחילים Full Scan.
-          # --------------------------------------------------------
-          CURRENT_TOTAL=$((10#$ISRAEL_HOUR * 60 + 10#$ISRAEL_MINUTE))
-          START_TOTAL=$((5 * 60))
-          END_TOTAL=$((10 * 60))
-
-          if [ "$CURRENT_TOTAL" -lt "$START_TOTAL" ] || [ "$CURRENT_TOTAL" -ge "$END_TOTAL" ]; then
-            echo "Outside 05:00-09:59 Israel window -> skipping."
-            echo "should_run=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          # --------------------------------------------------------
-          # בדוק אם Full Scan כבר הסתיימה היום
+          # בדיקת Full Scan מוצלחת של היום
           # --------------------------------------------------------
           LAST_SUCCESS=""
 
@@ -107,20 +98,21 @@ jobs:
             LAST_SUCCESS=$(tr -d '\r\n ' < "$MARKER_FILE")
           fi
 
-          echo "Last successful full scan date: ${LAST_SUCCESS:-NONE}"
+          echo "Last successful Full Scan: ${LAST_SUCCESS:-NONE}"
+          echo "Today: $ISRAEL_DATE"
 
           if [ "$LAST_SUCCESS" = "$ISRAEL_DATE" ]; then
             echo "✅ Full Scan already completed successfully today."
-            echo "No more scanner runs until tomorrow."
+            echo "Scanner will not run again until tomorrow."
             echo "should_run=false" >> "$GITHUB_OUTPUT"
           else
-            echo "No successful Full Scan today yet -> scanner may run."
+            echo "🚀 No successful Full Scan today."
+            echo "Scanner is allowed to run."
             echo "should_run=true" >> "$GITHUB_OUTPUT"
           fi
 
       # ============================================================
       # 3. Python
-      # רק אם עדיין לא הייתה Full Scan מוצלחת היום
       # ============================================================
       - name: Set up Python
         if: steps.dailycheck.outputs.should_run == 'true'
@@ -140,22 +132,25 @@ jobs:
           pip install -r requirements.txt
 
       # ============================================================
-      # 5. תיקיית State
+      # 5. וידוא תיקיית State
       # ============================================================
       - name: Make sure state folder exists
         if: steps.dailycheck.outputs.should_run == 'true'
-        run: mkdir -p scanner_state
+        run: |
+          mkdir -p scanner_state
 
       # ============================================================
       # 6. הפעלת הסורק
       #
-      # חשוב:
-      # Exit רגיל של Market Day Guard אינו נחשב Full Scan.
+      # Exit Code 0 לבדו אינו מספיק.
       #
-      # רק אם הקוד באמת מגיע:
+      # Market Day Guard יכול לצאת ב-0 בלי לבצע Full Scan.
+      #
+      # לכן אנחנו בודקים שהריצה הנוכחית באמת הגיעה לשורה:
+      #
       # Stock Scanner Unified — DONE
       #
-      # אנחנו מסמנים שהסריקה המלאה הצליחה.
+      # רק אז נסמן שהייתה Full Scan מוצלחת היום.
       # ============================================================
       - name: Run stock scanner
         id: scanner
@@ -165,34 +160,49 @@ jobs:
           set +e
 
           python stock_scanner_unified.py 2>&1 | tee current_scanner_run.log
+
           PYTHON_EXIT=${PIPESTATUS[0]}
 
           set -e
 
+          echo "============================================================"
           echo "Python exit code: $PYTHON_EXIT"
+          echo "============================================================"
 
           if [ "$PYTHON_EXIT" -ne 0 ]; then
-            echo "❌ Scanner crashed or returned an error."
+            echo "❌ Scanner failed."
             echo "full_scan_success=false" >> "$GITHUB_OUTPUT"
             exit "$PYTHON_EXIT"
           fi
 
-          # Market Day Guard יכול לצאת בהצלחה עם exit code 0,
-          # לכן Exit Code לבדו לא מספיק.
-          #
-          # DONE קיים רק כאשר הסריקה המלאה באמת הגיעה לסוף.
+          # --------------------------------------------------------
+          # בדיקה שהסריקה באמת הגיעה עד הסוף
+          # --------------------------------------------------------
           if grep -Eq "Stock Scanner Unified.*DONE" current_scanner_run.log; then
-            echo "✅ Full Scan completed successfully."
+
+            echo "✅ FULL SCAN COMPLETED SUCCESSFULLY"
             echo "full_scan_success=true" >> "$GITHUB_OUTPUT"
+
           else
-            echo "ℹ️ Python finished without Full Scan completion."
-            echo "Market Day Guard may have skipped the scan."
-            echo "The next scheduled attempt will be allowed."
+
+            echo "ℹ️ Python finished successfully,"
+            echo "but a Full Scan was NOT completed."
+            echo ""
+            echo "Most likely Market Day Guard skipped the scan."
+            echo ""
+            echo "The next scheduled attempt will still be allowed."
+
             echo "full_scan_success=false" >> "$GITHUB_OUTPUT"
+
           fi
 
       # ============================================================
-      # 7. נועלים את שאר היום רק אחרי Full Scan אמיתית
+      # 7. סימון שהיום כבר בוצעה Full Scan מוצלחת
+      #
+      # מתבצע רק אם:
+      # Python רץ
+      # +
+      # הסריקה באמת הגיעה ל-DONE
       # ============================================================
       - name: Mark successful full scan
         if: >
@@ -207,15 +217,32 @@ jobs:
           echo "$ISRAEL_DATE" > scanner_state/last_successful_full_scan_date.txt
 
           echo "============================================================"
-          echo "✅ Successful Full Scan saved for: $ISRAEL_DATE"
-          echo "Further scheduled attempts today will skip the scanner."
+          echo "✅ FULL SCAN LOCK CREATED"
+          echo "Date: $ISRAEL_DATE"
+          echo ""
+          echo "No additional scheduled Full Scan will run today."
+          echo "Tomorrow the date comparison resets automatically."
           echo "============================================================"
 
       # ============================================================
-      # 8. שמירת State ל-Repository
+      # 8. הסרת הלוג הזמני
+      # ============================================================
+      - name: Remove temporary workflow log
+        if: steps.dailycheck.outputs.should_run == 'true' && always()
+        run: |
+          rm -f current_scanner_run.log
+
+      # ============================================================
+      # 9. שמירת State ב-Repository
       #
-      # מתבצע אחרי כל ניסיון שבו Python הופעל,
-      # גם אם Market Day Guard החליט שאין עדיין נר חדש.
+      # כאן נשמרים:
+      # - last_successful_full_scan_date.txt
+      # - open_positions.json
+      # - alerts_sent.json
+      # - logs
+      # - performance
+      # - market state
+      # וכו'
       # ============================================================
       - name: Commit scanner state to repository
         if: steps.dailycheck.outputs.should_run == 'true' && always()
@@ -226,26 +253,32 @@ jobs:
 
           mkdir -p scanner_state
 
-          # לא שומרים את קובץ הלוג הזמני של ה-workflow
-          rm -f current_scanner_run.log
-
           git add scanner_state/
 
           if git diff --cached --quiet; then
+
             echo "No scanner state changes."
+
           else
+
             git commit -m "Update scanner state"
 
-            echo "Syncing with remote..."
+            echo "============================================================"
+            echo "Syncing scanner state with repository..."
+            echo "============================================================"
+
             git pull --rebase origin main
 
+            echo "============================================================"
             echo "Pushing scanner state..."
+            echo "============================================================"
+
             git push origin main
+
           fi
 
       # ============================================================
-      # 9. Artifact לגיבוי
-      # רק כאשר Python באמת הופעל
+      # 10. Artifact לגיבוי
       # ============================================================
       - name: Upload scanner state artifact
         if: steps.dailycheck.outputs.should_run == 'true' && always()
@@ -256,11 +289,13 @@ jobs:
           retention-days: 30
 
       # ============================================================
-      # 10. הודעה כאשר כבר הייתה סריקה מוצלחת היום
+      # 11. במקרה שכבר הייתה היום Full Scan
       # ============================================================
       - name: Scanner already completed today
         if: steps.dailycheck.outputs.should_run == 'false'
         run: |
-          echo "✅ No scanner execution required."
-          echo "A successful Full Scan was already completed today,"
-          echo "or this delayed scheduled run is outside the morning window."
+          echo "============================================================"
+          echo "✅ Scanner already completed a Full Scan today."
+          echo "No Python execution required."
+          echo "Next Full Scan will be allowed tomorrow."
+          echo "============================================================"
