@@ -86876,3 +86876,12 @@
 [2026-10-01 07:22:12]    🧹 stock_scanner_unified_log.txt: 86876 → 86868 (removed 8) | ok
 [2026-10-01 07:22:12] Stock Scanner Unified — DONE
 [2026-10-01 07:22:12] ============================================================
+[2026-10-04 08:17:05] ============================================================
+[2026-10-04 08:17:05] Stock Scanner Unified — START
+[2026-10-04 08:17:05] Code version: 2026-09-30-v9.3-pattern-aware-entry-data-integrity
+[2026-10-04 08:17:05] Market cap threshold: $1.0B | Pipeline: screener cache → precheck unknowns → fail-open only if unresolved
+[2026-10-04 08:17:05] Entry Ready threshold: quality>=60.0 | candidate_score>=35.0
+[2026-10-04 08:17:05] RESET VERIFIED FIX FILE
+[2026-10-04 08:17:05] ============================================================
+[2026-10-04 08:17:05] 🗓️ Market Day Guard: שבת/ראשון לפי שעון ישראל — מדלג כדי לא לסרוק ביום בלי מסחר
+[2026-10-04 08:17:05] ⏸️ No new market session — exiting before scan to prevent duplicate alerts.
