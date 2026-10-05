@@ -35,7 +35,7 @@ stock_scanner_unified.py
 # RESET VERIFIED FIX FILE — 2026-09-30 V9.3
 # This marker proves this is the rebuilt fixed file, not an old download copy.
 # ============================================================
-CODE_VERSION = "2026-09-30-v9.3-pattern-aware-entry-data-integrity"
+CODE_VERSION = "2026-10-05-v9.3.1-market-candle-only-guard"
 RESET_VERIFIED_FIX_FILE = True
 
 
@@ -195,7 +195,7 @@ LOGFILE = _state_path(os.getenv("LOGFILE", "stock_scanner_unified_log.txt"))
 # הקוד בודק אם יש נר יומי חדש ב-SPY שלא נסרק עדיין.
 # אם אין נר חדש — הוא מדלג על הסריקה כדי לא לשלוח התראות כפולות.
 MARKET_DAY_GUARD_ENABLED = os.getenv("MARKET_DAY_GUARD_ENABLED", "True").lower() in ("1", "true", "yes")
-SKIP_ISRAEL_WEEKENDS = os.getenv("SKIP_ISRAEL_WEEKENDS", "True").lower() in ("1", "true", "yes")
+SKIP_ISRAEL_WEEKENDS = False  # V9.3.1 legacy compatibility only; Market Day Guard no longer filters by weekday
 MARKET_SCAN_SYMBOL = os.getenv("MARKET_SCAN_SYMBOL", "SPY")
 MARKET_SCAN_STATE_FILE = _state_path(os.getenv("MARKET_SCAN_STATE_FILE", "last_market_scan_date.txt"))
 # V9.1.4: keep a richer guard state alongside the legacy date file.
@@ -203,6 +203,11 @@ MARKET_SCAN_STATE_FILE = _state_path(os.getenv("MARKET_SCAN_STATE_FILE", "last_m
 # scan cannot suppress the next scan after that same daily candle changes/finalizes.
 MARKET_CANDLE_STATE_FILE = _state_path(os.getenv("MARKET_CANDLE_STATE_FILE", "last_market_scan_state.json"))
 FORCE_SCAN = os.getenv("FORCE_SCAN", "False").lower() in ("1", "true", "yes")
+# V9.3.1: Saturday maintenance is independent of the Market Day Guard.
+# It runs once per Israeli Saturday even when there is no new US market candle.
+SATURDAY_MAINTENANCE_STATE_FILE = _state_path(
+    os.getenv("SATURDAY_MAINTENANCE_STATE_FILE", "last_saturday_maintenance_date.txt")
+)
 
 # --- V9.1.4 Market Day Guard: date + candle-change fail-safe ---
 # Yahoo occasionally serves a stale last daily candle in early-morning GitHub runs.
@@ -1848,9 +1853,6 @@ def should_run_for_new_market_session() -> tuple[bool, str | None, str]:
 
     if not MARKET_DAY_GUARD_ENABLED:
         return True, None, "MARKET_DAY_GUARD_ENABLED=False — guard disabled"
-
-    if SKIP_ISRAEL_WEEKENDS and _is_israel_weekend_now():
-        return False, None, "שבת/ראשון לפי שעון ישראל — מדלג כדי לא לסרוק ביום בלי מסחר"
 
     previous_state = _load_market_scan_guard_state()
     last_scanned = str(previous_state.get("market_date") or "").strip()
@@ -10281,6 +10283,51 @@ def precheck_market_caps_before_full_scan(ticker_list: list[str]) -> tuple[list[
     return passed, rejected
 
 
+def _run_saturday_maintenance_if_due() -> bool:
+    """
+    Run the scanner's weekly self-learning once per Israeli Saturday.
+
+    This maintenance is deliberately independent of the US Market Day Guard:
+    Saturday normally has no fresh US candle, but weekly learning still needs
+    to run. A small state marker prevents the 05:00-09:59 retry schedule from
+    running the learning job repeatedly on the same Saturday.
+
+    Returns True only when maintenance actually ran in this invocation.
+    """
+    try:
+        from zoneinfo import ZoneInfo
+        now_il = datetime.now(ZoneInfo("Asia/Jerusalem"))
+    except Exception:
+        now_il = datetime.utcnow() + timedelta(hours=3)
+
+    if now_il.weekday() != 5:  # Saturday
+        return False
+
+    today = now_il.date().isoformat()
+    last_done = ""
+    try:
+        if os.path.exists(SATURDAY_MAINTENANCE_STATE_FILE):
+            with open(SATURDAY_MAINTENANCE_STATE_FILE, "r", encoding="utf-8") as f:
+                last_done = f.read().strip()
+    except Exception as e:
+        log(f"🧠 Saturday maintenance marker read error: {e}")
+
+    if last_done == today:
+        log(f"🧠 Saturday maintenance already completed today ({today}) — skipping duplicate maintenance")
+        return False
+
+    log("🧠 Saturday maintenance — running weekly self-learning before Market Day Guard...")
+    result = run_self_learning()
+    try:
+        os.makedirs(os.path.dirname(SATURDAY_MAINTENANCE_STATE_FILE) or ".", exist_ok=True)
+        with open(SATURDAY_MAINTENANCE_STATE_FILE, "w", encoding="utf-8") as f:
+            f.write(today + "\n")
+        log(f"💾 Saturday maintenance marker saved: {today}")
+    except Exception as e:
+        log(f"🧠 Saturday maintenance marker save error: {e}")
+    return True
+
+
 def main() -> None:
     global tickers
 
@@ -10300,7 +10347,15 @@ def main() -> None:
     except Exception:
         pass
 
-    # ── Market Day Guard — לא לסרוק אם אין נר מסחר חדש ─────
+    # ── Saturday weekly maintenance — independent of market candles ──
+    # Market-cap > $1B remains part of every Full Scan. The special Saturday
+    # task is self-learning, and it must be allowed to run even with no fresh candle.
+    try:
+        _run_saturday_maintenance_if_due()
+    except Exception as e:
+        log(f"Saturday maintenance error: {e}")
+
+    # ── Market Day Guard — calendar day is irrelevant; only market data decides ──
     market_session_date = None
     try:
         should_run_market, market_session_date, market_guard_reason = should_run_for_new_market_session()
@@ -10607,20 +10662,6 @@ def main() -> None:
             log("🧪 V9.3 ENTRY FUNNEL — by pattern: " + " | ".join(parts[:10]))
     except Exception as e:
         log(f"Entry diagnostics summary error: {e}")
-
-    # ── Self-Learning — רץ כל שבת ──────────────────────────
-    try:
-        if datetime.now().weekday() == 5:  # שבת = 5
-            log("🧠 Saturday — running self-learning analysis...")
-            run_self_learning()
-        else:
-            # גם בימי חול — טען ויישם פרמטרים אם קיימים
-            days_left = 5 - datetime.now().weekday()
-            if days_left < 0:
-                days_left += 7
-            log(f"🧠 Self-learning scheduled for Saturday ({days_left} days away)")
-    except Exception as e:
-        log(f"Self-learning error: {e}")
 
     try:
         save_last_market_scan_date(market_session_date)
