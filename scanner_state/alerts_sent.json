@@ -41,16 +41,21 @@
   },
   "MSGE_EMA21/MA50 Pullback Bounce_66": "2026-09-14T07:28:03.813705",
   "BIO": {
-    "time": 1789542720.145704,
+    "time": 1791277889.31868,
     "patterns": [
       {
         "name": "EMA21/MA50 Pullback Bounce",
         "level": 370.51999,
         "time": 1789542720.145704
+      },
+      {
+        "name": "EMA21/MA50 Pullback Bounce",
+        "level": 369.39999,
+        "time": 1791277889.31868
       }
     ]
   },
-  "BIO_EMA21/MA50 Pullback Bounce_66": "2026-09-16T07:12:00.145706",
+  "BIO_EMA21/MA50 Pullback Bounce_66": "2026-10-06T09:11:29.318681",
   "WHD_EMA21/MA50 Pullback Bounce_66": "2026-09-16T07:35:26.714273",
   "PRLB": {
     "time": 1789624799.006004,
@@ -108,5 +113,16 @@
       }
     ]
   },
-  "SCSC_EMA21/MA50 Pullback Bounce_66": "2026-10-01T07:09:45.272036"
+  "SCSC_EMA21/MA50 Pullback Bounce_66": "2026-10-01T07:09:45.272036",
+  "URGN": {
+    "time": 1791279013.745708,
+    "patterns": [
+      {
+        "name": "EMA21/MA50 Pullback Bounce",
+        "level": 41.82,
+        "time": 1791279013.745708
+      }
+    ]
+  },
+  "URGN_EMA21/MA50 Pullback Bounce_66": "2026-10-06T09:30:13.745710"
 }
