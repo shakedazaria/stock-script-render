@@ -17,3 +17,6 @@ timestamp,ticker,pattern,entry_quality,professional_score,professional_status,la
 2026-10-06T09:23:06,TRGP,EMA21/MA50 Pullback Bounce,75.0,71.8,PRO_WATCHLIST,WATCHLIST,84.0,51.9,59.6,NEUTRAL,68.1,66.0,86.0,82.0,Multi-horizon RS נמוך (52 < 65) | Professional Quality נמוך (71.8 < 75.0)
 2026-10-06T09:27:37,CNMD,EMA21/MA50 Pullback Bounce,75.0,59.4,PRO_WATCHLIST,WATCHLIST,64.0,59.9,32.3,COLD,68.1,42.0,67.0,83.0,Multi-horizon RS נמוך (60 < 65) | Professional Quality נמוך (59.4 < 75.0)
 2026-10-06T09:30:13,URGN,EMA21/MA50 Pullback Bounce,75.0,75.7,PRO_READY,QUALIFIED,82.0,82.8,32.3,COLD,68.1,60.0,91.0,89.0,
+2026-10-07T08:45:29,ASH,EMA21/MA50 Pullback Bounce,73.0,65.1,PRO_WATCHLIST,WATCHLIST,82.0,68.8,2.0,FROZEN,69.5,42.0,78.0,94.0,Sector FROZEN | Professional Quality נמוך (65.1 < 75.0)
+2026-10-07T08:55:05,SXT,EMA21/MA50 Pullback Bounce,71.0,72.5,PRO_WATCHLIST,WATCHLIST,100.0,70.5,2.0,FROZEN,69.5,66.0,77.0,94.0,Sector FROZEN | Professional Quality נמוך (72.5 < 75.0)
+2026-10-07T09:08:36,VSAT,EMA21/MA50 Pullback Bounce,71.0,68.1,PRO_WATCHLIST,WATCHLIST,66.0,79.2,100.0,HOT,69.5,14.0,74.0,87.0,Professional Quality נמוך (68.1 < 75.0)
