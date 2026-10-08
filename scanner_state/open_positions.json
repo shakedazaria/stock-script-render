@@ -2643,29 +2643,28 @@
     "profit_protection_active": true,
     "profit_exit_floor": 89.1771,
     "exit_intelligence": {
-      "status": "WATCH",
-      "score": 35.0,
+      "status": "HOLD",
+      "score": 20.0,
       "signals": [
-        "Bearish Engulfing \u05de\u05d0\u05d5\u05e9\u05e8",
-        "OBV divergence: \u05d4\u05de\u05d7\u05d9\u05e8 \u05dc\u05d9\u05d3/\u05d1\u05e9\u05d9\u05d0 \u05d7\u05d3\u05e9 \u05d0\u05da OBV \u05e0\u05d7\u05dc\u05e9"
+        "\u05e1\u05d2\u05d9\u05e8\u05d4 \u05de\u05ea\u05d7\u05ea EMA10 (93.27 < 94.55)",
+        "RS vs SPY \u05e0\u05d7\u05dc\u05e9 \u05d1\u05d9\u05d5\u05ea\u05e8 \u05de-2% \u05d1-5 \u05d9\u05de\u05d9\u05dd \u05d5\u05e0\u05de\u05e6\u05d0 \u05de\u05ea\u05d7\u05ea EMA5 \u05e9\u05dc \u05e7\u05d5 \u05d4-RS"
       ],
       "categories": [
-        "candle",
-        "flow",
-        "price"
+        "price",
+        "relative"
       ],
       "profit_protection_active": true,
       "profit_exit_floor": 89.1771,
       "max_profit_pct": 21.09,
-      "closed_bar_date": "2026-10-06",
+      "closed_bar_date": "2026-10-07",
       "target_reached": false,
       "exit_confirmed": false,
       "exit_reason": null
     },
     "max_profit_pct": 21.09,
     "target_reached": false,
-    "last_tracker_price": 97.27999877929688,
-    "last_tracker_date": "2026-10-07"
+    "last_tracker_price": 93.2699966430664,
+    "last_tracker_date": "2026-10-08"
   },
   {
     "ticker": "NTCT",
@@ -2689,21 +2688,27 @@
     "profit_protection_active": true,
     "exit_intelligence": {
       "status": "HOLD",
-      "score": 0.0,
-      "signals": [],
-      "categories": [],
+      "score": 20.0,
+      "signals": [
+        "\u05e1\u05d2\u05d9\u05e8\u05d4 \u05de\u05ea\u05d7\u05ea EMA10 (40.07 < 40.13)",
+        "RS vs SPY \u05e0\u05d7\u05dc\u05e9 \u05d1\u05d9\u05d5\u05ea\u05e8 \u05de-2% \u05d1-5 \u05d9\u05de\u05d9\u05dd \u05d5\u05e0\u05de\u05e6\u05d0 \u05de\u05ea\u05d7\u05ea EMA5 \u05e9\u05dc \u05e7\u05d5 \u05d4-RS"
+      ],
+      "categories": [
+        "price",
+        "relative"
+      ],
       "profit_protection_active": true,
       "profit_exit_floor": 39.06,
       "max_profit_pct": 7.04,
-      "closed_bar_date": "2026-10-06",
+      "closed_bar_date": "2026-10-07",
       "target_reached": false,
       "exit_confirmed": false,
       "exit_reason": null
     },
     "max_profit_pct": 7.04,
     "target_reached": false,
-    "last_tracker_price": 40.9900016784668,
-    "last_tracker_date": "2026-10-07",
+    "last_tracker_price": 40.06999969482422,
+    "last_tracker_date": "2026-10-08",
     "profit_exit_floor": 39.06
   },
   {
@@ -2726,24 +2731,24 @@
     "soft_warnings": [],
     "highest_closed_price": 487.4700012207031,
     "profit_protection_active": true,
-    "profit_exit_floor": 457.0972,
+    "profit_exit_floor": 457.485,
     "exit_intelligence": {
       "status": "HOLD",
       "score": 0.0,
       "signals": [],
       "categories": [],
       "profit_protection_active": true,
-      "profit_exit_floor": 457.0972,
+      "profit_exit_floor": 457.485,
       "max_profit_pct": 16.11,
-      "closed_bar_date": "2026-10-06",
+      "closed_bar_date": "2026-10-07",
       "target_reached": false,
       "exit_confirmed": false,
       "exit_reason": null
     },
     "max_profit_pct": 16.11,
     "target_reached": false,
-    "last_tracker_price": 482.29998779296875,
-    "last_tracker_date": "2026-10-07"
+    "last_tracker_price": 472.20001220703125,
+    "last_tracker_date": "2026-10-08"
   },
   {
     "ticker": "WT",
@@ -2756,39 +2761,43 @@
     "highest_price": 25.030000686645508,
     "stop_method": "fixed_initial_plus_exit_intelligence",
     "trailing_status": "disabled_v9.2",
-    "closed": false,
-    "close_reason": null,
-    "close_price": null,
-    "close_date": null,
-    "pnl_pct": null,
+    "closed": true,
+    "close_reason": "\ud83d\udd04 \u05e9\u05d9\u05e0\u05d5\u05d9 \u05db\u05d9\u05d5\u05d5\u05df \u05de\u05d0\u05d5\u05e9\u05e8 \u2014 Confirmed reversal score 55/100 \u2014 \u05e1\u05d2\u05d9\u05e8\u05d4 \u05de\u05ea\u05d7\u05ea EMA10 (23.37 < 23.97); \u05e1\u05d2\u05d9\u05e8\u05d4 \u05de\u05ea\u05d7\u05ea EMA21 (23.37 < 23.81); MACD histogram \u05d7\u05e6\u05d4 \u05de\u05ea\u05d7\u05ea \u05dc\u05d0\u05e4\u05e1 \u2014 Momentum \u05e0\u05d7\u05dc\u05e9; RS vs SPY \u05e0\u05d7\u05dc\u05e9 \u05d1\u05d9\u05d5\u05ea\u05e8 \u05de-2% \u05d1-5 \u05d9\u05de\u05d9\u05dd \u05d5\u05e0\u05de\u05e6\u05d0 \u05de\u05ea\u05d7\u05ea EMA5 \u05e9\u05dc \u05e7\u05d5 \u05d4-RS",
+    "close_price": 23.3700008392334,
+    "close_date": "2026-10-08",
+    "pnl_pct": 2.5,
     "data_status": "ok",
     "soft_warnings": [],
     "highest_closed_price": 25.030000686645508,
     "profit_protection_active": true,
     "profit_exit_floor": 22.8,
     "exit_intelligence": {
-      "status": "WATCH",
-      "score": 25.0,
+      "status": "EXIT",
+      "score": 55.0,
       "signals": [
-        "Shooting Star / upper-wick rejection",
+        "\u05e1\u05d2\u05d9\u05e8\u05d4 \u05de\u05ea\u05d7\u05ea EMA10 (23.37 < 23.97)",
+        "\u05e1\u05d2\u05d9\u05e8\u05d4 \u05de\u05ea\u05d7\u05ea EMA21 (23.37 < 23.81)",
+        "MACD histogram \u05d7\u05e6\u05d4 \u05de\u05ea\u05d7\u05ea \u05dc\u05d0\u05e4\u05e1 \u2014 Momentum \u05e0\u05d7\u05dc\u05e9",
         "RS vs SPY \u05e0\u05d7\u05dc\u05e9 \u05d1\u05d9\u05d5\u05ea\u05e8 \u05de-2% \u05d1-5 \u05d9\u05de\u05d9\u05dd \u05d5\u05e0\u05de\u05e6\u05d0 \u05de\u05ea\u05d7\u05ea EMA5 \u05e9\u05dc \u05e7\u05d5 \u05d4-RS"
       ],
       "categories": [
-        "candle",
+        "momentum",
+        "price",
         "relative"
       ],
       "profit_protection_active": true,
       "profit_exit_floor": 22.8,
       "max_profit_pct": 9.78,
-      "closed_bar_date": "2026-10-06",
+      "closed_bar_date": "2026-10-07",
       "target_reached": false,
-      "exit_confirmed": false,
-      "exit_reason": null
+      "exit_confirmed": true,
+      "exit_reason": "Confirmed reversal score 55/100 \u2014 \u05e1\u05d2\u05d9\u05e8\u05d4 \u05de\u05ea\u05d7\u05ea EMA10 (23.37 < 23.97); \u05e1\u05d2\u05d9\u05e8\u05d4 \u05de\u05ea\u05d7\u05ea EMA21 (23.37 < 23.81); MACD histogram \u05d7\u05e6\u05d4 \u05de\u05ea\u05d7\u05ea \u05dc\u05d0\u05e4\u05e1 \u2014 Momentum \u05e0\u05d7\u05dc\u05e9; RS vs SPY \u05e0\u05d7\u05dc\u05e9 \u05d1\u05d9\u05d5\u05ea\u05e8 \u05de-2% \u05d1-5 \u05d9\u05de\u05d9\u05dd \u05d5\u05e0\u05de\u05e6\u05d0 \u05de\u05ea\u05d7\u05ea EMA5 \u05e9\u05dc \u05e7\u05d5 \u05d4-RS"
     },
     "max_profit_pct": 9.78,
     "target_reached": false,
-    "last_tracker_price": 24.18000030517578,
-    "last_tracker_date": "2026-10-07"
+    "last_tracker_price": 23.3700008392334,
+    "last_tracker_date": "2026-10-08",
+    "exit_kind": "REVERSAL_EXIT"
   },
   {
     "ticker": "VOYA",
@@ -2819,7 +2828,7 @@
     "stop_current": 15.41255,
     "target": 19.008625000000006,
     "date_open": "2026-09-25",
-    "highest_price": 17.229999542236328,
+    "highest_price": 17.40999984741211,
     "stop_method": "fixed_initial_plus_exit_intelligence",
     "trailing_status": "disabled_v9.2",
     "closed": false,
@@ -2828,32 +2837,26 @@
     "close_date": null,
     "pnl_pct": null,
     "data_status": "ok",
-    "highest_closed_price": 17.229999542236328,
+    "highest_closed_price": 17.40999984741211,
     "profit_protection_active": true,
     "profit_exit_floor": 16.14,
     "exit_intelligence": {
       "status": "HOLD",
-      "score": 20.0,
-      "signals": [
-        "\u05e1\u05d2\u05d9\u05e8\u05d4 \u05de\u05ea\u05d7\u05ea EMA10 (16.55 < 16.67)",
-        "RS vs SPY \u05e0\u05d7\u05dc\u05e9 \u05d1\u05d9\u05d5\u05ea\u05e8 \u05de-2% \u05d1-5 \u05d9\u05de\u05d9\u05dd \u05d5\u05e0\u05de\u05e6\u05d0 \u05de\u05ea\u05d7\u05ea EMA5 \u05e9\u05dc \u05e7\u05d5 \u05d4-RS"
-      ],
-      "categories": [
-        "price",
-        "relative"
-      ],
+      "score": 0.0,
+      "signals": [],
+      "categories": [],
       "profit_protection_active": true,
       "profit_exit_floor": 16.14,
-      "max_profit_pct": 6.75,
-      "closed_bar_date": "2026-10-06",
+      "max_profit_pct": 7.87,
+      "closed_bar_date": "2026-10-07",
       "target_reached": false,
       "exit_confirmed": false,
       "exit_reason": null
     },
-    "max_profit_pct": 6.75,
+    "max_profit_pct": 7.87,
     "target_reached": false,
-    "last_tracker_price": 16.549999237060547,
-    "last_tracker_date": "2026-10-07",
+    "last_tracker_price": 17.059999465942383,
+    "last_tracker_date": "2026-10-08",
     "soft_warnings": []
   },
   {
@@ -2889,13 +2892,17 @@
     },
     "exit_intelligence": {
       "status": "HOLD",
-      "score": 0.0,
-      "signals": [],
-      "categories": [],
+      "score": 10.0,
+      "signals": [
+        "\u05e1\u05d2\u05d9\u05e8\u05d4 \u05de\u05ea\u05d7\u05ea EMA10 (59.68 < 59.81)"
+      ],
+      "categories": [
+        "price"
+      ],
       "profit_protection_active": true,
       "profit_exit_floor": 58.3621,
       "max_profit_pct": 9.01,
-      "closed_bar_date": "2026-10-06",
+      "closed_bar_date": "2026-10-07",
       "target_reached": false,
       "exit_confirmed": false,
       "exit_reason": null
@@ -2906,8 +2913,8 @@
     "close_date": null,
     "pnl_pct": null,
     "data_status": "ok",
-    "last_tracker_price": 60.939998626708984,
-    "last_tracker_date": "2026-10-07",
+    "last_tracker_price": 59.68000030517578,
+    "last_tracker_date": "2026-10-08",
     "soft_warnings": []
   },
   {
@@ -3015,7 +3022,7 @@
       "profit_protection_active": false,
       "profit_exit_floor": null,
       "max_profit_pct": 4.11,
-      "closed_bar_date": "2026-10-06",
+      "closed_bar_date": "2026-10-07",
       "target_reached": false,
       "exit_confirmed": false,
       "exit_reason": null
@@ -3026,8 +3033,8 @@
     "close_date": null,
     "pnl_pct": null,
     "data_status": "ok",
-    "last_tracker_price": 41.43000030517578,
-    "last_tracker_date": "2026-10-07",
+    "last_tracker_price": 40.70000076293945,
+    "last_tracker_date": "2026-10-08",
     "soft_warnings": []
   }
 ]
