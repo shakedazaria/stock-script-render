@@ -35,7 +35,7 @@ stock_scanner_unified.py
 # RESET VERIFIED FIX FILE — 2026-09-30 V9.3
 # This marker proves this is the rebuilt fixed file, not an old download copy.
 # ============================================================
-CODE_VERSION = "2026-10-05-v9.3.1-market-candle-only-guard"
+CODE_VERSION = "2026-10-10-v9.4-research-validation"
 RESET_VERIFIED_FIX_FILE = True
 
 
@@ -47,11 +47,12 @@ import re
 import json
 import csv
 import calendar
+import hashlib
 import time
 import random
 import traceback
 import smtplib
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -89,7 +90,7 @@ def _is_finite_number(value) -> bool:
         return False
 
 
-def _normalize_yfinance_df(df: pd.DataFrame | None) -> pd.DataFrame | None:
+def _normalize_yfinance_df(df: pd.DataFrame | None, *, drop_invalid_close: bool = True) -> pd.DataFrame | None:
     """
     מנקה DataFrame שמגיע מ-yfinance:
     - מוריד MultiIndex לעמודות רגילות
@@ -114,7 +115,8 @@ def _normalize_yfinance_df(df: pd.DataFrame | None) -> pd.DataFrame | None:
             if col in out.columns:
                 out[col] = pd.to_numeric(out[col], errors="coerce")
         out = out.replace([np.inf, -np.inf], np.nan)
-        out = out.dropna(subset=["close"])
+        if drop_invalid_close:
+            out = out.dropna(subset=["close"])
         if out.empty:
             return None
         return out
@@ -680,7 +682,18 @@ os.makedirs(CHARTS_DIR, exist_ok=True)
 
 # --- מעקב ביצועים ---
 PERFORMANCE_CSV    = _state_path(os.getenv("PERFORMANCE_CSV",     "performance_log.csv"))
-PERF_CHECK_DAYS    = [5, 10, 20]   # בודק ביצועים אחרי X ימי מסחר
+PERF_CHECK_DAYS    = [5, 10, 20]  # Closed trading sessions, never calendar days.
+# V9.4 keeps the old CSV intact; new observations use a separately versioned schema.
+SETUP_EVALUATIONS_CSV = _state_path(os.getenv("SETUP_EVALUATIONS_CSV", "setup_evaluations_v2.csv"))
+LEARNING_REPORT_FILE = _state_path(os.getenv("LEARNING_REPORT_FILE", "scanner_learning_report_v2.json"))
+RESEARCH_HISTORY_DAYS = max(180, int(os.getenv("RESEARCH_HISTORY_DAYS", "180")))
+RESEARCH_SLIPPAGE_BPS = max(0.0, float(os.getenv("RESEARCH_SLIPPAGE_BPS", "5")))
+SHADOW_TRACKING_ENABLED = os.getenv("SHADOW_TRACKING_ENABLED", "True").lower() in ("1", "true", "yes")
+STRICT_PATTERN_STRUCTURE = os.getenv("STRICT_PATTERN_STRUCTURE", "False").lower() in ("1", "true", "yes")
+REQUIRE_VERIFIED_EARNINGS = os.getenv("REQUIRE_VERIFIED_EARNINGS", "True").lower() in ("1", "true", "yes")
+AUTO_APPLY_LEARNING = os.getenv("AUTO_APPLY_LEARNING", "False").lower() in ("1", "true", "yes")
+_EVALUATION_BUFFER: dict = {}
+_market_cap_diagnostics: dict = {}
 
 # --- סינון דוחות ---
 EARNINGS_FILTER_DAYS = int(os.getenv("EARNINGS_FILTER_DAYS", "14"))  # skip אם דוח ב-14 ימים
@@ -1510,16 +1523,18 @@ def cleanup_history_older_than_one_month() -> list[dict]:
     cutoff = _one_calendar_month_ago(today)
     results = []
 
-    results.append(_prune_csv_by_date(ENTRY_QUALITY_LOG, "date", cutoff))
-    results.append(_prune_csv_by_date(PRO_QUALITY_LOG, "timestamp", cutoff))
+    research_cutoff = today - timedelta(days=max(RESEARCH_HISTORY_DAYS, LEARNING_LOOKBACK_DAYS + 60))
+    results.append(_prune_csv_by_date(ENTRY_QUALITY_LOG, "date", research_cutoff))
+    results.append(_prune_csv_by_date(PRO_QUALITY_LOG, "timestamp", research_cutoff))
+    results.append(_prune_csv_by_date(SETUP_EVALUATIONS_CSV, "date_sent", research_cutoff))
     results.append(_prune_csv_by_date(SIGNALS_CSV, "Time", cutoff))
-    results.append(_prune_csv_by_date(PERFORMANCE_CSV, "date_sent", cutoff))
+    results.append(_prune_csv_by_date(PERFORMANCE_CSV, "date_sent", research_cutoff))
     results.append(_prune_alert_history_json(ALERT_HISTORY_FILE, cutoff))
     results.append(_prune_watchlist_log(WATCHLIST_LOG, cutoff))
     # Prune the main log last, then emit the cleanup summary so current-run lines remain.
     results.append(_prune_scanner_log(LOGFILE, cutoff))
 
-    log(f"🧹 History retention: today={today.isoformat()} | cutoff={cutoff.isoformat()} (inclusive, one calendar month)")
+    log(f"🧹 History retention: logs cutoff={cutoff.isoformat()}, research cutoff={research_cutoff.isoformat()}")
     for item in results:
         status = item.get("status", "unknown")
         if status == "missing":
@@ -1992,81 +2007,8 @@ def log_setup_for_tracking(alert: dict) -> None:
         log(f"log_setup_for_tracking error: {e}")
 
 def update_performance_log() -> None:
-    """
-    בודק סטאפים ישנים ב-performance_log.csv ומעדכן מחירים אחרי 5/10/20 ימים.
-    קורא בתחילת כל ריצה.
-    """
-    if not os.path.exists(PERFORMANCE_CSV):
-        return
-    try:
-        df = pd.read_csv(PERFORMANCE_CSV)
-        if df.empty:
-            return
-        today = datetime.now().date()
-        changed = False
-
-        for idx, row in df.iterrows():
-            if row.get("checked") == True:
-                continue
-            try:
-                sent_date = pd.to_datetime(row["date_sent"]).date()
-                ticker    = str(row["ticker"]).strip().upper()
-                entry     = float(row["entry"])
-                target    = float(row["target"])
-                stop      = float(row["stop"])
-
-                # מביא מחיר נוכחי
-                price_df = yf.download(ticker, period="30d", interval="1d",
-                                       progress=False, auto_adjust=True)
-                if price_df is None or price_df.empty:
-                    continue
-
-                price_df.index = pd.to_datetime(price_df.index).date
-
-                all_checked = True
-                for days in PERF_CHECK_DAYS:
-                    col_p = f"price_{days}d"
-                    col_r = f"result_{days}d"
-                    if pd.notna(row.get(col_p)):
-                        continue  # כבר מולא
-
-                    target_date = sent_date + timedelta(days=days)
-                    # מצא את הנר הכי קרוב לתאריך היעד
-                    available = [d for d in price_df.index if d >= target_date]
-                    if not available:
-                        all_checked = False
-                        continue
-
-                    close_date  = min(available)
-                    close_price = float(price_df.loc[close_date, "Close"])
-                    pct_chg     = round((close_price - entry) / max(entry, 1e-9) * 100, 2)
-
-                    # תוצאה: Win / Loss / Partial
-                    if close_price >= target:
-                        result = f"WIN ({pct_chg:+.1f}%)"
-                    elif close_price <= stop:
-                        result = f"LOSS ({pct_chg:+.1f}%)"
-                    else:
-                        result = f"OPEN ({pct_chg:+.1f}%)"
-
-                    df.at[idx, col_p] = round(close_price, 2)
-                    df.at[idx, col_r] = result
-                    changed = True
-
-                if all_checked:
-                    df.at[idx, "checked"] = True
-                    changed = True
-
-            except Exception as e:
-                log(f"performance update error for {row.get('ticker','?')}: {e}")
-                continue
-
-        if changed:
-            df.to_csv(PERFORMANCE_CSV, index=False)
-            log(f"Performance log updated: {PERFORMANCE_CSV}")
-
-    except Exception as e:
-        log(f"update_performance_log error: {e}")
+    """Update V9.4 sent/shadow observations; leave unverifiable legacy outcomes intact."""
+    _update_setup_evaluations()
 
 # ============================================================
 #  API KEY MANAGEMENT
@@ -2302,8 +2244,10 @@ def fetch_market_cap(ticker: str) -> float | None:
                 fi = getattr(yf.Ticker(t), "fast_info", None)
                 if fi is not None:
                     try:
-                        fast_mc = fi.get("market_cap")
+                        fast_mc = fi.get("marketCap")
                     except Exception:
+                        fast_mc = getattr(fi, "market_cap", None)
+                    if not _is_finite_number(fast_mc) or float(fast_mc or 0) <= 0:
                         fast_mc = getattr(fi, "market_cap", None)
                     if fast_mc and _is_finite_number(fast_mc) and float(fast_mc) > 0:
                         mc = float(fast_mc)
@@ -2311,6 +2255,9 @@ def fetch_market_cap(ticker: str) -> float | None:
                 pass
 
         _mc_cache[t] = mc
+        _market_cap_diagnostics[t] = {"status": "resolved" if mc else "unresolved", "value": mc}
+        if mc is None:
+            log(f"Market cap unresolved {t}: info/shares-price/fast_info unavailable")
         return mc
     except Exception as e:
         log(f"market cap error for {t}: {e}")
@@ -2326,8 +2273,9 @@ def _get_yf_info(ticker: str) -> dict:
     if t not in _info_cache:
         try:
             _info_cache[t] = getattr(yf.Ticker(t), "info", {}) or {}
-        except Exception:
+        except Exception as exc:
             _info_cache[t] = {}
+            log(f"Yahoo company info unavailable {t}: {type(exc).__name__}")
     return _info_cache[t]
 
 def get_company_info(ticker: str) -> str:
@@ -2942,18 +2890,18 @@ def compute_setup_score(df: pd.DataFrame, ticker: str,
     except Exception:
         total += 3.0; reasons.append("C2 ⚠️ 13F לא זמין (+3)")
 
-    # C3) Dark Pool prints (מקס 5)
+    # C3) Narrow-range volume proxy prints (מקס 5)
     try:
         dp_result = get_dark_pool_prints(ticker, df)
         dp = int(dp_result.get("bullish_prints", 0)) if isinstance(dp_result, dict) else 0
         if dp >= 2:
-            pts = 5.0; reasons.append(f"C3 ✅ Dark Pool: {dp} פרינטים (+5)")
+            pts = 5.0; reasons.append(f"C3 ✅ Narrow-range volume proxy: {dp} פרינטים (+5)")
         elif dp == 1:
-            pts = 3.0; reasons.append(f"C3 ⚠️ Dark Pool: {dp} פרינט (+3)")
+            pts = 3.0; reasons.append(f"C3 ⚠️ Narrow-range volume proxy: {dp} פרינט (+3)")
         else:
-            pts = 1.0; reasons.append("C3 ❌ אין Dark Pool (+1)")
+            pts = 1.0; reasons.append("C3 ❌ אין Narrow-range volume proxy (+1)")
     except Exception:
-        pts = 2.0; reasons.append("C3 ⚠️ Dark Pool לא זמין (+2)")
+        pts = 2.0; reasons.append("C3 ⚠️ Narrow-range volume proxy לא זמין (+2)")
     total += pts
 
     # C4) Short Interest (מקס 5)
@@ -3492,7 +3440,8 @@ def _entry_quality_metrics(df: pd.DataFrame, ticker: str, breakout_level: float,
         high = _to_float_or_none(row.get("high"))
         low = _to_float_or_none(row.get("low"))
         vol = _to_float_or_none(row.get("volume"))
-        breakout = _to_float_or_none(breakout_level)
+        breakout = _to_float_or_none(meta.get("pattern_pivot", breakout_level))
+        metrics["planned_entry"] = _to_float_or_none(meta.get("planned_entry", breakout_level))
 
         metrics.update({
             "close": close,
@@ -3647,7 +3596,8 @@ def _validate_long_trade_levels(alert: dict) -> tuple[bool, list[str], dict]:
             return None
         return value
 
-    entry = finite_positive("Entry", alert.get("breakout_level"))
+    _sync_trade_geometry(alert)
+    entry = finite_positive("Entry", alert.get("planned_entry", alert.get("breakout_level")))
     stop = finite_positive("Stop", alert.get("stop_loss"))
     target = finite_positive("Target", alert.get("target"))
     rr = finite_positive("R:R", alert.get("rr_ratio"))
@@ -4404,7 +4354,7 @@ def classify_quality(quality: float, missing: Sequence[str], config: V9PatternCo
         "stop risk above",
     )
     has_hard_fail = any(any(phrase in m for phrase in hard_fail_phrases) for m in missing)
-    if quality >= config.entry_ready_min_quality and not has_hard_fail:
+    if quality >= config.entry_ready_min_quality and not missing and not has_hard_fail:
         return ENTRY_READY
     if quality >= config.almost_ready_min_quality:
         return ALMOST_READY
@@ -4451,6 +4401,18 @@ def make_candidate(
     if high_proximity is not None:
         dist_52w = (high_proximity - 1.0) * 100.0
 
+    meta = dict(meta or {})
+    if "VCP" in pattern_name:
+        meta["target_model"] = "R_MULTIPLE_SCENARIO"
+    elif "Pullback" in pattern_name:
+        meta["target_model"] = "PRIOR_SWING_HIGH" if meta.get("prior_swing_high") and meta["prior_swing_high"] > (entry or 0) else "R_MULTIPLE_SCENARIO"
+    else:
+        meta["target_model"] = "MEASURED_MOVE"
+    if meta["target_model"] != "R_MULTIPLE_SCENARIO":
+        meta["structural_target"] = target
+    meta["pattern_pivot"] = pivot
+    meta["planned_entry"] = entry
+    meta["signal_date"] = pd.Timestamp(df.index[-1]).date().isoformat()
     return PatternCandidate(
         ticker=ticker,
         pattern_name=pattern_name,
@@ -4568,7 +4530,7 @@ def detect_flat_base_breakout(
     technical_target = base_high + (base_high - base_low)
     target_by_r = entry + (entry - stop) * config.min_rr if stop is not None and entry > stop else None
     if target_by_r is not None:
-        target = max(technical_target, target_by_r)
+        target = technical_target
     else:
         target = technical_target
 
@@ -4590,6 +4552,8 @@ def detect_flat_base_breakout(
         notes=notes,
         meta={
             "base_days": base_days,
+            "base_start": pd.Timestamp(base.index[0]).isoformat(),
+            "base_end": pd.Timestamp(base.index[-1]).isoformat(),
             "base_high": base_high,
             "base_low": base_low,
             "resistance_touches": resistance_touches,
@@ -4666,7 +4630,7 @@ def detect_darvas_box_breakout(
         technical_target = box_high + (box_high - box_low)
         target_by_r = close + (close - stop) * config.min_rr if stop is not None and close > stop else None
         if target_by_r is not None:
-            target = max(technical_target, target_by_r)
+            target = technical_target
         else:
             target = technical_target
 
@@ -4688,6 +4652,8 @@ def detect_darvas_box_breakout(
             notes=notes,
             meta={
                 "box_window": window,
+                "box_start": pd.Timestamp(box.index[0]).isoformat(),
+                "box_end": pd.Timestamp(box.index[-1]).isoformat(),
                 "box_high": box_high,
                 "box_low": box_low,
                 "resistance_touches": touches,
@@ -4767,10 +4733,11 @@ def detect_vcp(
     ranges = [_segment_range_pct(seg1), _segment_range_pct(seg2), _segment_range_pct(seg3)]
     contractions = _count_contractions(ranges, config.vcp_range_contraction_ratio)
 
-    atr5 = latest_value(data, "ATR5")
-    atr20 = latest_value(data, "ATR20")
-    atr10 = latest_value(data, "ATR10")
-    atr30 = latest_value(data, "ATR30")
+    before_breakout = data.iloc[:-1]
+    atr5 = latest_value(before_breakout, "ATR5")
+    atr20 = latest_value(before_breakout, "ATR20")
+    atr10 = latest_value(before_breakout, "ATR10")
+    atr30 = latest_value(before_breakout, "ATR30")
     atr_contracting = (
         atr5 is not None and atr20 is not None and atr20 > 0 and atr5 < atr20
         and atr10 is not None and atr30 is not None and atr30 > 0 and atr10 < atr30
@@ -4784,10 +4751,13 @@ def detect_vcp(
     )
 
     vol5 = safe_float(data["Volume"].iloc[-6:-1].mean())
-    vol20 = latest_value(data, "VOL20")
+    vol20 = latest_value(data.iloc[:-1], "VOL20")
     volume_dryup = vol5 is not None and vol20 is not None and vol20 > 0 and vol5 <= vol20 * config.vcp_volume_dryup_ratio
 
     if contractions < 1 and not (atr_contracting and range_contracting and volume_dryup):
+        return None
+    structural_confirmed = contractions >= config.vcp_min_contractions and atr_contracting and range_contracting and volume_dryup
+    if STRICT_PATTERN_STRUCTURE and not structural_confirmed:
         return None
 
     # VCP pivot: high of the final tight area, not necessarily whole base high.
@@ -4849,6 +4819,11 @@ def detect_vcp(
             "lookback_days": lookback_days,
             "segment_ranges_pct": ranges,
             "contractions": contractions,
+            "structural_confirmed": structural_confirmed,
+            "base_start": pd.Timestamp(base.index[0]).isoformat(),
+            "base_end": pd.Timestamp(base.index[-1]).isoformat(),
+            "tight_area_start": pd.Timestamp(tight_area.index[0]).isoformat(),
+            "tight_area_end": pd.Timestamp(tight_area.index[-1]).isoformat(),
             "atr_contracting": atr_contracting,
             "range_contracting": range_contracting,
             "volume_dryup": volume_dryup,
@@ -4928,8 +4903,8 @@ def detect_ema_pullback_bounce(
 
     ema21_recent = data["EMA21"].iloc[-1 - len(pullback):-1]
     ma50_recent = data["MA50"].iloc[-1 - len(pullback):-1]
-    touched_ema21 = bool((pullback["Low"].values <= ema21_recent.values * (1.0 + config.ema_touch_tolerance_pct / 100.0)).any())
-    touched_ma50 = bool((pullback["Low"].values <= ma50_recent.values * (1.0 + config.ema_touch_tolerance_pct / 100.0)).any())
+    touched_ema21 = _range_touched_band(pullback, ema21_recent, config.ema_touch_tolerance_pct)
+    touched_ma50 = _range_touched_band(pullback, ma50_recent, config.ema_touch_tolerance_pct)
     if not touched_ema21 and not touched_ma50:
         return None
 
@@ -4941,10 +4916,11 @@ def detect_ema_pullback_bounce(
         prior_momentum = (pre_pullback_high - before_pullback_close) / before_pullback_close * 100.0 >= 6.0
 
     is_green = close > open_
-    bounce_confirmed = close > prev_high and is_green
+    ma_reclaimed = (touched_ema21 and close >= latest_value(data, "EMA21", float("inf"))) or (touched_ma50 and close >= latest_value(data, "MA50", float("inf")))
+    bounce_confirmed = close > prev_high and is_green and ma_reclaimed
 
     vol_pullback = safe_float(pullback["Volume"].mean())
-    vol20 = latest_value(data, "VOL20")
+    vol20 = latest_value(data.iloc[:-1], "VOL20")
     pullback_volume_quiet = vol_pullback is not None and vol20 is not None and vol20 > 0 and vol_pullback <= vol20
 
     base_score = 0.0
@@ -4970,11 +4946,11 @@ def detect_ema_pullback_bounce(
     pivot = prev_high
     entry = close
     stop = pullback_low * 0.995
-    # First target: prior swing high; if too close, use 2.5R.
+    # Preserve a reachable prior swing high; use an explicit 2.5R scenario only without one.
     prior_swing_high = safe_float(data["High"].iloc[-45:-1 - len(pullback)].max()) if len(data) > 50 else None
     target_by_r = entry + (entry - stop) * 2.5 if entry > stop else None
     if prior_swing_high is not None and prior_swing_high > entry:
-        target = max(prior_swing_high, target_by_r or prior_swing_high)
+        target = prior_swing_high
     else:
         target = target_by_r
 
@@ -5001,6 +4977,9 @@ def detect_ema_pullback_bounce(
             "touched_ema21": touched_ema21,
             "touched_ma50": touched_ma50,
             "bounce_confirmed": bounce_confirmed,
+            "ma_reclaimed": ma_reclaimed,
+            "pullback_start": pd.Timestamp(pullback.index[0]).isoformat(),
+            "pullback_end": pd.Timestamp(pullback.index[-1]).isoformat(),
             "pullback_volume_quiet": pullback_volume_quiet,
             "prior_swing_high": prior_swing_high,
         },
@@ -5035,6 +5014,9 @@ def _find_recent_breakout_for_retest(data: pd.DataFrame, config: V9PatternConfig
         if breakout_pct >= config.min_breakout_pct * 100.0 and (breakout_volume_ratio is None or breakout_volume_ratio >= 1.0):
             return {
                 "breakout_idx": idx,
+                "breakout_date": pd.Timestamp(data.index[idx]).isoformat(),
+                "box_start": pd.Timestamp(prior_box.index[0]).isoformat(),
+                "box_end": pd.Timestamp(prior_box.index[-1]).isoformat(),
                 "days_ago": offset - 1,
                 "pivot": pivot,
                 "box_low": box_low,
@@ -5077,6 +5059,7 @@ def detect_breakout_retest_entry(
 
     pivot = br["pivot"]
     breakout_idx = br["breakout_idx"]
+    # The current bounce can touch the zone; the original breakout is excluded.
     after_breakout = data.iloc[breakout_idx + 1:]
     if len(after_breakout) < 2:
         return None
@@ -5092,7 +5075,7 @@ def detect_breakout_retest_entry(
         and retest_low >= pivot * (1.0 - config.retest_max_below_pivot_pct / 100.0)
     )
     no_failed_breakout = min_close_after_breakout >= pivot * (1.0 - config.retest_max_below_pivot_pct / 100.0)
-    if not touched_retest_zone and not no_failed_breakout:
+    if not touched_retest_zone or not no_failed_breakout:
         return None
 
     bounce_confirmed = close > pivot and close > prev_high and close > open_
@@ -5115,7 +5098,7 @@ def detect_breakout_retest_entry(
     technical_target = pivot + box_height if box_height > 0 else None
     target_by_r = entry + (entry - stop) * 2.5 if entry > stop else None
     if technical_target is not None and target_by_r is not None:
-        target = max(technical_target, target_by_r)
+        target = technical_target
     else:
         target = technical_target or target_by_r
 
@@ -5137,6 +5120,8 @@ def detect_breakout_retest_entry(
         notes=notes,
         meta={
             **br,
+            "retest_start": pd.Timestamp(after_breakout.index[0]).isoformat(),
+            "retest_end": pd.Timestamp(after_breakout.index[-1]).isoformat(),
             "retest_low": retest_low,
             "min_close_after_breakout": min_close_after_breakout,
             "touched_retest_zone": touched_retest_zone,
@@ -5321,17 +5306,24 @@ def _v9_pattern_candidate_to_alert(candidate: PatternCandidate) -> dict:
         "fail_reasons": fail_reasons,
     })
 
-    return {
+    meta.update({"pattern_pivot": candidate.pivot, "reference_price": candidate.entry,
+                 "detector_rr": candidate.rr})
+    alert = {
         "ticker": candidate.ticker,
         "phase": 3,
         "pattern_type": candidate.pattern_name,
-        "breakout_level": candidate.pivot or candidate.entry or 0,
+        "pattern_pivot": candidate.pivot,
+        "reference_price": candidate.entry,
+        "planned_entry": max(candidate.pivot or 0, candidate.entry or 0),
+        "breakout_level": max(candidate.pivot or 0, candidate.entry or 0),
         "score": max(float(candidate.entry_quality or 0.0), float(candidate.base_score or 0.0)),
         "stop_loss": candidate.stop,
         "target": candidate.target,
         "rr_ratio": candidate.rr,
         "meta": meta,
     }
+    _sync_trade_geometry(alert)
+    return alert
 
 
 def append_v9_pattern_candidates(symbol: str, df: pd.DataFrame, candidates: list[dict]) -> int:
@@ -6555,9 +6547,16 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
     df = fetch_data_twelvedata(symbol, outputsize=500)
     if df is None or df.empty:
         df = fetch_data_yfinance(symbol)
-    df = _normalize_yfinance_df(df) if df is not None else None
+    df = _normalize_yfinance_df(df, drop_invalid_close=False) if df is not None else None
     if df is None or df.empty or len(df) < 50:
         log(f"{symbol}: no data. Skip."); _fs("no_data"); return []
+
+    df = _closed_daily_frame(df)
+    if df is None or df.empty or len(df) < 50:
+        log(f"{symbol}: no sufficient closed daily data. Skip."); _fs("no_data"); return []
+    if _daily_data_problems(df):
+        log(f"{symbol}: invalid/stale daily data: {'; '.join(_daily_data_problems(df))}")
+        _fs("no_data"); return []
 
     # ── פילטר דוחות: skip אם דוח קרוב ────────────────────────
     earn_ok, earn_reason = earnings_filter_ok(symbol)
@@ -6824,6 +6823,26 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
                 meta = alert.setdefault("meta", {})
                 base_score = float(alert.get("score", 0) or 0)
 
+                _sync_trade_geometry(alert, df)
+                meta.update({"signal_date": pd.Timestamp(df.index[-1]).date().isoformat(),
+                             "market_cap_verified": mc is not None,
+                             "earnings_evidence": earn_reason})
+                data_blockers = []
+                if mc is None:
+                    data_blockers.append("Market cap לא אומת מעל $1B")
+                if REQUIRE_VERIFIED_EARNINGS and "unknown" in str(earn_reason).lower():
+                    data_blockers.append("מועד דוחות לא אומת")
+                if data_blockers:
+                    quality = {"entry_ready": False, "status": "DATA_WAIT", "quality_score": 0,
+                               "blocking_fails": data_blockers, "fail_reasons": data_blockers, "metrics": {}}
+                    alert["entry_quality"] = quality
+                    log_entry_quality_decision(alert, quality)
+                    _record_entry_diagnostics(alert.get("pattern_type", ""), quality)
+                    _record_setup_evaluation(alert, "DATA_WAIT", df)
+                    log(f"{symbol}: DATA WAIT — {'; '.join(data_blockers)}")
+                    _fs("entry_quality")
+                    continue
+
                 # V9.1.5 hard safety: invalid long levels are rejected before any score.
                 levels_ok, level_problems, level_values = _validate_long_trade_levels(alert)
                 if not levels_ok:
@@ -6847,6 +6866,7 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
                     meta["fail_reasons"] = list(dict.fromkeys((meta.get("fail_reasons", []) or []) + level_problems))
                     log_entry_quality_decision(alert, safety_quality)
                     _record_entry_diagnostics(alert.get("pattern_type", ""), safety_quality)
+                    _record_setup_evaluation(alert, "SAFETY_REJECTED", df)
                     log(f"{symbol}: 🛑 SAFETY REJECT {alert.get('pattern_type','')} — {'; '.join(level_problems[:4])}")
                     _fs("entry_quality")
                     continue
@@ -6869,6 +6889,7 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
                 meta["fail_reasons"] = list(dict.fromkeys((meta.get("fail_reasons", []) or []) + quality.get("fail_reasons", [])))
                 log_entry_quality_decision(alert, quality)
                 _record_entry_diagnostics(alert.get("pattern_type", ""), quality)
+                _record_setup_evaluation(alert, "ENTRY_PASSED" if quality.get("entry_ready") else "ENTRY_REJECTED", df)
 
                 if not quality.get("entry_ready", False):
                     fails = quality.get("blocking_fails", []) or quality.get("fail_reasons", []) or []
@@ -6916,6 +6937,7 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
                 alert["professional_score"] = float(pro.get("professional_score", 0) or 0)
                 alert.setdefault("meta", {})["professional_quality"] = pro
                 log_professional_quality_decision(alert, pro)
+                _record_setup_evaluation(alert, "PRO_PASSED" if pro.get("professional_ready") else "PRO_REJECTED", df)
 
                 if not pro.get("professional_ready", False):
                     blockers = pro.get("blockers", []) or []
@@ -7423,31 +7445,30 @@ def _ensure_exit_plan(alert: dict) -> dict:
     return plan
 
 
-def _closed_daily_frame(df: pd.DataFrame | None) -> pd.DataFrame | None:
-    """מחזיר רק נרות יומיים סגורים. בזמן המסחר האמריקאי מסיר את הנר של היום."""
+def _closed_daily_frame(df: pd.DataFrame | None, now=None) -> pd.DataFrame | None:
+    """Remove today's unfinished daily bar and future session labels; fail closed.
+
+    Daily index labels represent trading-session dates, not intraday event timestamps.
+    16:15 New York is a conservative finalization cutoff, also on early-close days.
+    """
+    if df is None or df.empty:
+        return None
     try:
-        if df is None or df.empty:
-            return None
-        out = df.copy()
-        if len(out) < 2:
-            return out
         from zoneinfo import ZoneInfo
-        now_ny = datetime.now(ZoneInfo("America/New_York"))
-        last_ts = pd.Timestamp(out.index[-1])
-        try:
-            if last_ts.tzinfo is not None:
-                last_date = last_ts.tz_convert("America/New_York").date()
-            else:
-                last_date = last_ts.date()
-        except Exception:
-            last_date = last_ts.date()
-        # 16:15 נותן מרווח לעדכון הנר הסופי אצל ספק הנתונים.
-        before_settlement = (now_ny.hour, now_ny.minute) < (16, 15)
-        if last_date == now_ny.date() and before_settlement:
-            out = out.iloc[:-1].copy()
+        now_ny = pd.Timestamp(now if now is not None else datetime.now(ZoneInfo("America/New_York")))
+        if now_ny.tzinfo is None:
+            now_ny = now_ny.tz_localize("America/New_York")
+        else:
+            now_ny = now_ny.tz_convert("America/New_York")
+        dates = [pd.Timestamp(x).date() for x in df.index]
+        settled = (now_ny.hour, now_ny.minute) >= (16, 15)
+        mask = [d < now_ny.date() or (d == now_ny.date() and settled and now_ny.weekday() < 5) for d in dates]
+        out = df.loc[mask].sort_index().copy()
+        out = out.loc[~out.index.duplicated(keep="last")]
         return out if not out.empty else None
-    except Exception:
-        return df.copy() if df is not None and not df.empty else None
+    except Exception as exc:
+        log(f"Closed daily bar validation failed: {type(exc).__name__}")
+        return None
 
 
 def _doji_flag(row: pd.Series) -> bool:
@@ -7772,6 +7793,9 @@ def open_position(alert: dict) -> None:
         positions.append({
             "ticker": ticker,
             "pattern": alert.get("pattern_type", ""),
+            "tracking_kind": "PAPER_REFERENCE_NOT_BROKER_FILL",
+            "signal_date": (alert.get("meta") or {}).get("signal_date"),
+            "sent_at": alert.get("sent_at"),
             "entry": entry,
             "stop_initial": stop,
             "stop_current": stop,  # compatibility: V9.2 keeps this equal to stop_initial
@@ -8109,6 +8133,9 @@ def _apply_learned_params() -> None:
     נקרא בתחילת כל ריצה.
     """
     global MIN_ALERT_SCORE, BREAKOUT_TOLERANCE, EMA28_MAX_DIST_PCT
+    if not AUTO_APPLY_LEARNING:
+        log("Weekly learning is report-only; legacy learned overrides are not applied.")
+        return
     global MA150_MAX_DISTANCE, DB_BOTTOM_DIFF_PCT, CH_PEAKS_MAX_DIFF_PCT
     try:
         params = _load_learned_params()
@@ -8138,167 +8165,47 @@ def _apply_learned_params() -> None:
         log(f"_apply_learned_params error: {e}")
 
 def run_self_learning() -> dict:
-    """
-    מנוע הלמידה המרכזי — מנתח performance_log.csv ומחלץ תובנות:
+    """Weekly descriptive research, with no automatic threshold search or changes.
 
-    1. שיעור הצלחה לפי תבנית
-    2. ציון מינימלי אופטימלי (MIN_ALERT_SCORE)
-    3. זמן ממוצע לפריצה לפי תבנית
-    4. איזה פרמטר BREAKOUT_TOLERANCE אופטימלי
-    5. RR ממוצע בפועל vs מה שנחזה
-    מחזיר dict עם תובנות + מעדכן JSON
+    Bracket outcomes and fixed-horizon returns are distinct from V9.2 exits.
+    Raw sample counts include correlated candidates and are not significance tests.
     """
-    result = {
-        "status":       "no_data",
-        "samples":      0,
-        "insights":     [],
-        "new_params":   {},
-        "pattern_stats": {},
-    }
-
-    if not os.path.exists(PERFORMANCE_CSV):
-        log("🧠 Self-learning: no performance CSV found yet")
+    result = {"status": "no_data", "samples": 0, "insights": [], "new_params": {}, "pattern_stats": {},
+              "code_version": CODE_VERSION, "mode": "REPORT_ONLY", "model": "NEXT_OPEN_COUNTERFACTUAL_BRACKET",
+              "limitations": ["candidate observations are correlated", "daily intrabar order may be unknown",
+                              "not broker fills", "not the V9.2 target-reference exit strategy", "no out-of-sample calibration yet"]}
+    if not os.path.exists(SETUP_EVALUATIONS_CSV):
+        log("Weekly research: no versioned sent/shadow observations yet")
         return result
-
     try:
-        df = pd.read_csv(PERFORMANCE_CSV)
-        if df.empty:
-            return result
-
-        # סנן: רק סטאפים שנבדקו + 90 הימים האחרונים
-        df["date_sent"] = pd.to_datetime(df["date_sent"], errors="coerce")
-        cutoff = pd.Timestamp.now() - pd.Timedelta(days=LEARNING_LOOKBACK_DAYS)
-        df = df[df["date_sent"] >= cutoff].copy()
-
-        # רק שורות עם result_20d (נבדקו)
-        checked = df[df["result_20d"].notna()].copy()
-        n = len(checked)
-        result["samples"] = n
-
-        if n < LEARNING_MIN_SAMPLES:
-            log(f"🧠 Self-learning: only {n} samples (need {LEARNING_MIN_SAMPLES})")
-            result["status"] = "insufficient_data"
-            return result
-
-        log(f"🧠 Self-learning: analyzing {n} completed setups...")
-
-        # ── ניתוח 1: שיעור הצלחה לפי תבנית ─────────────────
-        pattern_stats = {}
-        for pattern, grp in checked.groupby("pattern"):
-            wins   = grp["result_20d"].str.startswith("WIN").sum()
-            losses = grp["result_20d"].str.startswith("LOSS").sum()
-            total  = len(grp)
-            win_r  = wins / max(total, 1)
-            avg_rr = grp["rr"].mean() if "rr" in grp.columns else 0
-            # פריצה ממוצעת: חלץ % מ"WIN (+8.3%)"
-            pct_vals = grp["result_20d"].str.extract(r"([+-]?[\d.]+)%").iloc[:,0].astype(float)
-            avg_pct  = float(pct_vals.mean()) if not pct_vals.isna().all() else 0.0
-            pattern_stats[pattern] = {
-                "total":   total,
-                "wins":    int(wins),
-                "losses":  int(losses),
-                "win_rate": round(win_r, 3),
-                "avg_rr":  round(float(avg_rr), 2),
-                "avg_pct_20d": round(avg_pct, 2),
+        data = pd.read_csv(SETUP_EVALUATIONS_CSV)
+        cutoff = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=LEARNING_LOOKBACK_DAYS)
+        stamps = pd.to_datetime(data["observed_at"], utc=True, errors="coerce")
+        data = data[(stamps >= cutoff) & (data["schema_version"] == 2)].copy()
+        complete = data[data["price_20d"].notna()].copy()
+        sent = complete[complete["stage"] == "SENT"]
+        result["samples"] = len(sent)
+        result["shadow_samples"] = len(complete) - len(sent)
+        for (stage, pattern), group in complete.groupby(["stage", "pattern"]):
+            ambiguous = group["bracket_result_20d"].eq("AMBIGUOUS_BOTH")
+            known = group.loc[~ambiguous]
+            rvalues = pd.to_numeric(known["bracket_net_r_20d"], errors="coerce").dropna()
+            returns = pd.to_numeric(group["horizon_return_pct_20d"], errors="coerce").dropna()
+            result["pattern_stats"][f"{stage}|{pattern}"] = {
+                "observations": len(group), "unique_tickers": int(group["ticker"].nunique()),
+                "ambiguous_bars": int(ambiguous.sum()), "unambiguous_samples": len(rvalues),
+                "bracket_positive_fraction": float((rvalues > 0).mean()) if len(rvalues) else None,
+                "bracket_mean_net_r": float(rvalues.mean()) if len(rvalues) else None,
+                "mean_horizon_return_pct": float(returns.mean()) if len(returns) else None,
             }
-        result["pattern_stats"] = pattern_stats
-
-        insights = []
-        new_params = {}
-
-        # ── ניתוח 2: ציון אופטימלי (MIN_ALERT_SCORE) ────────
-        # V9.3: הציונים כיום בסקאלה של עשרות נקודות. מנוע ישן בדק 5-7.5
-        # ועלול היה להוריד סף בצורה מסוכנת. כעת השינוי bounded ושמרני.
-        score_num = pd.to_numeric(checked["score"], errors="coerce") if "score" in checked.columns else pd.Series(np.nan, index=checked.index)
-        best_score_threshold = None
-        for threshold in [45.0, 50.0, 55.0, 60.0, 65.0]:
-            subset = checked[score_num >= threshold]
-            if len(subset) < max(15, LEARNING_MIN_SAMPLES // 3):
-                continue
-            wins_s = subset["result_20d"].str.startswith("WIN").sum()
-            wr = wins_s / len(subset)
-            if wr >= 0.55:
-                best_score_threshold = threshold
-                break
-
-        current_wr_all = checked["result_20d"].str.startswith("WIN").sum() / n
-        if best_score_threshold is not None:
-            bounded = max(40.0, min(65.0, float(best_score_threshold)))
-            if bounded > MIN_ALERT_SCORE + 4.9:
-                new_params["MIN_ALERT_SCORE"] = min(MIN_ALERT_SCORE + 5.0, bounded)
-                insights.append(f"📈 העלה MIN_ALERT_SCORE באופן מדורג ל-{new_params['MIN_ALERT_SCORE']:.1f}")
-            elif current_wr_all >= 0.65 and bounded < MIN_ALERT_SCORE - 4.9:
-                new_params["MIN_ALERT_SCORE"] = max(40.0, MIN_ALERT_SCORE - 5.0)
-                insights.append(f"📊 הורד MIN_ALERT_SCORE באופן מדורג ל-{new_params['MIN_ALERT_SCORE']:.1f} (מדגם {n}, WR={current_wr_all*100:.0f}%)")
-
-        # ── ניתוח 3: BREAKOUT_TOLERANCE ─────────────────────
-        # בדוק אם הרוב מרחוק הפריצה קרוב ל-0 או מגיע ל-0.5%
-        if "entry" in checked.columns and "breakout_level" in checked.columns:
-            try:
-                checked["over_pct"] = (
-                    (checked["entry"] - checked["breakout_level"]) /
-                    checked["breakout_level"].replace(0, float("nan"))
-                ) * 100
-                avg_over = float(checked["over_pct"].mean())
-                if avg_over < 0.15 and BREAKOUT_TOLERANCE > 0.003:
-                    new_params["BREAKOUT_TOLERANCE"] = 0.003
-                    insights.append(
-                        f"🎯 הפחת BREAKOUT_TOLERANCE ל-0.3% "
-                        f"(ממוצע פריצה בפועל: {avg_over:.2f}%)"
-                    )
-            except Exception:
-                pass
-
-        # ── ניתוח 4: EMA28_MAX_DIST_PCT ─────────────────────
-        # סטאפים שנכשלו — מה המרחק שלהם מ-EMA28 ביום הכניסה?
-        losses_df = checked[checked["result_20d"].str.startswith("LOSS")]
-        if len(losses_df) >= 10:
-            # אם יש הרבה הפסדים — הידק את EMA28
-            loss_rate = len(losses_df) / n
-            if loss_rate > 0.45 and EMA28_MAX_DIST_PCT > 0.02:
-                new_params["EMA28_MAX_DIST_PCT"] = max(0.02, EMA28_MAX_DIST_PCT - 0.005)
-                insights.append(
-                    f"🔴 הפחת EMA28_MAX_DIST_PCT ל-{new_params['EMA28_MAX_DIST_PCT']*100:.1f}% "
-                    f"(שיעור הפסד: {loss_rate*100:.0f}%)"
-                )
-
-        # ── ניתוח 5: תבנית הכי מצליחה / הכי גרועה ──────────
-        if pattern_stats:
-            best_p  = max(pattern_stats, key=lambda p: pattern_stats[p]["win_rate"])
-            worst_p = min(pattern_stats, key=lambda p: pattern_stats[p]["win_rate"])
-            best_wr  = pattern_stats[best_p]["win_rate"]
-            worst_wr = pattern_stats[worst_p]["win_rate"]
-            if best_wr > 0.60:
-                insights.append(f"⭐ התבנית הכי מוצלחת: {best_p} ({best_wr*100:.0f}% win rate)")
-            if worst_wr < 0.35 and pattern_stats[worst_p]["total"] >= 5:
-                insights.append(f"⚠️ התבנית הכי חלשה: {worst_p} ({worst_wr*100:.0f}% win rate) — שקול להגדיל סף ציון")
-
-        # ── שמור ─────────────────────────────────────────────
-        result["insights"]   = insights
-        result["new_params"] = new_params
-        result["status"]     = "ok"
-        result["win_rate_overall"] = round(current_wr_all, 3)
-
-        if new_params:
-            _save_learned_params(new_params)
-            log(f"🧠 Self-learning complete — {len(new_params)} params updated, {len(insights)} insights")
-        else:
-            log(f"🧠 Self-learning complete — no param changes needed (win rate: {current_wr_all*100:.0f}%)")
-
-        # ── לוג מפורט ────────────────────────────────────────
-        log("=" * 55)
-        log(f"🧠 SELF-LEARNING REPORT ({n} setups, last {LEARNING_LOOKBACK_DAYS}d)")
-        log(f"   Win Rate כולל: {current_wr_all*100:.0f}%")
-        for p, s in sorted(pattern_stats.items(), key=lambda x: -x[1]["win_rate"]):
-            log(f"   {p:<22} | win={s['win_rate']*100:.0f}% | avg={s['avg_pct_20d']:+.1f}% | n={s['total']}")
-        for ins in insights:
-            log(f"   💡 {ins}")
-        log("=" * 55)
-
-    except Exception as e:
-        log(f"run_self_learning error: {e}")
+        result["status"] = "descriptive_only" if len(sent) >= LEARNING_MIN_SAMPLES else "insufficient_data"
+        result["insights"].append("Entry 60 / Professional 75 remain unchanged; collect sent and rejected outcomes before calibration.")
+        _atomic_write_json(LEARNING_REPORT_FILE, result)
+        log(f"Weekly research: {len(sent)} mature sent observations, {result['shadow_samples']} shadow observations; report-only")
+    except Exception as exc:
         result["status"] = "error"
-
+        result["error_type"] = type(exc).__name__
+        log(f"Weekly research error: {type(exc).__name__}: {exc}")
     return result
 
 
@@ -8848,7 +8755,7 @@ def get_congressional_trading(ticker: str) -> dict:
 # ============================================================
 #  REVERSE SCANNER — סריקה הפוכה: איפה המוסדיים מוכרים?
 #  מזהה מניות שמוסדיים יוצאים מהן — להימנע מהן
-#  לוגיקה: Dark Pool BEARISH + Short Interest גבוה + Options Put Flow
+#  לוגיקה: Narrow-range volume proxy BEARISH + Short Interest גבוה + Options Put Flow
 # ============================================================
 
 REVERSE_MIN_SCORE = float(os.getenv("REVERSE_MIN_SCORE", "2.0"))  # לפחות 2 סימנים אדומים
@@ -8857,7 +8764,7 @@ def scan_for_institutional_selling(ticker: str, df: pd.DataFrame) -> dict:
     """
     בודק האם מוסדיים יוצאים ממניה — אות אזהרה.
     לוגיקה משולבת:
-      +1: Dark Pool bearish prints
+      +1: Narrow-range volume proxy bearish prints
       +1: Short Interest > 10% + עולה
       +1: Put/Call ratio > 1.2 (יותר puts מcalls)
       +1: מחיר מתחת MA50 + MA50 יורד
@@ -8875,11 +8782,11 @@ def scan_for_institutional_selling(ticker: str, df: pd.DataFrame) -> dict:
         score  = 0
         signals = []
 
-        # ── Dark Pool bearish ─────────────────────────────────
+        # ── Narrow-range volume proxy bearish ─────────────────────────────────
         dp = get_dark_pool_prints(ticker, df)
         if dp.get("net_bias") == "BEARISH" and dp.get("bearish_prints", 0) >= 2:
             score += 1
-            signals.append(f"🔴 Dark Pool bearish ({dp['bearish_prints']} prints)")
+            signals.append(f"🔴 Narrow-range volume proxy bearish ({dp['bearish_prints']} prints)")
 
         # ── Short Interest > 10% ──────────────────────────────
         si = get_short_interest(ticker)
@@ -9148,12 +9055,12 @@ def get_institutional_ownership(ticker: str) -> dict:
 
 def get_dark_pool_prints(ticker: str, df: pd.DataFrame | None = None) -> dict:
     """
-    מזהה עסקאות Dark Pool לפי סימני מחיר-נפח:
+    מזהה ימים עם ווליום חריג בטווח מחיר צר לפי סימני מחיר-נפח:
 
-    Dark Pool Print = יום שבו:
+    Narrow-range volume proxy Print = יום שבו:
       1. Volume גבוה פי DARKPOOL_VOL_MULT מהממוצע
       2. תנועת מחיר (high-low)/close קטנה מ-DARKPOOL_PRICE_MAX%
-         → מוסד קנה/מכר כמות גדולה בלי להזיז את המחיר
+         → אומדן יומי של פעילות נפח בטווח צר; אינו מזהה זירת מסחר או זהות משקיע
 
     תוצאות: רשימת הימים, כיוון מצטבר (net_bias), סיכום
     """
@@ -9163,7 +9070,7 @@ def get_dark_pool_prints(ticker: str, df: pd.DataFrame | None = None) -> dict:
         "net_bias":      "NEUTRAL",  # BULLISH / BEARISH / NEUTRAL
         "bullish_prints":0,
         "bearish_prints":0,
-        "summary":       "אין נתוני Dark Pool",
+        "summary":       "אין נתוני Narrow-range volume proxy",
     }
     try:
         if df is None or df.empty or len(df) < DARKPOOL_LOOKBACK + 5:
@@ -9192,7 +9099,7 @@ def get_dark_pool_prints(ticker: str, df: pd.DataFrame | None = None) -> dict:
             low   = float(lows[i])
             op    = float(opens[i])
 
-            # תנאי Dark Pool: volume חריג + טווח מחיר קטן
+            # תנאי Narrow-range volume proxy: volume חריג + טווח מחיר קטן
             vol_ratio  = vol / max(avg_vol, 1)
             price_range= (high - low) / max(close, 1e-9) * 100
 
@@ -9225,14 +9132,14 @@ def get_dark_pool_prints(ticker: str, df: pd.DataFrame | None = None) -> dict:
 
             bias_emoji = {"BULLISH": "🟢", "BEARISH": "🔴", "NEUTRAL": "🟡"}.get(result["net_bias"], "🟡")
             result["summary"] = (
-                f"{bias_emoji} Dark Pool: {len(prints)} prints ב-{DARKPOOL_LOOKBACK} יום "
+                f"{bias_emoji} Narrow-range volume proxy: {len(prints)} prints ב-{DARKPOOL_LOOKBACK} יום "
                 f"| {bull} קנייה / {bear} מכירה"
             )
         else:
-            result["summary"] = "אין Dark Pool prints"
+            result["summary"] = "אין Narrow-range volume proxy prints"
 
     except Exception as e:
-        result["summary"] = "שגיאה בניתוח Dark Pool"
+        result["summary"] = "שגיאה בניתוח Narrow-range volume proxy"
 
     return result
 
@@ -9384,7 +9291,7 @@ def get_options_flow(ticker: str) -> dict:
 
 def get_deep_intelligence(ticker: str, df=None) -> dict:
     """
-    מרכז את כל הניתוח המעמיק: Weekly + Accumulation + Insider + Short + Options + Dark Pool + 13F + Sentiment + Congress.
+    מרכז את כל הניתוח המעמיק: Weekly + Accumulation + Insider + Short + Options + Narrow-range volume proxy + 13F + Sentiment + Congress.
     """
     weekly      = get_weekly_timeframe(ticker)
     accum       = get_accumulation_score(df) if df is not None else {"summary": "N/A"}
@@ -9555,11 +9462,11 @@ def _build_html_card(alert: dict, company: dict, send_date: str, sector: dict | 
             opt_emoji = "🔥" if options.get("bullish_flow") else "📊"
             rows.append(f'<tr><td style="padding:5px 8px;font-weight:600;color:#374151;width:120px;">{opt_emoji} Options</td>'
                        f'<td style="padding:5px 8px;color:#111;">{opt_sum}</td></tr>')
-        # Dark Pool
+        # Narrow-range volume proxy
         dp_sum = darkpool.get("summary", "")
-        if dp_sum and "אין Dark Pool" not in dp_sum and "שגיאה" not in dp_sum:
+        if dp_sum and "אין Narrow-range volume proxy" not in dp_sum and "שגיאה" not in dp_sum:
             dp_emoji = "🟢" if darkpool.get("net_bias") == "BULLISH" else "🔴" if darkpool.get("net_bias") == "BEARISH" else "🏊"
-            rows.append(f'<tr><td style="padding:5px 8px;font-weight:600;color:#374151;width:120px;">{dp_emoji} Dark Pool</td>'
+            rows.append(f'<tr><td style="padding:5px 8px;font-weight:600;color:#374151;width:120px;">{dp_emoji} Narrow-range volume proxy</td>'
                        f'<td style="padding:5px 8px;color:#111;">{dp_sum}</td></tr>')
         # 13F מוסדיים
         inst_sum = inst.get("summary", "")
@@ -9693,51 +9600,422 @@ def _build_html_card(alert: dict, company: dict, send_date: str, sector: dict | 
   </div>
 </div>"""
 
+def _canonical_pattern_name(alert: dict) -> str:
+    return str(alert.get("pattern_type", "")).lstrip("🏆⭐ ")
+
+
+def _sync_trade_geometry(alert: dict, df: pd.DataFrame | None = None) -> dict:
+    """One planned entry for scoring, mail, state and research; pivot stays separate.
+
+    planned_entry is a signal-time reference, not a claim of an executable broker fill.
+    """
+    meta = alert.setdefault("meta", {})
+    pivot = _to_float_or_none(alert.get("pattern_pivot", meta.get("pattern_pivot", alert.get("breakout_level"))))
+    reference = _to_float_or_none(alert.get("reference_price", meta.get("reference_price")))
+    if reference is None and df is not None and not df.empty:
+        reference = _to_float_or_none(df.iloc[-1].get("close", df.iloc[-1].get("Close")))
+    entry = _to_float_or_none(alert.get("planned_entry"))
+    if entry is None:
+        choices = [x for x in (pivot, reference) if x is not None]
+        entry = max(choices) if choices else None
+    stop = _to_float_or_none(alert.get("stop_loss"))
+    target = _to_float_or_none(alert.get("target"))
+    risk, reward, rr = None, None, None
+    if all(x is not None and x > 0 for x in (entry, stop, target)) and stop < entry < target:
+        risk, reward = entry - stop, target - entry
+        rr = reward / risk
+    old_rr = _to_float_or_none(alert.get("rr_ratio"))
+    if "detector_rr" not in meta and old_rr is not None:
+        meta["detector_rr"] = old_rr
+    alert.update({"pattern_pivot": pivot, "planned_entry": entry, "breakout_level": entry,
+                  "reference_price": reference, "rr_ratio": rr})
+    meta.update({"pattern_pivot": pivot, "planned_entry": entry, "reference_price": reference,
+                 "planned_risk": risk, "planned_reward": reward, "calculated_rr": rr,
+                 "entry_model": "SIGNAL_REFERENCE_NOT_EXECUTED"})
+    if df is not None and not df.empty:
+        meta["signal_date"] = pd.Timestamp(df.index[-1]).date().isoformat()
+    return alert
+
+
+def _daily_data_problems(df: pd.DataFrame) -> list[str]:
+    issues = []
+    try:
+        prices = df[["open", "high", "low", "close"]].apply(pd.to_numeric, errors="coerce")
+        valid = np.isfinite(prices).all(axis=1) & (prices > 0).all(axis=1)
+        valid &= prices["high"] >= prices[["open", "close", "low"]].max(axis=1)
+        valid &= prices["low"] <= prices[["open", "close", "high"]].min(axis=1)
+        if not bool(valid.all()):
+            issues.append("invalid OHLC geometry")
+        volume = pd.to_numeric(df["volume"], errors="coerce")
+        if not _is_finite_number(volume.iloc[-1]) or float(volume.iloc[-1]) <= 0:
+            issues.append("latest daily volume missing/zero")
+        if (datetime.now(timezone.utc).date() - pd.Timestamp(df.index[-1]).date()).days > 7:
+            issues.append("price history older than seven calendar days")
+    except Exception as exc:
+        issues.append(f"data validation error: {type(exc).__name__}")
+    return issues
+
+
+def _range_touched_band(frame: pd.DataFrame, average: pd.Series, tolerance_pct: float) -> bool:
+    """True only when a candle intersects the moving-average tolerance band."""
+    low = pd.to_numeric(frame["Low"], errors="coerce").to_numpy(dtype=float)
+    high = pd.to_numeric(frame["High"], errors="coerce").to_numpy(dtype=float)
+    ma = pd.to_numeric(average.reindex(frame.index), errors="coerce").to_numpy(dtype=float)
+    tolerance = max(0.0, float(tolerance_pct)) / 100.0
+    valid = np.isfinite(low) & np.isfinite(high) & np.isfinite(ma) & (ma > 0) & (high >= low)
+    return bool((valid & (low <= ma * (1 + tolerance)) & (high >= ma * (1 - tolerance))).any())
+
+
+def _eligible_research_date(observed_at, signal_date) -> str:
+    """Avoid using a full daily bar whose early prices predate the observation.
+
+    Before 09:30 NY the current session is eligible. From the open onward,
+    use the next session (selected later from actual bars, including holidays).
+    """
+    ts = pd.Timestamp(observed_at)
+    if ts.tzinfo is None:
+        ts = ts.tz_localize("UTC")
+    ts = ts.tz_convert("America/New_York")
+    day = ts.date()
+    if (ts.hour, ts.minute) >= (9, 30):
+        day += timedelta(days=1)
+    signal = pd.Timestamp(signal_date).date()
+    return max(day, signal + timedelta(days=1)).isoformat()
+
+
+def _evaluation_columns() -> list[str]:
+    cols = ["evaluation_id", "schema_version", "code_version", "date_sent", "observed_at", "signal_date",
+            "eligible_date", "ticker", "pattern", "stage", "planned_entry", "pattern_pivot", "stop", "target",
+            "target_model", "entry_quality", "professional_score", "blockers", "metadata_json", "execution_model",
+            "slippage_bps", "fill_price", "fill_date", "evaluation_status", "checked"]
+    for n in PERF_CHECK_DAYS:
+        cols += [f"price_{n}d", f"horizon_return_pct_{n}d", f"horizon_mfe_pct_{n}d", f"horizon_mae_pct_{n}d",
+                 f"bracket_result_{n}d", f"bracket_net_r_{n}d", f"event_date_{n}d"]
+    return cols
+
+
+def _record_setup_evaluation(alert: dict, stage: str, df: pd.DataFrame | None = None) -> None:
+    """Buffer candidate-level evidence, including rejected, selected and SMTP-failed setups."""
+    if not SHADOW_TRACKING_ENABLED and stage != "SENT":
+        return
+    try:
+        meta = alert.get("meta") or {}
+        signal = meta.get("signal_date")
+        if df is not None and not df.empty:
+            signal = pd.Timestamp(df.index[-1]).date().isoformat()
+        if not signal:
+            return
+        entry = _to_float_or_none(alert.get("planned_entry", alert.get("breakout_level")))
+        stop = _to_float_or_none(alert.get("stop_loss"))
+        target = _to_float_or_none(alert.get("target"))
+        pattern = _canonical_pattern_name(alert)
+        signature = [CODE_VERSION, alert.get("ticker"), pattern, signal, entry, stop, target]
+        evaluation_id = hashlib.sha256(json.dumps(signature, default=str).encode()).hexdigest()[:24]
+        previous = _EVALUATION_BUFFER.get(evaluation_id, {})
+        stamp = alert.get("sent_at") if stage == "SENT" else previous.get("observed_at")
+        stamp = stamp or datetime.now(timezone.utc).isoformat()
+        stamp_ts = pd.Timestamp(stamp)
+        if stamp_ts.tzinfo is None:
+            stamp_ts = stamp_ts.tz_localize("UTC")
+        quality = alert.get("entry_quality") or {}
+        pro = alert.get("professional_quality") or {}
+        blockers = quality.get("blocking_fails", []) + pro.get("blockers", [])
+        record = {col: None for col in _evaluation_columns()}
+        record.update({"evaluation_id": evaluation_id, "schema_version": 2, "code_version": CODE_VERSION,
+                       "date_sent": stamp_ts.tz_convert("America/New_York").date().isoformat(),
+                       "observed_at": stamp, "signal_date": signal,
+                       "eligible_date": _eligible_research_date(stamp, signal),
+                       "ticker": alert.get("ticker", ""), "pattern": pattern, "stage": stage,
+                       "planned_entry": entry, "pattern_pivot": alert.get("pattern_pivot"), "stop": stop, "target": target,
+                       "target_model": meta.get("target_model", "LEGACY_TARGET_REFERENCE"),
+                       "entry_quality": quality.get("quality_score", alert.get("entry_quality_score")),
+                       "professional_score": pro.get("professional_score", alert.get("professional_score")),
+                       "blockers": json.dumps(blockers, ensure_ascii=False, default=str),
+                       "metadata_json": json.dumps({k: v for k, v in meta.items() if k not in ("entry_quality", "professional_quality")}, ensure_ascii=False, default=str),
+                       "execution_model": "COUNTERFACTUAL_NEXT_ELIGIBLE_OPEN",
+                       "slippage_bps": RESEARCH_SLIPPAGE_BPS, "checked": False,
+                       "evaluation_status": "PENDING"})
+        _EVALUATION_BUFFER[evaluation_id] = record
+    except Exception as exc:
+        log(f"Evaluation record error: {type(exc).__name__}: {exc}")
+
+
+def _flush_setup_evaluations() -> None:
+    if not _EVALUATION_BUFFER:
+        return
+    # A failure propagates: the run must not claim a completed research checkpoint.
+    rows = {}
+    if os.path.exists(SETUP_EVALUATIONS_CSV):
+        existing = pd.read_csv(SETUP_EVALUATIONS_CSV, dtype={"evaluation_id": str})
+        rows = {str(row["evaluation_id"]): row.to_dict() for _, row in existing.iterrows()}
+    for key, incoming in _EVALUATION_BUFFER.items():
+        previous = rows.get(key)
+        if previous is not None:
+            if previous.get("stage") == "SENT":
+                continue
+            # Preserve the first observation unless mail acceptance supplies the actual send time.
+            if incoming.get("stage") != "SENT":
+                incoming["observed_at"] = previous.get("observed_at", incoming["observed_at"])
+                incoming["eligible_date"] = previous.get("eligible_date", incoming["eligible_date"])
+                incoming["date_sent"] = previous.get("date_sent", incoming["date_sent"])
+                for col in _evaluation_columns():
+                    if col in ("checked", "evaluation_status", "fill_price", "fill_date") or col.startswith(("price_", "horizon_", "bracket_", "event_date_")) or col not in incoming or incoming[col] is None:
+                        incoming[col] = previous.get(col)
+            else:
+                # Reset prior counterfactual outcomes: actual send time may permit a later session.
+                incoming["checked"] = False
+                incoming["evaluation_status"] = "PENDING"
+        rows[key] = incoming
+    _atomic_write_text(SETUP_EVALUATIONS_CSV, pd.DataFrame(list(rows.values()), columns=_evaluation_columns()).to_csv(index=False))
+    log(f"Research observations saved: {len(_EVALUATION_BUFFER)} updates, {len(rows)} total")
+    _EVALUATION_BUFFER.clear()
+
+
+def evaluate_setup_path(price_df: pd.DataFrame, observation: dict, horizons=None) -> dict:
+    """Pure daily-bar research evaluator, separate from the V9.2 exit policy.
+
+    Simulates entry at the first eligible session's open. First stop/target hit
+    wins; a bar touching both is AMBIGUOUS, with a conservative stop-first R.
+    This bracket comparison is not a broker result or V9.2's target-reference exit.
+    """
+    horizons = tuple(horizons or PERF_CHECK_DAYS)
+    result = {"evaluation_status": "PENDING", "checked": False}
+    normalized = _normalize_yfinance_df(price_df, drop_invalid_close=False)
+    if normalized is None or normalized.empty:
+        return result
+    data = normalized.sort_index().copy()
+    data = data.loc[~data.index.duplicated(keep="last")]
+    signal = pd.Timestamp(observation["signal_date"]).date()
+    eligible = pd.Timestamp(observation["eligible_date"]).date()
+    dates = [pd.Timestamp(x).date() for x in data.index]
+    data = data.loc[[d > signal and d >= eligible for d in dates]]
+    if data.empty:
+        return result
+    data = data.iloc[:max(horizons)]
+    # Original signal levels cannot be compared across a split without knowing
+    # both providers' adjustment basis; retain the observation for review.
+    if "stock splits" in data and pd.to_numeric(data["stock splits"], errors="coerce").fillna(0).ne(0).any():
+        return {"evaluation_status": "CORPORATE_ACTION_REVIEW", "checked": False}
+    if not {"open", "high", "low", "close"}.issubset(data.columns):
+        return {"evaluation_status": "INVALID_PRICE_HISTORY", "checked": False}
+    required = data[["open", "high", "low", "close"]].apply(pd.to_numeric, errors="coerce")
+    valid = np.isfinite(required).all(axis=1) & (required > 0).all(axis=1)
+    valid &= required["high"] >= required[["open", "low", "close"]].max(axis=1)
+    valid &= required["low"] <= required[["open", "high", "close"]].min(axis=1)
+    if not bool(valid.all()):
+        return {"evaluation_status": "INVALID_PRICE_HISTORY", "checked": False}
+    planned = _to_float_or_none(observation.get("planned_entry"))
+    stop = _to_float_or_none(observation.get("stop"))
+    target = _to_float_or_none(observation.get("target"))
+    if not all(x is not None and x > 0 for x in (planned, stop, target)) or not stop < planned < target:
+        return {"evaluation_status": "INVALID_PLANNED_GEOMETRY", "checked": True}
+    slip = max(0.0, float(observation.get("slippage_bps", RESEARCH_SLIPPAGE_BPS))) / 10000.0
+    fill = float(data["open"].iloc[0]) * (1 + slip)
+    result.update({"fill_price": fill, "fill_date": pd.Timestamp(data.index[0]).date().isoformat()})
+    if not stop < fill < target:
+        result.update({"evaluation_status": "SKIPPED_OPEN_OUTSIDE_BRACKET", "checked": True})
+        return result
+    risk = fill - stop
+    event = None
+    event_r = None
+    event_date = None
+    for i, (ts, bar) in enumerate(data.iterrows(), 1):
+        op, hi, lo = map(float, (bar["open"], bar["high"], bar["low"]))
+        if event is None:
+            if op <= stop:
+                event, exit_price = "GAP_STOP", op * (1 - slip)
+            elif op >= target:
+                event, exit_price = "GAP_TARGET", op * (1 - slip)
+            elif lo <= stop and hi >= target:
+                event, exit_price = "AMBIGUOUS_BOTH", stop * (1 - slip)
+            elif lo <= stop:
+                event, exit_price = "STOP", stop * (1 - slip)
+            elif hi >= target:
+                event, exit_price = "TARGET", target * (1 - slip)
+            if event is not None:
+                event_r = (exit_price - fill) / risk
+                event_date = pd.Timestamp(ts).date().isoformat()
+        if i in horizons:
+            prefix = data.iloc[:i]
+            close = float(bar["close"])
+            result.update({f"price_{i}d": close,
+                           f"horizon_return_pct_{i}d": (close * (1 - slip) / fill - 1) * 100,
+                           f"horizon_mfe_pct_{i}d": (float(prefix["high"].max()) / fill - 1) * 100,
+                           f"horizon_mae_pct_{i}d": (float(prefix["low"].min()) / fill - 1) * 100,
+                           f"bracket_result_{i}d": event or "OPEN",
+                           f"bracket_net_r_{i}d": event_r if event is not None else (close * (1 - slip) - fill) / risk,
+                           f"event_date_{i}d": event_date})
+        if i >= max(horizons):
+            break
+    result["evaluation_status"] = "COMPLETE" if len(data) >= max(horizons) else "PARTIAL"
+    result["checked"] = len(data) >= max(horizons)
+    return result
+
+
+def _update_setup_evaluations() -> None:
+    if not os.path.exists(SETUP_EVALUATIONS_CSV):
+        return
+    observations = pd.read_csv(SETUP_EVALUATIONS_CSV, dtype={"evaluation_id": str})
+    if observations.empty:
+        return
+    cache = {}
+    changed = False
+    for index, row in observations.iterrows():
+        if str(row.get("checked", "")).lower() == "true":
+            continue
+        ticker = str(row.get("ticker", "")).strip().upper()
+        try:
+            if ticker not in cache:
+                # One request per ticker, sufficient for the 180-day retained research window.
+                time.sleep(max(0.0, MARKET_CAP_PRECHECK_SLEEP_SECONDS))
+                cache[ticker] = _closed_daily_frame(_normalize_yfinance_df(yf.download(
+                    ticker, period="1y", interval="1d", progress=False, auto_adjust=False, actions=True, keepna=True), drop_invalid_close=False))
+            update = evaluate_setup_path(cache[ticker], row.to_dict())
+            for key, value in update.items():
+                if key not in observations:
+                    observations[key] = pd.Series([None] * len(observations), dtype=object)
+                if isinstance(value, str) and observations[key].dtype != object:
+                    observations[key] = observations[key].astype(object)
+                observations.at[index, key] = value
+            changed = True
+        except Exception as exc:
+            log(f"Research update unavailable {ticker}: {type(exc).__name__}")
+    if changed:
+        _atomic_write_text(SETUP_EVALUATIONS_CSV, observations.to_csv(index=False))
+        log(f"Research performance updated: {len(observations)} observations")
+
+
+def _select_final_alerts(alerts: list[dict], limit=None) -> list[dict]:
+    best = {}
+    for alert in sorted(alerts, key=lambda a: float(a.get("score", 0) or 0), reverse=True):
+        ticker = str(alert.get("ticker", "")).strip().upper()
+        if ticker and ticker not in best:
+            best[ticker] = alert
+    return list(best.values())[:max(0, int(TOP_ALERTS_TO_SEND if limit is None else limit))]
+
+
+def _deliver_selected_alerts(alerts: list[dict], history: dict) -> dict:
+    valid = []
+    for alert in alerts:
+        if _validate_long_trade_levels(alert)[0]:
+            valid.append(alert)
+        else:
+            _record_setup_evaluation(alert, "SAFETY_REJECTED", alert.get("_df"))
+    selected = _select_final_alerts(valid)
+    selected_ids = {id(a) for a in selected}
+    for alert in valid:
+        if id(alert) not in selected_ids:
+            _record_setup_evaluation(alert, "TOP_EXCLUDED", alert.get("_df"))
+    if not selected:
+        return {"sent": 0, "success": False, "status": "no_valid_selected", "refused": 0}
+    email_copy = [dict(a) for a in selected]
+    email_copy[0]["display_pattern_name"] = "🏆 " + _canonical_pattern_name(email_copy[0])
+    delivery = send_email_alerts(email_copy)
+    if not isinstance(delivery, dict) or not delivery.get("success"):
+        failure = delivery if isinstance(delivery, dict) else {}
+        for alert in selected:
+            _record_setup_evaluation(alert, "SMTP_FAILED", alert.get("_df"))
+        return {"sent": 0, "success": False, "status": failure.get("status", "failed"), "refused": failure.get("refused", 0)}
+    stamp = datetime.now(timezone.utc).isoformat()
+    for alert in selected:
+        alert["sent_at"] = stamp
+        record_alert_sent(alert["ticker"], _canonical_pattern_name(alert), alert.get("breakout_level"), history)
+        log_setup_for_tracking(alert)
+        open_position(alert)
+        log_to_csv(alert["ticker"], (alert.get("meta") or {}).get("score_reasons", []))
+        _record_setup_evaluation(alert, "SENT", alert.get("_df"))
+    save_alert_history(history)
+    log("TOP accepted by email server: " + ", ".join(a["ticker"] for a in selected))
+    return {"sent": len(selected), "success": True, "status": delivery.get("status", "accepted"), "refused": delivery.get("refused", 0)}
+
+
+
+
+def _build_setup_chart_figure(ticker: str, df: pd.DataFrame, alert: dict):
+    """Plot the detector's recorded anchors; never invent a second pattern for display."""
+    from plotly.subplots import make_subplots
+    data = _normalize_yfinance_df(df)
+    if data is None or data.empty:
+        raise ValueError("No chart data")
+    pattern = _canonical_pattern_name(alert)
+    meta = alert.get("meta") or {}
+    signal_date = meta.get("signal_date")
+    if signal_date:
+        signal = pd.Timestamp(signal_date).date()
+        data = data.loc[[pd.Timestamp(x).date() <= signal for x in data.index]]
+    lookback = DB_LOOKBACK if pattern.startswith("Double") else max(TRIANGLE_LOOKBACK, int(meta.get("pattern_bars", 0) or 0) + 25)
+    data = data.tail(max(lookback, 60)).copy()
+    close = data["close"]
+    averages = {"ema21": close.ewm(span=21, adjust=False).mean(), "ema28": close.ewm(span=28, adjust=False).mean(),
+                "ma50": close.rolling(50, min_periods=20).mean(), "ma150": close.rolling(150, min_periods=50).mean(),
+                "ma200": close.rolling(200, min_periods=80).mean()}
+    # Existing full-history indicators take priority; do not rewarm long averages on a short plot window.
+    full = _normalize_yfinance_df(df)
+    for col, span in [("ema21", 21), ("ema28", 28)]:
+        if col not in full:
+            full[col] = full["close"].ewm(span=span, adjust=False).mean()
+    ensure_ma_columns(full)
+    for col in averages:
+        data[col] = full[col].reindex(data.index) if col in full else averages[col]
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.035, row_heights=[0.74, 0.26])
+    fig.add_trace(go.Candlestick(x=data.index, open=data["open"], high=data["high"], low=data["low"], close=data["close"], name="Price"), row=1, col=1)
+    colors = {"ema21": "#2563eb", "ema28": "#0891b2", "ma50": "#16a34a", "ma150": "#ea580c", "ma200": "#64748b"}
+    cols = ["ema28", "ma150", "ma200"]
+    if "Pullback" in pattern or "Retest" in pattern:
+        cols = ["ema21", "ema28", "ma50", "ma150", "ma200"]
+    for col in cols:
+        fig.add_trace(go.Scatter(x=data.index, y=data[col], name=col.upper(), line={"color": colors[col], "width": 1.25}), row=1, col=1)
+    for key, label, color in [("planned_entry", "Planned reference entry", "#15803d"), ("stop_loss", "Initial stop", "#dc2626"), ("target", "Target reference", "#9333ea")]:
+        value = _to_float_or_none(alert.get(key, alert.get("breakout_level") if key == "planned_entry" else None))
+        if value is not None and value > 0:
+            fig.add_hline(y=value, line_color=color, line_dash="dash", annotation_text=f"{label} {value:.2f}", row=1, col=1)
+    pivot = _to_float_or_none(alert.get("pattern_pivot", meta.get("pattern_pivot")))
+    if pivot is not None:
+        fig.add_hline(y=pivot, line_color="#475569", line_dash="dot", annotation_text=f"Pattern pivot {pivot:.2f}", row=1, col=1)
+    for prefix, label, color in [("base", "Base", "#bfdbfe"), ("box", "Box", "#bfdbfe"), ("pullback", "Pullback", "#bbf7d0"), ("retest", "Retest", "#fde68a"), ("tight_area", "Final contraction", "#ddd6fe")]:
+        left, right = meta.get(prefix + "_start"), meta.get(prefix + "_end")
+        if left and right:
+            fig.add_vrect(x0=pd.Timestamp(left), x1=pd.Timestamp(right), fillcolor=color, opacity=0.18, line_width=0, annotation_text=label, row=1, col=1)
+    for key, label in [("base_high", "Base resistance"), ("base_low", "Base support"), ("box_high", "Box resistance"), ("box_low", "Box support"), ("pullback_low", "Pullback low"), ("prior_swing_high", "Prior swing high"), ("retest_low", "Retest low"), ("tight_area_low", "Contraction low")]:
+        value = _to_float_or_none(meta.get(key))
+        if value is not None:
+            fig.add_hline(y=value, line_color="#94a3b8", line_dash="dot", line_width=0.8, annotation_text=label, row=1, col=1)
+    # Legacy detector anchors are shown only when the detector stored them.
+    for key in ("bottom1", "bottom2", "cup_bottom", "handle_low", "support", "support_level"):
+        value = _to_float_or_none(meta.get(key))
+        if value is not None:
+            fig.add_hline(y=value, line_color="#94a3b8", line_dash="dot", annotation_text=key, row=1, col=1)
+    volume_colors = np.where(data["close"] >= data["open"], "#16a34a", "#dc2626")
+    fig.add_trace(go.Bar(x=data.index, y=data["volume"], marker_color=volume_colors, name="Volume"), row=2, col=1)
+    vol_average = full["volume"].shift(1).rolling(20, min_periods=10).mean().reindex(data.index)
+    fig.add_trace(go.Scatter(x=data.index, y=vol_average, name="Prior volume average 20", line={"color": "#f59e0b", "width": 1.3}), row=2, col=1)
+    model = meta.get("target_model", "LEGACY_TARGET_REFERENCE")
+    title = alert.get("display_pattern_name", pattern)
+    fig.update_layout(title=f"{ticker} — {title}<br>Signal {signal_date or 'unrecorded'} | RR {float(alert.get('rr_ratio') or 0):.2f} | target: {model}", template="plotly_white", width=1120, height=800, margin={"l": 55, "r": 190, "t": 95, "b": 55}, legend={"orientation": "h", "y": 1.04}, xaxis_rangeslider_visible=False, xaxis2_rangeslider_visible=False)
+    fig.update_xaxes(rangebreaks=[{"bounds": ["sat", "mon"]}])
+    fig.update_yaxes(title_text="USD", row=1, col=1)
+    fig.update_yaxes(title_text="Volume", row=2, col=1)
+    return fig
+
+
 def create_chart(ticker: str, df: pd.DataFrame, alert: dict) -> str | None:
     if not PLOTLY_AVAILABLE or df is None:
         return None
     try:
-        # חלון גרף: לפי סוג הדפוס — Double Bottom צריך יותר בר
-        chart_lookback = DB_LOOKBACK if alert.get("pattern_type","").startswith("Double") else TRIANGLE_LOOKBACK
-        df_c = df.tail(max(chart_lookback, 60)).copy()
-        fig  = go.Figure(data=[go.Candlestick(
-            x=df_c.index, open=df_c["open"], high=df_c["high"],
-            low=df_c["low"],  close=df_c["close"], name="Price",
-        )])
-        if "ema28" in df_c.columns:
-            fig.add_trace(go.Scatter(x=df_c.index, y=df_c["ema28"], name="EMA28",
-                                      line=dict(color="blue", width=1)))
-        if "ma150" in df_c.columns:
-            fig.add_trace(go.Scatter(x=df_c.index, y=df_c["ma150"], name="MA150",
-                                      line=dict(color="orange", width=1, dash="dash")))
-        if "ma200" in df_c.columns:
-            fig.add_trace(go.Scatter(x=df_c.index, y=df_c["ma200"], name="MA200",
-                                      line=dict(color="gray", width=1, dash="dot")))
-        bl = alert.get("breakout_level")
-        if bl:
-            fig.add_hline(y=bl, line_color="green", line_dash="dash", line_width=2)
-        sl = alert.get("stop_loss")
-        if sl:
-            fig.add_hline(y=sl, line_color="red",   line_dash="dash", line_width=1)
-        tg = alert.get("target")
-        if tg:
-            fig.add_hline(y=tg, line_color="purple",line_dash="dash", line_width=1)
-        fig.update_layout(
-            title=f"{ticker} — {alert.get('pattern_type','')} (Score: {alert.get('score',0):.1f})",
-            xaxis_rangeslider_visible=False, height=550, width=880,
-        )
+        fig = _build_setup_chart_figure(ticker, df, alert)
         path = os.path.join(CHARTS_DIR, f"{ticker}_{int(time.time())}.png")
         pio.write_image(fig, path)
         return path
-    except Exception as e:
-        log(f"create_chart error {ticker}: {e}")
+    except Exception as exc:
+        log(f"Chart export unavailable {ticker}: {type(exc).__name__}: {exc}")
         return None
 
-def send_email_alerts(alerts: list[dict]) -> None:
+def send_email_alerts(alerts: list[dict]) -> dict:
     if not alerts:
-        return
-    if not APP_PASSWORD:
-        log("APP_PASSWORD not set — email disabled."); return
+        return {"success": False, "accepted": 0, "refused": 0, "status": "no_alerts"}
+    if not APP_PASSWORD or not TO_EMAILS:
+        log("Email configuration missing — email disabled.")
+        return {"success": False, "accepted": 0, "refused": len(TO_EMAILS), "status": "disabled"}
 
     alerts = sorted(alerts, key=lambda a: float(a.get("score",0) or 0), reverse=True)
     now_str   = datetime.now().strftime("%d/%m/%Y")
@@ -9800,7 +10078,7 @@ def send_email_alerts(alerts: list[dict]) -> None:
             rs_data = {}
 
         chart_path = None
-        df = alert.pop("_df", None)   # ← מוחק מה-alert לשחרור RAM
+        df = alert.get("_df")  # retain the exact signal frame until selection/history finish
         if df is None or (hasattr(df, "empty") and df.empty):
             df = fetch_data_twelvedata(ticker, outputsize=TRIANGLE_LOOKBACK + 10)
         if df is not None and not df.empty:
@@ -9848,12 +10126,16 @@ def send_email_alerts(alerts: list[dict]) -> None:
         msg.attach(att)
 
     try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as srv:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as srv:
             srv.login(FROM_EMAIL, APP_PASSWORD)
-            srv.sendmail(FROM_EMAIL, TO_EMAILS, msg.as_string())
-        log(f"Email sent: {len(alerts)} alert(s) to {len(TO_EMAILS)} recipients.")
+            refused = srv.sendmail(FROM_EMAIL, TO_EMAILS, msg.as_string()) or {}
+        accepted = len(TO_EMAILS) - len(refused)
+        log(f"Email server accepted {len(alerts)} alert(s) for {accepted}/{len(TO_EMAILS)} recipients; refused={len(refused)}")
+        return {"success": accepted > 0, "accepted": accepted, "refused": len(refused),
+                "status": "accepted" if not refused else "partial"}
     except Exception as e:
-        log(f"Email send error: {e}")
+        log(f"Email send error: {type(e).__name__}: {e}")
+        return {"success": False, "accepted": 0, "refused": len(TO_EMAILS), "status": "failed"}
 def send_daily_summary_email(stats: dict, filter_stats: dict, regime: dict | None = None,
                              prefilter_stats: dict | None = None, note: str = "") -> None:
     """
@@ -10317,6 +10599,7 @@ def _run_saturday_maintenance_if_due() -> bool:
         return False
 
     log("🧠 Saturday maintenance — running weekly self-learning before Market Day Guard...")
+    update_performance_log()
     result = run_self_learning()
     try:
         os.makedirs(os.path.dirname(SATURDAY_MAINTENANCE_STATE_FILE) or ".", exist_ok=True)
@@ -10555,11 +10838,6 @@ def main() -> None:
                     filter_stats["score_low"] += 1
                     continue
                 all_alerts.append(alert)
-                record_alert_sent(symbol, alert.get("pattern_type",""),
-                                  alert.get("breakout_level"), alert_history)
-                log_setup_for_tracking(alert)
-                open_position(alert)
-                log_to_csv(symbol, alert.get("meta", {}).get("score_reasons", []))
                 accepted_count += 1
 
             if accepted_count == 0:
@@ -10582,32 +10860,19 @@ def main() -> None:
         log("No valid setups found today.")
         try:
             send_daily_summary_email(stats, filter_stats, regime, PREFILTER_STATS)
-        except Exception:
+        except Exception as e:
             stats["errors"] += 1
             log(f"Daily summary email error: {type(e).__name__}: {e}")
     else:
-        all_alerts.sort(key=lambda a: float(a.get("score",0) or 0), reverse=True)
-        # בחר את הסטאפ הכי טוב לכל טיקר, אחרי שכל הסריקה הסתיימה
-        best_per_ticker = {}
-        for a in all_alerts:
-            t = a.get("ticker","")
-            if t not in best_per_ticker:
-                best_per_ticker[t] = a  # הראשון = הכי גבוה (כבר ממוין)
-        # מיין את הטיקרים לפי ציון הסטאפ הטוב ביותר שלהם ובחר TOP 3
-        top = sorted(best_per_ticker.values(),
-                     key=lambda a: float(a.get("score",0) or 0),
-                     reverse=True)[:TOP_ALERTS_TO_SEND]
-        # הוסף trophy רק למייל — לא מוטציה על dict שכבר נרשם בהיסטוריה
-        top_for_email = [dict(a) for a in top]  # shallow copy
-        if top_for_email:
-            top_for_email[0]["pattern_type"] = "🏆 " + top_for_email[0].get("pattern_type","Best Setup")
-        try:
-            send_email_alerts(top_for_email)
-            stats["sent"] = len(top)
-            log("TOP: " + ", ".join(f"{a['ticker']}({a['score']})" for a in top))
-        except Exception:
+        delivery = _deliver_selected_alerts(all_alerts, alert_history)
+        stats["sent"] = delivery["sent"]
+        stats["email_status"] = delivery["status"]
+        stats["email_refused_recipients"] = delivery.get("refused", 0)
+        if not delivery["success"]:
             stats["errors"] += 1
-            log(f"Email error: {type(e).__name__}: {e}")
+            stats["entry_email_failed"] = True
+
+    _flush_setup_evaluations()
 
     # נקה DataFrames מהזיכרון אחרי שסיימנו לשלוח מיילים וליצור גרפים
     for a in all_alerts:
@@ -10662,6 +10927,10 @@ def main() -> None:
             log("🧪 V9.3 ENTRY FUNNEL — by pattern: " + " | ".join(parts[:10]))
     except Exception as e:
         log(f"Entry diagnostics summary error: {e}")
+
+    if stats.get("entry_email_failed"):
+        log("Full scan finished, but entry email failed; market candle remains eligible for retry.")
+        raise RuntimeError("Entry email delivery failed")
 
     try:
         save_last_market_scan_date(market_session_date)
