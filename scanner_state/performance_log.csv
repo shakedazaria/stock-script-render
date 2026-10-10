@@ -11,3 +11,4 @@ date_sent,ticker,pattern,entry,stop,target,score,rr,price_5d,price_10d,price_20d
 2026-10-01,SCSC,EMA21/MA50 Pullback Bounce,58.13,55.76,66.78,90.5,2.71,60.94,,,OPEN (+4.8%),,,False
 2026-10-06,BIO,EMA21/MA50 Pullback Bounce,369.4,351.53,450.54,78.8,2.5,,,,,,,False
 2026-10-06,URGN,EMA21/MA50 Pullback Bounce,41.82,39.52,50.93,75.7,2.5,,,,,,,False
+2026-10-10,WCC,EMA21/MA50 Pullback Bounce,364.92,350.54,403.57,79.7,2.5,,,,,,,False
