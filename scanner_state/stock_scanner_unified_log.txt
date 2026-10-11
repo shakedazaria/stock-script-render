@@ -88454,3 +88454,13 @@
 [2026-10-10 09:19:34]    🧹 stock_scanner_unified_log.txt: 92624 → 88446 (removed 4178) | ok
 [2026-10-10 09:19:34] Stock Scanner Unified — DONE
 [2026-10-10 09:19:34] ============================================================
+[2026-10-11 08:37:48] ============================================================
+[2026-10-11 08:37:48] Stock Scanner Unified — START
+[2026-10-11 08:37:48] Code version: 2026-10-10-v9.4-research-validation
+[2026-10-11 08:37:48] Market cap threshold: $1.0B | Pipeline: screener cache → precheck unknowns → fail-open only if unresolved
+[2026-10-11 08:37:48] Entry Ready threshold: quality>=60.0 | candidate_score>=35.0
+[2026-10-11 08:37:48] RESET VERIFIED FIX FILE
+[2026-10-11 08:37:48] ============================================================
+[2026-10-11 08:37:58] 🛡️ Market Day Guard candles: Yahoo:SPY=2026-10-09 close=778.570007 vol=22596500, Yahoo:QQQ=2026-10-09 close=751.27002 vol=21122000, TwelveData:SPY=2026-10-09 close=778.57001 vol=22596500
+[2026-10-11 08:37:58] 🗓️ Market Day Guard: אין תאריך חדש ואין שינוי ב-OHLCV מאז הסריקה האחרונה (2026-10-09); אומת מול 2 מקור/ות זהים
+[2026-10-11 08:37:58] ⏸️ No new market session — exiting before scan to prevent duplicate alerts.
