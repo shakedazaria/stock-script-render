@@ -2646,7 +2646,7 @@
       "status": "HOLD",
       "score": 20.0,
       "signals": [
-        "\u05e1\u05d2\u05d9\u05e8\u05d4 \u05de\u05ea\u05d7\u05ea EMA10 (93.84 < 94.07)",
+        "\u05e1\u05d2\u05d9\u05e8\u05d4 \u05de\u05ea\u05d7\u05ea EMA10 (91.60 < 93.62)",
         "RS vs SPY \u05e0\u05d7\u05dc\u05e9 \u05d1\u05d9\u05d5\u05ea\u05e8 \u05de-2% \u05d1-5 \u05d9\u05de\u05d9\u05dd \u05d5\u05e0\u05de\u05e6\u05d0 \u05de\u05ea\u05d7\u05ea EMA5 \u05e9\u05dc \u05e7\u05d5 \u05d4-RS"
       ],
       "categories": [
@@ -2656,15 +2656,15 @@
       "profit_protection_active": true,
       "profit_exit_floor": 89.1771,
       "max_profit_pct": 21.09,
-      "closed_bar_date": "2026-10-09",
+      "closed_bar_date": "2026-10-12",
       "target_reached": false,
       "exit_confirmed": false,
       "exit_reason": null
     },
     "max_profit_pct": 21.09,
     "target_reached": false,
-    "last_tracker_price": 93.83999633789062,
-    "last_tracker_date": "2026-10-10"
+    "last_tracker_price": 91.5999984741211,
+    "last_tracker_date": "2026-10-13"
   },
   {
     "ticker": "NTCT",
@@ -2688,21 +2688,27 @@
     "profit_protection_active": true,
     "exit_intelligence": {
       "status": "HOLD",
-      "score": 0.0,
-      "signals": [],
-      "categories": [],
+      "score": 20.0,
+      "signals": [
+        "\u05e1\u05d2\u05d9\u05e8\u05d4 \u05de\u05ea\u05d7\u05ea EMA10 (40.05 < 40.10)",
+        "RS vs SPY \u05e0\u05d7\u05dc\u05e9 \u05d1\u05d9\u05d5\u05ea\u05e8 \u05de-2% \u05d1-5 \u05d9\u05de\u05d9\u05dd \u05d5\u05e0\u05de\u05e6\u05d0 \u05de\u05ea\u05d7\u05ea EMA5 \u05e9\u05dc \u05e7\u05d5 \u05d4-RS"
+      ],
+      "categories": [
+        "price",
+        "relative"
+      ],
       "profit_protection_active": true,
       "profit_exit_floor": 39.06,
       "max_profit_pct": 7.04,
-      "closed_bar_date": "2026-10-09",
+      "closed_bar_date": "2026-10-12",
       "target_reached": false,
       "exit_confirmed": false,
       "exit_reason": null
     },
     "max_profit_pct": 7.04,
     "target_reached": false,
-    "last_tracker_price": 40.689998626708984,
-    "last_tracker_date": "2026-10-10",
+    "last_tracker_price": 40.04999923706055,
+    "last_tracker_date": "2026-10-13",
     "profit_exit_floor": 39.06
   },
   {
@@ -2831,7 +2837,7 @@
     "stop_current": 15.41255,
     "target": 19.008625000000006,
     "date_open": "2026-09-25",
-    "highest_price": 18.190000534057617,
+    "highest_price": 18.344999313354492,
     "stop_method": "fixed_initial_plus_exit_intelligence",
     "trailing_status": "disabled_v9.2",
     "closed": false,
@@ -2840,26 +2846,26 @@
     "close_date": null,
     "pnl_pct": null,
     "data_status": "ok",
-    "highest_closed_price": 18.190000534057617,
+    "highest_closed_price": 18.344999313354492,
     "profit_protection_active": true,
-    "profit_exit_floor": 16.441,
+    "profit_exit_floor": 16.6314,
     "exit_intelligence": {
       "status": "HOLD",
       "score": 0.0,
       "signals": [],
       "categories": [],
       "profit_protection_active": true,
-      "profit_exit_floor": 16.441,
-      "max_profit_pct": 12.7,
-      "closed_bar_date": "2026-10-09",
+      "profit_exit_floor": 16.6314,
+      "max_profit_pct": 13.66,
+      "closed_bar_date": "2026-10-12",
       "target_reached": false,
       "exit_confirmed": false,
       "exit_reason": null
     },
-    "max_profit_pct": 12.7,
+    "max_profit_pct": 13.66,
     "target_reached": false,
-    "last_tracker_price": 18.110000610351562,
-    "last_tracker_date": "2026-10-10",
+    "last_tracker_price": 18.290000915527344,
+    "last_tracker_date": "2026-10-13",
     "soft_warnings": []
   },
   {
@@ -2901,7 +2907,7 @@
       "profit_protection_active": true,
       "profit_exit_floor": 58.3621,
       "max_profit_pct": 9.01,
-      "closed_bar_date": "2026-10-09",
+      "closed_bar_date": "2026-10-12",
       "target_reached": false,
       "exit_confirmed": false,
       "exit_reason": null
@@ -2912,8 +2918,8 @@
     "close_date": null,
     "pnl_pct": null,
     "data_status": "ok",
-    "last_tracker_price": 60.93000030517578,
-    "last_tracker_date": "2026-10-10",
+    "last_tracker_price": 60.66999816894531,
+    "last_tracker_date": "2026-10-13",
     "soft_warnings": []
   },
   {
@@ -3046,9 +3052,9 @@
     "target": 403.56877487500014,
     "target_reference": 403.56877487500014,
     "date_open": "2026-10-10",
-    "highest_price": 364.92001,
-    "highest_closed_price": 364.92001,
-    "max_profit_pct": 0.0,
+    "highest_price": 369.2200012207031,
+    "highest_closed_price": 369.2200012207031,
+    "max_profit_pct": 1.18,
     "stop_method": "fixed_initial_plus_exit_intelligence",
     "trailing_status": "disabled_v9.2",
     "profit_protection_active": false,
@@ -3071,12 +3077,26 @@
     "exit_intelligence": {
       "status": "BUILDING",
       "score": 0.0,
-      "signals": []
+      "signals": [
+        "Profit Protection \u05de\u05de\u05ea\u05d9\u05df \u05dc-+5.0% (\u05e9\u05d9\u05d0 \u05db\u05e8\u05d2\u05e2 +1.2%)"
+      ],
+      "categories": [],
+      "profit_protection_active": false,
+      "profit_exit_floor": null,
+      "max_profit_pct": 1.18,
+      "closed_bar_date": "2026-10-12",
+      "target_reached": false,
+      "exit_confirmed": false,
+      "exit_reason": null
     },
     "closed": false,
     "close_reason": null,
     "close_price": null,
     "close_date": null,
-    "pnl_pct": null
+    "pnl_pct": null,
+    "data_status": "ok",
+    "last_tracker_price": 361.3399963378906,
+    "last_tracker_date": "2026-10-13",
+    "soft_warnings": []
   }
 ]
