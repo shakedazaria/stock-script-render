@@ -1,0 +1,20 @@
+{
+  "status": "insufficient_data",
+  "samples": 0,
+  "insights": [
+    "Entry 60 / Professional 75 remain unchanged; collect sent and rejected outcomes before calibration."
+  ],
+  "new_params": {},
+  "pattern_stats": {},
+  "code_version": "2026-10-10-v9.4-research-validation",
+  "mode": "REPORT_ONLY",
+  "model": "NEXT_OPEN_COUNTERFACTUAL_BRACKET",
+  "limitations": [
+    "candidate observations are correlated",
+    "daily intrabar order may be unknown",
+    "not broker fills",
+    "not the V9.2 target-reference exit strategy",
+    "no out-of-sample calibration yet"
+  ],
+  "shadow_samples": 0
+}
