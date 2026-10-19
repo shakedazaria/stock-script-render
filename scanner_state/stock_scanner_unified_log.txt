@@ -87441,3 +87441,13 @@
 [2026-10-18 07:09:18] 🛡️ Market Day Guard candles: Yahoo:SPY=2026-10-16 close=763.25 vol=64035200, Yahoo:QQQ=2026-10-16 close=709.799988 vol=66693300, TwelveData:SPY=2026-10-16 close=763.25 vol=64035200
 [2026-10-18 07:09:18] 🗓️ Market Day Guard: אין תאריך חדש ואין שינוי ב-OHLCV מאז הסריקה האחרונה (2026-10-16); אומת מול 2 מקור/ות זהים
 [2026-10-18 07:09:18] ⏸️ No new market session — exiting before scan to prevent duplicate alerts.
+[2026-10-19 07:36:34] ============================================================
+[2026-10-19 07:36:34] Stock Scanner Unified — START
+[2026-10-19 07:36:34] Code version: 2026-10-10-v9.4-research-validation
+[2026-10-19 07:36:34] Market cap threshold: $1.0B | Pipeline: screener cache → precheck unknowns → fail-open only if unresolved
+[2026-10-19 07:36:34] Entry Ready threshold: quality>=60.0 | candidate_score>=35.0
+[2026-10-19 07:36:34] RESET VERIFIED FIX FILE
+[2026-10-19 07:36:34] ============================================================
+[2026-10-19 07:36:44] 🛡️ Market Day Guard candles: Yahoo:SPY=2026-10-16 close=763.25 vol=64035200, Yahoo:QQQ=2026-10-16 close=709.799988 vol=66693300, TwelveData:SPY=2026-10-16 close=763.25 vol=64035200
+[2026-10-19 07:36:44] 🗓️ Market Day Guard: אין תאריך חדש ואין שינוי ב-OHLCV מאז הסריקה האחרונה (2026-10-16); אומת מול 2 מקור/ות זהים
+[2026-10-19 07:36:44] ⏸️ No new market session — exiting before scan to prevent duplicate alerts.
