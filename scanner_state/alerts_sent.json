@@ -1,24 +1,4 @@
 {
-  "WT": {
-    "time": 1789972523.512902,
-    "patterns": [
-      {
-        "name": "EMA21/MA50 Pullback Bounce",
-        "level": 22.8,
-        "time": 1789972523.512902
-      }
-    ]
-  },
-  "VOYA": {
-    "time": 1789973270.031991,
-    "patterns": [
-      {
-        "name": "EMA21/MA50 Pullback Bounce",
-        "level": 101.23,
-        "time": 1789973270.031991
-      }
-    ]
-  },
   "BIO": {
     "time": 1791277889.31868,
     "patterns": [
@@ -30,8 +10,6 @@
     ]
   },
   "BIO_EMA21/MA50 Pullback Bounce_66": "2026-10-06T09:11:29.318681",
-  "WT_EMA21/MA50 Pullback Bounce_66": "2026-09-21T06:35:23.512903",
-  "VOYA_EMA21/MA50 Pullback Bounce_66": "2026-09-21T06:47:50.031992",
   "MQ": {
     "time": 1790318531.043067,
     "patterns": [

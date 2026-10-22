@@ -2854,28 +2854,24 @@
     "data_status": "ok",
     "highest_closed_price": 19.3799991607666,
     "profit_protection_active": true,
-    "profit_exit_floor": 17.5346,
+    "profit_exit_floor": 17.5624,
     "exit_intelligence": {
       "status": "RIDE_WINNER",
-      "score": 15.0,
-      "signals": [
-        "Shooting Star / upper-wick rejection"
-      ],
-      "categories": [
-        "candle"
-      ],
+      "score": 0.0,
+      "signals": [],
+      "categories": [],
       "profit_protection_active": true,
-      "profit_exit_floor": 17.5346,
+      "profit_exit_floor": 17.5624,
       "max_profit_pct": 20.07,
-      "closed_bar_date": "2026-10-20",
+      "closed_bar_date": "2026-10-21",
       "target_reached": true,
       "exit_confirmed": false,
       "exit_reason": null
     },
     "max_profit_pct": 20.07,
     "target_reached": true,
-    "last_tracker_price": 18.75,
-    "last_tracker_date": "2026-10-21",
+    "last_tracker_price": 18.799999237060547,
+    "last_tracker_date": "2026-10-22",
     "soft_warnings": []
   },
   {
@@ -2917,7 +2913,7 @@
       "profit_protection_active": true,
       "profit_exit_floor": 58.3621,
       "max_profit_pct": 9.01,
-      "closed_bar_date": "2026-10-20",
+      "closed_bar_date": "2026-10-21",
       "target_reached": false,
       "exit_confirmed": false,
       "exit_reason": null
@@ -2928,8 +2924,8 @@
     "close_date": null,
     "pnl_pct": null,
     "data_status": "ok",
-    "last_tracker_price": 60.22999954223633,
-    "last_tracker_date": "2026-10-21",
+    "last_tracker_price": 61.04999923706055,
+    "last_tracker_date": "2026-10-22",
     "soft_warnings": []
   },
   {
