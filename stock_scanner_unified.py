@@ -29,13 +29,15 @@ stock_scanner_unified.py
   Target כיעד ייחוס, וזיהוי שינוי כיוון רב-סיגנלי על נרות יומיים סגורים.
   V9.3 מוסיף Pattern-Aware Entry: אישור כניסה מותאם לסוג הסטאפ (Breakout / Pullback / Retest),
   תיקון דיוק R:R, עקביות טובה יותר ב-EMA28 Pre-filter ובדיקת Earnings עתידית בלבד.
+  V9.6 בוחר Pullback אחרי שיא מקומי, משווה ווליום ל-20 נרות קודמים,
+  ובודק את כל משפחות התבניות לפני בחירת הסטאפים לשליחה.
 """
 
 # ============================================================
 # RESET VERIFIED FIX FILE — 2026-09-30 V9.3
 # This marker proves this is the rebuilt fixed file, not an old download copy.
 # ============================================================
-CODE_VERSION = "2026-10-10-v9.4-research-validation"
+CODE_VERSION = "2026-10-23-v9.6.2-email-design"
 RESET_VERIFIED_FIX_FILE = True
 
 
@@ -57,6 +59,516 @@ from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email import encoders
+
+# Infrastructure only. No trading thresholds or indicator calculations here.
+import sys
+import io
+import ssl
+import logging
+from logging.handlers import RotatingFileHandler
+import tempfile
+import shutil
+import threading
+import contextlib
+import contextvars
+import functools
+import base64
+import codecs
+import math
+from urllib.parse import quote, quote_plus
+
+
+def _infra_float(value, default=None, *, minimum=None, maximum=None):
+    """Finite parsing for operational settings/presentation, never indicators."""
+    try:
+        result = float(value)
+        if not math.isfinite(result):
+            return default
+        if minimum is not None:
+            result = max(minimum, result)
+        if maximum is not None:
+            result = min(maximum, result)
+        return result
+    except (TypeError, ValueError, OverflowError):
+        return default
+
+
+def _infra_int(value, default=0, *, minimum=None, maximum=None):
+    number = _infra_float(value)
+    if number is None:
+        return default
+    result = int(number)
+    if minimum is not None:
+        result = max(minimum, result)
+    if maximum is not None:
+        result = min(maximum, result)
+    return result
+
+
+def _mail_float(value):
+    """Invalid financial presentation data must not be displayed as zero profit."""
+    result = _infra_float(value)
+    if result is None:
+        raise ValueError("Non-finite notification value")
+    return result
+
+
+_PRIVACY_LOCK = threading.RLock()
+_SECRET_SNAPSHOT = None
+_SECRET_REPLACEMENTS = ()
+_SECRET_NAME = re.compile(r"(?:^|_)(?:api_?keys?|keys?|tokens?|secrets?|passwords?|passwd|pass|pwd|credentials?|authorization|cookie|private_key|client_secret|emails?)(?:_|$)", re.I)
+# A linear token pass avoids catastrophic backtracking on long provider errors.
+_EMAIL_TOKEN_PATTERN = re.compile(r"[^\s<>\"',;]+")
+_CREDENTIAL_LABEL = r"(?:api[_-]?key|access[_-]?token|refresh[_-]?token|token|app[_-]?password|password|passwd|client[_-]?secret|authorization)"
+_QUOTED_CREDENTIAL = re.compile(r"(" + _CREDENTIAL_LABEL + r"[\"']?\s*(?:=|:|%3d|%253d)\s*)([\"'])(.*?)\2", re.I | re.S)
+_PLAIN_CREDENTIAL = re.compile(r"(" + _CREDENTIAL_LABEL + r"[\"']?\s*(?:=|:|%3d|%253d)\s*)[^\s&\"',;)}\]]+", re.I)
+_BEARER = re.compile(r"\b(Bearer|Basic|AUTH\s+(?:PLAIN|LOGIN))\s+[^\s\"']+", re.I)
+_URL_AUTH = re.compile(r"(https?://)[^/\s:@]+:[^@\s/]+@", re.I)
+_MAX_PRIVATE_EVENT = 65536
+
+
+def _current_secret_replacements():
+    global _SECRET_SNAPSHOT, _SECRET_REPLACEMENTS
+    pairs = [(name, value) for name, value in os.environ.items() if _SECRET_NAME.search(name) and value]
+    # Current globals cover secrets loaded before an environment variable was
+    # removed/rotated. Only one snapshot is retained, never an unlimited history.
+    for name in ("FROM_EMAIL", "APP_PASSWORD", "TO_EMAILS", "API_KEYS"):
+        value = globals().get(name)
+        if isinstance(value, str) and value:
+            pairs.append((name, value))
+        elif isinstance(value, (list, tuple, set)):
+            pairs.extend((name, item) for item in value if isinstance(item, str) and item)
+    snapshot = tuple(sorted(pairs))
+    with _PRIVACY_LOCK:
+        if snapshot != _SECRET_SNAPSHOT:
+            values = set()
+            for name, value in snapshot:
+                values.add(value)
+                values.update(part.strip() for part in re.split(r"[,;\r\n]", value) if part.strip())
+                if "PASSWORD" in name.upper():
+                    values.add(value.replace(" ", ""))
+            encoded = set()
+            for value in values:
+                if not value:
+                    continue
+                encoded.update((value, quote(value, safe=""), quote_plus(value),
+                                quote(quote(value, safe=""), safe=""),
+                                json.dumps(value, ensure_ascii=True)[1:-1]))
+                if len(value) >= 4:
+                    encoded.add(base64.b64encode(value.encode("utf-8")).decode("ascii"))
+            _SECRET_REPLACEMENTS = tuple(sorted(encoded, key=len, reverse=True))
+            _SECRET_SNAPSHOT = snapshot
+        return _SECRET_REPLACEMENTS
+
+
+def _redact_sensitive(value):
+    """Fail closed; never fall back to the unfiltered exception/message."""
+    try:
+        text = str(value)
+        if len(text) > _MAX_PRIVATE_EVENT:
+            return ""
+        replacements = _current_secret_replacements()
+        for secret in replacements:
+            text = text.replace(secret, "[REDACTED]")
+            if len(text) > _MAX_PRIVATE_EVENT:
+                return ""
+        text = _QUOTED_CREDENTIAL.sub(lambda m: m.group(1) + "[REDACTED]", text)
+        text = _PLAIN_CREDENTIAL.sub(lambda m: m.group(1) + "[REDACTED]", text)
+        text = _BEARER.sub(lambda m: m.group(1) + " [REDACTED]", text)
+        text = _URL_AUTH.sub(r"\1[REDACTED]@", text)
+        result = _EMAIL_TOKEN_PATTERN.sub(
+            lambda match: "[REDACTED_EMAIL]" if any(marker in match.group(0).lower()
+                for marker in ("@", "%40", "%2540", "\\u0040")) else match.group(0), text)
+        # Even the masking marker must not accidentally equal a configured secret.
+        return "" if any(secret in result for secret in replacements) else result
+    except Exception:
+        return ""
+
+
+def _redact_log_value(value):
+    """Protect diagnostic strings while preserving numerical observations."""
+    if isinstance(value, str):
+        return _redact_sensitive(value)
+    if isinstance(value, dict):
+        return {key: _redact_log_value(item) for key, item in value.items()}
+    if isinstance(value, (tuple, list)):
+        return [_redact_log_value(item) for item in value]
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    return value
+
+
+class _PrivateBinaryOutput(io.RawIOBase):
+    def __init__(self, owner):
+        self.owner = owner
+        self.decoder = codecs.getincrementaldecoder("utf-8")("replace")
+
+    def writable(self):
+        return True
+
+    def write(self, value):
+        data = bytes(value)
+        self.owner.write(self.decoder.decode(data))
+        return len(data)
+
+    def flush(self):
+        self.owner.flush()
+
+
+class _PrivateOutput(io.TextIOBase):
+    """Line-buffered redaction also catches third-party stderr/stdout writes.
+
+    flush() does not release incomplete lines: doing so could leak the first
+    half of a secret written in separate chunks. Oversized lines are discarded.
+    """
+    _scanner_private_output = True
+
+    def __init__(self, stream):
+        self.stream = stream
+        self.pending = ""
+        self.dropping = False
+        self.lock = threading.RLock()
+        self.sanitize = _redact_sensitive
+        self._binary = _PrivateBinaryOutput(self)
+
+    @property
+    def buffer(self):
+        return self._binary
+
+    @property
+    def encoding(self):
+        return getattr(self.stream, "encoding", "utf-8")
+
+    def writable(self):
+        return True
+
+    def isatty(self):
+        return False
+
+    def write(self, value):
+        text = str(value)
+        with self.lock:
+            pieces = text.splitlines(keepends=True)
+            for piece in pieces:
+                ended = piece.endswith(("\n", "\r"))
+                if not self.dropping:
+                    if len(self.pending) + len(piece) > _MAX_PRIVATE_EVENT:
+                        self.stream.write(self.sanitize("[REDACTED_OVERSIZED_OUTPUT]") + "\n")
+                        self.pending = ""
+                        self.dropping = True
+                    else:
+                        self.pending += piece
+                if ended:
+                    if not self.dropping:
+                        self.stream.write(self.sanitize(self.pending).replace("\r", "\\r"))
+                    self.pending = ""
+                    self.dropping = False
+        return len(text)
+
+    def flush(self):
+        with self.lock:
+            self.stream.flush()
+
+
+def _install_output_privacy():
+    for name in ("stdout", "stderr"):
+        stream = getattr(sys, name)
+        if getattr(stream, "_scanner_private_output", False):
+            stream.sanitize = _redact_sensitive
+        elif stream is not None:
+            setattr(sys, name, _PrivateOutput(stream))
+    base_factory = logging.getLogRecordFactory()
+    base_factory = getattr(base_factory, "_scanner_base_factory", base_factory)
+
+    def private_record(*args, **kwargs):
+        record = base_factory(*args, **kwargs)
+        try:
+            record.msg = _redact_sensitive(record.getMessage())
+            record.args = ()
+            if record.exc_info:
+                record.exc_text = _redact_sensitive("".join(traceback.format_exception(*record.exc_info)))
+                record.exc_info = None
+            if record.stack_info:
+                record.stack_info = _redact_sensitive(record.stack_info)
+        except Exception:
+            record.msg, record.args, record.exc_info, record.exc_text = "[REDACTED_LOG_RECORD]", (), None, None
+        return record
+
+    private_record._scanner_base_factory = base_factory
+    logging.setLogRecordFactory(private_record)
+    logging.raiseExceptions = False
+
+
+class _PrivateFormatter(logging.Formatter):
+    def format(self, record):
+        return _redact_sensitive(super().format(record))
+
+
+class _PrivateRotatingHandler(RotatingFileHandler):
+    def _open(self):
+        flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(self.baseFilename, flags, 0o600)
+        try:
+            if hasattr(os, "fchmod"):
+                os.fchmod(fd, 0o600)
+            return os.fdopen(fd, "a", encoding="utf-8")
+        except BaseException:
+            os.close(fd)
+            raise
+
+    def handleError(self, record):
+        # Logging I/O failure must not print the original record or traceback.
+        try:
+            sys.stderr.write("Protected log file unavailable\n")
+        except Exception:
+            pass
+
+
+_APP_LOG_LOCK = threading.RLock()
+
+
+def _protected_logger():
+    logger = logging.getLogger("stock_scanner.private")
+    target = os.path.abspath(globals().get("LOGFILE", "stock_scanner_unified_log.txt"))
+    with _APP_LOG_LOCK:
+        configuration = (target, id(sys.stdout))
+        if getattr(logger, "_scanner_configuration", None) != configuration:
+            for handler in logger.handlers[:]:
+                logger.removeHandler(handler)
+                handler.close()
+            formatter = _PrivateFormatter("[%(asctime)s] %(message)s", "%Y-%m-%d %H:%M:%S")
+            console = logging.StreamHandler(sys.stdout)
+            console.setFormatter(formatter)
+            logger.addHandler(console)
+            try:
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                file_handler = _PrivateRotatingHandler(target, maxBytes=_infra_int(
+                    os.getenv("INFRA_LOG_MAX_BYTES", "5242880"), 5242880,
+                    minimum=65536, maximum=52428800), backupCount=_infra_int(
+                    os.getenv("INFRA_LOG_BACKUPS", "3"), 3, minimum=1, maximum=10),
+                    encoding="utf-8", delay=True)
+                file_handler.setFormatter(formatter)
+                logger.addHandler(file_handler)
+            except Exception:
+                pass
+            logger.setLevel(logging.INFO)
+            logger.propagate = False
+            logger._scanner_configuration = configuration
+        return logger
+
+
+def _close_private_log_handlers():
+    logger = logging.getLogger("stock_scanner.private")
+    with _APP_LOG_LOCK:
+        for handler in logger.handlers[:]:
+            logger.removeHandler(handler)
+            try:
+                handler.close()
+            except Exception:
+                pass
+        logger._scanner_configuration = None
+
+
+def _mail_status(status, *, accepted=0, refused=0, success=False, **extra):
+    return {"success": bool(success), "accepted": _infra_int(accepted, 0, minimum=0),
+            "refused": _infra_int(refused, 0, minimum=0), "status": status, **extra}
+
+
+def _email_configured():
+    return bool(FROM_EMAIL and APP_PASSWORD and TO_EMAILS
+                and APP_PASSWORD not in ("YOUR_APP_PASSWORD_HERE", "YOUR_PASSWORD", "CHANGEME")
+                and not any(c in str(FROM_EMAIL) for c in "\r\n")
+                and all(isinstance(address, str) and not any(c in address for c in "\r\n") for address in TO_EMAILS))
+
+
+def _smtp_deliver(message, purpose="notification"):
+    """One bounded, verified-TLS delivery attempt; no ambiguous automatic resend."""
+    client = None
+    stage = "serialization"
+    try:
+        _install_output_privacy()
+        if not _email_configured():
+            return _mail_status("disabled", refused=len(TO_EMAILS))
+        payload = message.as_string()
+        context = ssl.create_default_context()
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+        timeout = _infra_float(os.getenv("SMTP_TIMEOUT_SECONDS", "30"), 30.0,
+                               minimum=1.0, maximum=30.0)
+        stage = "connect"
+        client = smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=timeout,
+                                  context=context, local_hostname="scanner.local")
+        client.set_debuglevel(0)
+        stage = "authentication"
+        client.login(FROM_EMAIL, APP_PASSWORD)
+        stage = "send"
+        refused = client.sendmail(FROM_EMAIL, TO_EMAILS, payload)
+        if refused is None:
+            refused = {}
+        if not isinstance(refused, dict):
+            raise TypeError("Invalid SMTP response shape")
+        refused_count = min(len(TO_EMAILS), len(refused))
+        accepted = len(TO_EMAILS) - refused_count
+        result = _mail_status("accepted" if not refused_count else "partial" if accepted else "failed",
+                              accepted=accepted, refused=refused_count, success=accepted > 0)
+        log(f"SMTP {purpose}: status={result['status']}, accepted={accepted}, refused={refused_count}")
+        return result
+    except Exception as exc:
+        code = _infra_int(getattr(exc, "smtp_code", None), None, minimum=100, maximum=599)
+        retryable = isinstance(exc, (TimeoutError, ConnectionError, smtplib.SMTPServerDisconnected)) or (code is not None and 400 <= code < 500)
+        known_rejection = isinstance(exc, (smtplib.SMTPResponseException, smtplib.SMTPRecipientsRefused))
+        uncertain = stage == "send" and not known_rejection
+        # The provider's error body and recipients are deliberately not logged.
+        error_type = _redact_sensitive(type(exc).__name__)
+        log(f"SMTP {purpose}: failed at {stage}; type={error_type}; code={code}; uncertain={uncertain}")
+        return _mail_status("failed", refused=len(TO_EMAILS), error_type=error_type,
+                            smtp_code=code, retryable=retryable, uncertain=uncertain)
+    finally:
+        if client is not None:
+            try:
+                client.close()
+            except Exception:
+                log("SMTP socket cleanup failed")
+
+
+_MAIL_CHART_DIRECTORY = contextvars.ContextVar("scanner_mail_chart_directory", default=None)
+
+
+@contextlib.contextmanager
+def _mail_chart_workspace():
+    os.makedirs(CHARTS_DIR, exist_ok=True)
+    directory = tempfile.mkdtemp(prefix="scanner-mail-", dir=CHARTS_DIR)
+    token = _MAIL_CHART_DIRECTORY.set(directory)
+    try:
+        yield directory
+    finally:
+        _MAIL_CHART_DIRECTORY.reset(token)
+        for attempt in range(2):
+            try:
+                shutil.rmtree(directory)
+                break
+            except FileNotFoundError:
+                break
+            except OSError:
+                if attempt == 1:
+                    log("Temporary chart cleanup failed; startup orphan cleanup will retry")
+
+
+def _chart_in_mail_workspace(path):
+    directory = _MAIL_CHART_DIRECTORY.get()
+    try:
+        return bool(directory and os.path.commonpath((os.path.realpath(directory), os.path.realpath(path))) == os.path.realpath(directory))
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+def _nonfatal_mail(function):
+    @functools.wraps(function)
+    def wrapped(*args, **kwargs):
+        try:
+            _install_output_privacy()
+            context = _mail_chart_workspace() if function.__name__ == "send_email_alerts" and _email_configured() and args and args[0] else contextlib.nullcontext()
+            with context:
+                result = function(*args, **kwargs)
+            return result if isinstance(result, dict) else _mail_status("skipped")
+        except Exception as exc:
+            log(f"Mail assembly failed ({function.__name__}): {type(exc).__name__}")
+            return _mail_status("failed", refused=len(TO_EMAILS), error_type=_redact_sensitive(type(exc).__name__), retryable=False)
+    return wrapped
+
+
+def _cleanup_orphan_charts():
+    """Only scanner-generated exports, never arbitrary images or live state."""
+    ttl = _infra_float(os.getenv("INFRA_CHART_TTL_SECONDS", "86400"), 86400.0, minimum=3600.0)
+    cutoff = time.time() - ttl
+    try:
+        with os.scandir(CHARTS_DIR) as entries:
+            for entry in entries:
+                try:
+                    if entry.is_symlink() or entry.stat(follow_symlinks=False).st_mtime >= cutoff:
+                        continue
+                    if entry.is_dir(follow_symlinks=False) and entry.name.startswith("scanner-mail-"):
+                        shutil.rmtree(entry.path)
+                    elif entry.is_file(follow_symlinks=False) and (entry.name.startswith("scanner-chart-") or re.fullmatch(r"[A-Z0-9._-]+_\d{10}\.png", entry.name)):
+                        os.unlink(entry.path)
+                except OSError:
+                    log("Orphan chart cleanup deferred")
+    except OSError:
+        pass
+
+
+def _reset_ephemeral_runtime_caches():
+    for name in ("_mc_cache", "_info_cache", "_earnings_date_cache", "_market_cap_diagnostics",
+                 "_entry_spy_line_cache", "_rs_spy_cache", "_PRO_ENGINE_CACHE", "recent_sent",
+                 "_MARKET_GUARD_PENDING_EVIDENCE", "UNIVERSE_MARKET_CAP_HINTS"):
+        value = globals().get(name)
+        if isinstance(value, (dict, set, list)):
+            value.clear()
+    globals()["_regime_cache"] = None
+    globals()["_sector_rotation_cache"] = None
+    diagnostics = globals().get("ENTRY_DIAGNOSTICS")
+    if isinstance(diagnostics, dict):
+        diagnostics.clear()
+        diagnostics.update({"patterns": {}, "blockers": {}})
+
+
+_RUN_MUTEX = threading.Lock()
+
+
+def _managed_scanner_run(function):
+    @functools.wraps(function)
+    def wrapped(*args, **kwargs):
+        global HTTP_SESSION
+        if not _RUN_MUTEX.acquire(blocking=False):
+            log("Scanner run already active in this process; overlapping invocation skipped")
+            return None
+        try:
+            _install_output_privacy()
+            # Never discard a failed checkpoint and accumulate another full run.
+            if globals().get("_EVALUATION_BUFFER"):
+                _flush_setup_evaluations()
+            _reset_ephemeral_runtime_caches()
+            _cleanup_orphan_charts()
+            previous = globals().get("HTTP_SESSION")
+            if previous is not None and callable(getattr(previous, "close", None)):
+                try:
+                    previous.close()
+                except Exception:
+                    log("Previous HTTP session cleanup failed")
+            HTTP_SESSION = requests.Session()
+            HTTP_SESSION.headers.update({"User-Agent": "Mozilla/5.0"})
+            return function(*args, **kwargs)
+        finally:
+            try:
+                if globals().get("_EVALUATION_BUFFER"):
+                    try:
+                        _flush_setup_evaluations()
+                    except Exception:
+                        log("Research checkpoint failed; pending observations retained; next run must save them first")
+                current = globals().get("HTTP_SESSION")
+                if current is not None and callable(getattr(current, "close", None)):
+                    try:
+                        current.close()
+                    except Exception:
+                        log("HTTP session cleanup failed")
+                HTTP_SESSION = None
+                _reset_ephemeral_runtime_caches()
+                try:
+                    import ctypes
+                    ctypes.windll.kernel32.SetThreadExecutionState(0x80000000)
+                except Exception:
+                    pass
+            finally:
+                try:
+                    _close_private_log_handlers()
+                finally:
+                    _RUN_MUTEX.release()
+    return wrapped
+
+
+# Install before external imports when this file is the application entry point.
+if __name__ == "__main__":
+    _install_output_privacy()
+
 
 import numpy as np
 import pandas as pd
@@ -155,11 +667,8 @@ def _safe_pct(numerator, denominator, default=None):
 # --- אבטחה: סיסמה + מפתחות API ----
 FROM_EMAIL = os.getenv("FROM_EMAIL", "")
 APP_PASSWORD = os.getenv("APP_PASSWORD", "")
-if APP_PASSWORD == "YOUR_APP_PASSWORD_HERE" or not APP_PASSWORD:
-    print(
-        "Warning: APP_PASSWORD is still set to the default value or is empty. Email sending disabled."
-    )
-    APP_PASSWORD = os.getenv("APP_PASSWORD", "")
+if APP_PASSWORD in ("YOUR_APP_PASSWORD_HERE", "YOUR_PASSWORD", "CHANGEME"):
+    APP_PASSWORD = ""
 TO_EMAILS = [
     email.strip()
     for email in os.getenv("TO_EMAILS", "").split(",")
@@ -167,8 +676,6 @@ TO_EMAILS = [
 ]
 TO_EMAILS = list(dict.fromkeys(TO_EMAILS))
 
-if not TO_EMAILS:
-    raise RuntimeError("TO_EMAILS environment variable is missing")
 CHARTS_DIR = os.getenv("CHARTS_DIR", "temp_images")
 os.makedirs(CHARTS_DIR, exist_ok=True)
 
@@ -289,6 +796,9 @@ ENTRY_QUALITY_LOG             = _state_path(os.getenv("ENTRY_QUALITY_LOG", "entr
 #  סדר הסינון נשאר: Market Cap → Data → Earnings → EMA28 → Reverse Scanner → Patterns → Entry Quality.
 # ============================================================
 V9_PATTERN_ENGINE_ENABLED     = os.getenv("V9_PATTERN_ENGINE_ENABLED", "True").lower() in ("1", "true", "yes")
+# Kept for compatibility with existing environment files. No detector-stage cap
+# is applied: all five pattern families must reach the final Entry/Pro gates.
+# TOP_ALERTS_TO_SEND still limits unique, fully qualified email selections.
 V9_MAX_CANDIDATES_PER_TICKER  = int(os.getenv("V9_MAX_CANDIDATES_PER_TICKER", "3"))
 V9_INCLUDE_REJECTED_DEBUG     = os.getenv("V9_INCLUDE_REJECTED_DEBUG", "False").lower() in ("1", "true", "yes")
 
@@ -451,8 +961,9 @@ def _check_reversal_signals() -> tuple[bool, float, str]:
         return False, 0.0, f"שגיאה: {e}"
 
 
+@_nonfatal_mail
 def _send_reversal_email(signals: list[tuple], score: int,
-                         reversal_detected: bool = False) -> None:
+                         reversal_detected: bool = False) -> dict:
     """שולח מייל התראה על סיגנלים לקנייה או היפוך שוק."""
     try:
         today = datetime.now().strftime("%d/%m/%Y")
@@ -470,76 +981,26 @@ def _send_reversal_email(signals: list[tuple], score: int,
             headline_color = "#dc2626"
             action = "שקול לקנות SPY כמה דקות לפני סגירת המסחר (15:50-16:00 ET)"
 
-        signals_html = "".join([
-            f'<tr><td style="padding:8px 12px;font-size:15px;">{s}</td></tr>'
-            for _, _, s in signals
-        ])
-
-        facts_html = "".join([
-            f'<li style="margin:8px 0;color:#1e40af;font-size:14px;">📈 {f}</li>'
-            for f in facts
-        ])
-
-        html = f"""
-        <html><body style="font-family:Arial,sans-serif;background:#f8fafc;padding:20px;">
-        <div style="max-width:600px;margin:auto;background:white;border-radius:12px;
-                    box-shadow:0 4px 20px rgba(0,0,0,0.1);overflow:hidden;">
-
-          <!-- כותרת -->
-          <div style="background:{headline_color};padding:24px;text-align:center;">
-            <h1 style="color:white;margin:0;font-size:24px;">{headline}</h1>
-            <p style="color:rgba(255,255,255,0.9);margin:8px 0 0;">{today}</p>
-          </div>
-
-          <!-- סיגנלים -->
-          <div style="padding:20px;">
-            <h2 style="color:#374151;border-bottom:2px solid #e5e7eb;padding-bottom:8px;">
-              📊 סיגנלים שזוהו
-            </h2>
-            <table style="width:100%;border-collapse:collapse;">
-              {signals_html}
-            </table>
-          </div>
-
-          <!-- המלצת פעולה -->
-          <div style="background:#fef3c7;border:2px solid #f59e0b;
-                      border-radius:8px;margin:0 20px;padding:16px;">
-            <h3 style="color:#92400e;margin:0 0 8px;">💡 המלצת פעולה</h3>
-            <p style="color:#78350f;margin:0;font-size:15px;">{action}</p>
-          </div>
-
-          <!-- נתונים היסטוריים -->
-          <div style="padding:20px;">
-            <h2 style="color:#374151;border-bottom:2px solid #e5e7eb;padding-bottom:8px;">
-              📚 למה לקנות דווקא עכשיו? — נתונים היסטוריים
-            </h2>
-            <ul style="padding-right:20px;list-style:none;margin:0;">
-              {facts_html}
-            </ul>
-          </div>
-
-          <!-- footer -->
-          <div style="background:#f1f5f9;padding:16px;text-align:center;">
-            <p style="color:#64748b;font-size:12px;margin:0;">
-              Stock Scanner — Market Reversal Detector | {today}
-            </p>
-          </div>
-        </div>
-        </body></html>
-        """
+        signals_html = _mail_list([description for _, _, description in signals], "לא נרשמו סיגנלים")
+        facts_html = _mail_list(facts)
+        body = _mail_section("סיגנלים שזוהו", signals_html, "blue" if reversal_detected else "amber")
+        body += _mail_section("המלצת פעולה", f'<p style="color:#c5d0e0;font-size:14px;line-height:1.9;margin:0;">{_mail_text(action)}</p>', "amber")
+        body += _mail_section("נתונים היסטוריים", facts_html, "muted")
+        html = _mail_document("עדכון מצב השוק", today,
+                              _mail_card(headline, body, "Market Reversal Detector",
+                                         _mail_pill("שינוי כיוון" if reversal_detected else f"{score}/4 סיגנלים", "blue" if reversal_detected else "amber")),
+                              eyebrow="MARKET REVERSAL REPORT", preheader=headline)
 
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
         msg["From"]    = FROM_EMAIL
         msg["To"]      = ", ".join(TO_EMAILS) if isinstance(TO_EMAILS, list) else TO_EMAILS
-        msg.attach(MIMEText(html, "html", "utf-8"))
+        _attach_mail_content(msg, html)
 
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as s:
-            s.login(FROM_EMAIL, APP_PASSWORD)
-            s.send_message(msg)
-        log(f"📧 Reversal email sent: {subject}")
+        return _smtp_deliver(msg, "market_reversal")
     except Exception as e:
         log(f"_send_reversal_email error: {e}")
+        return _mail_status("failed", refused=len(TO_EMAILS))
 
 
 def run_market_reversal_detector() -> None:
@@ -692,6 +1153,11 @@ SHADOW_TRACKING_ENABLED = os.getenv("SHADOW_TRACKING_ENABLED", "True").lower() i
 STRICT_PATTERN_STRUCTURE = os.getenv("STRICT_PATTERN_STRUCTURE", "False").lower() in ("1", "true", "yes")
 REQUIRE_VERIFIED_EARNINGS = os.getenv("REQUIRE_VERIFIED_EARNINGS", "True").lower() in ("1", "true", "yes")
 AUTO_APPLY_LEARNING = os.getenv("AUTO_APPLY_LEARNING", "False").lower() in ("1", "true", "yes")
+# Research instrumentation never changes the live entry or delivery gates.
+ENTRY_AUDIT_FILE = _state_path(os.getenv("ENTRY_AUDIT_FILE", "entry_funnel_report_v3.json"))
+PRO_SHADOW_DIAGNOSTICS = os.getenv("PRO_SHADOW_DIAGNOSTICS", "True").lower() in ("1", "true", "yes")
+PRO_SHADOW_MIN_ENTRY_SCORE = float(os.getenv("PRO_SHADOW_MIN_ENTRY_SCORE", "55"))
+PRO_SHADOW_MAX_ENTRY_BLOCKERS = max(0, int(os.getenv("PRO_SHADOW_MAX_ENTRY_BLOCKERS", "2")))
 _EVALUATION_BUFFER: dict = {}
 _market_cap_diagnostics: dict = {}
 
@@ -939,8 +1405,7 @@ def _save_universe_cache(tickers_list: list[str], meta: dict) -> None:
             "tickers": tickers_list,
             **(meta or {}),
         }
-        with open(UNIVERSE_CACHE_FILE, "w", encoding="utf-8") as f:
-            json.dump(cache_data, f, indent=2)
+        _atomic_write_text(UNIVERSE_CACHE_FILE, json.dumps(cache_data, indent=2))
         log(f"💾 Universe cache updated: {len(tickers_list)} tickers → {UNIVERSE_CACHE_FILE}")
     except Exception as e:
         log(f"Universe cache save error: {e}")
@@ -1186,23 +1651,16 @@ HTTP_SESSION.headers.update({"User-Agent": "Mozilla/5.0"})
 #  LOGGING
 # ============================================================
 def log(msg: str) -> None:
-    # FIXED: never expose TwelveData API keys in GitHub logs.
+    """Only protected text reaches the console and size-bounded runner log."""
+    safe = _redact_sensitive(msg).replace("\r", "\\r").replace("\n", "\\n")
     try:
-        msg = re.sub(r"(apikey=)[^&\s)]+", r"\1***", str(msg))
-        msg = re.sub(r"(apikey%3D)[^&\s)]+", r"\1***", str(msg), flags=re.IGNORECASE)
+        _protected_logger().info(safe)
     except Exception:
-        msg = str(msg)
-    line = f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {msg}"
-
-    # מציג את ההודעה ב-Render Logs
-    print(line, flush=True)
-
-    # שומר גם לקובץ לוג
-    try:
-        with open(LOGFILE, "a", encoding="utf-8") as f:
-            f.write(line + "\n")
-    except Exception:
-        pass
+        # A failing logger must never fall back to printing the original value.
+        try:
+            sys.stderr.write("Protected logging unavailable\n")
+        except Exception:
+            pass
 
 def log_watchlist(symbol: str, reason: str, price: float,
                   pattern: str = "", breakout: float = 0.0,
@@ -1216,7 +1674,8 @@ def log_watchlist(symbol: str, reason: str, price: float,
     # בדוק אם כבר כתבנו כותרת היום
     header = f"\n{'═'*50}\n📅  {today}\n{'═'*50}\n"
     try:
-        content = open(WATCHLIST_LOG, "r", encoding="utf-8").read()
+        with open(WATCHLIST_LOG, "r", encoding="utf-8") as existing:
+            content = existing.read()
         write_header = today not in content
     except Exception:
         write_header = True
@@ -1247,8 +1706,8 @@ def log_watchlist(symbol: str, reason: str, price: float,
     try:
         with open(WATCHLIST_LOG, "a", encoding="utf-8") as f:
             if write_header:
-                f.write(header)
-            f.write(entry)
+                f.write(_redact_sensitive(header))
+            f.write(_redact_sensitive(entry))
     except Exception as e:
         log(f"watchlist_log error: {e}")
 
@@ -1270,8 +1729,7 @@ def _save_json(path: str, data) -> None:
         parent = os.path.dirname(path)
         if parent:
             os.makedirs(parent, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2, default=str)
+        _atomic_write_text(path, json.dumps(data, ensure_ascii=False, indent=2, default=str))
     except Exception as e:
         log(f"_save_json error {path}: {e}")
 
@@ -1302,23 +1760,36 @@ def _one_calendar_month_ago(day):
 
 
 def _atomic_write_text(path: str, text: str) -> None:
-    parent = os.path.dirname(path)
-    if parent:
-        os.makedirs(parent, exist_ok=True)
-    tmp = f"{path}.tmp"
-    with open(tmp, "w", encoding="utf-8", newline="") as f:
-        f.write(text)
-    os.replace(tmp, path)
+    """Private unique temp file, fsync, atomic replacement, cleanup on failure."""
+    parent = os.path.dirname(os.path.abspath(path))
+    os.makedirs(parent, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix="scanner-state-", suffix=".tmp", dir=parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as handle:
+            descriptor = None
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        if hasattr(os, "O_DIRECTORY"):
+            directory_fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            log("Temporary state file cleanup deferred")
 
 
 def _atomic_write_json(path: str, data) -> None:
-    parent = os.path.dirname(path)
-    if parent:
-        os.makedirs(parent, exist_ok=True)
-    tmp = f"{path}.tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2, default=str)
-    os.replace(tmp, path)
+    _atomic_write_text(path, json.dumps(data, ensure_ascii=False, indent=2, default=str))
 
 
 def _prune_csv_by_date(path: str, date_column: str, cutoff_date) -> dict:
@@ -1342,9 +1813,7 @@ def _prune_csv_by_date(path: str, date_column: str, cutoff_date) -> dict:
         keep = parsed.isna() | (valid_dates >= cutoff_date)
         out = df.loc[keep].copy()
 
-        tmp = f"{path}.tmp"
-        out.to_csv(tmp, index=False)
-        os.replace(tmp, path)
+        _atomic_write_text(path, out.to_csv(index=False))
         result["after"] = int(len(out))
         result["removed"] = result["before"] - result["after"]
         result["status"] = "ok"
@@ -1821,8 +2290,7 @@ def save_last_market_scan_date(market_date: str | None) -> None:
         parent = os.path.dirname(MARKET_SCAN_STATE_FILE)
         if parent:
             os.makedirs(parent, exist_ok=True)
-        with open(MARKET_SCAN_STATE_FILE, "w", encoding="utf-8") as f:
-            f.write(str(market_date).strip())
+        _atomic_write_text(MARKET_SCAN_STATE_FILE, str(market_date).strip())
         log(f"💾 Market scan date saved: {market_date}")
     except Exception as e:
         log(f"save_last_market_scan_date error: {e}")
@@ -1842,8 +2310,7 @@ def save_last_market_scan_date(market_date: str | None) -> None:
         parent = os.path.dirname(MARKET_CANDLE_STATE_FILE)
         if parent:
             os.makedirs(parent, exist_ok=True)
-        with open(MARKET_CANDLE_STATE_FILE, "w", encoding="utf-8") as f:
-            json.dump(state, f, ensure_ascii=False, indent=2)
+        _atomic_write_text(MARKET_CANDLE_STATE_FILE, json.dumps(state, ensure_ascii=False, indent=2))
         log(f"💾 Market candle fingerprint saved: {len(candles)} source(s) → {MARKET_CANDLE_STATE_FILE}")
     except Exception as e:
         log(f"save market candle fingerprint error: {e}")
@@ -1975,7 +2442,7 @@ def save_blocklist(bl: set) -> None:
 def log_to_csv(ticker: str, reasons: list) -> None:
     try:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        row = pd.DataFrame([{"Time": now, "Ticker": ticker, "Reasons": " | ".join(reasons)}])
+        row = pd.DataFrame([{"Time": now, "Ticker": ticker, "Reasons": " | ".join(_redact_sensitive(reason) for reason in reasons)}])
         row.to_csv(SIGNALS_CSV, mode="a", index=False, header=not os.path.exists(SIGNALS_CSV))
     except Exception:
         pass
@@ -3871,6 +4338,7 @@ def log_entry_quality_decision(alert: dict, quality: dict) -> None:
             "regime": m.get("regime"),
             "blocking_fails": " | ".join(quality.get("blocking_fails", [])[:10]),
         }
+        row = _redact_log_value(row)
         file_exists = os.path.exists(ENTRY_QUALITY_LOG)
         with open(ENTRY_QUALITY_LOG, "a", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=list(row.keys()))
@@ -4085,7 +4553,10 @@ def add_v9_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
     daily_range = (high - low).replace(0, np.nan)
     out["CLOSE_POSITION"] = ((close - low) / daily_range).clip(0, 1)
-    out["VOLUME_RATIO20"] = volume / out["VOL20"].replace(0, np.nan)
+    # Match the final Entry engine: the signal's volume cannot be part of its
+    # own comparison baseline. Retest history uses the same causal convention.
+    prior_volume20 = volume.shift(1).rolling(20, min_periods=20).mean()
+    out["VOLUME_RATIO20"] = volume / prior_volume20.replace(0, np.nan)
     out["DIST_52W_HIGH_PCT"] = (close / out["HIGH_52W"].replace(0, np.nan) - 1.0) * 100.0
     return out
 
@@ -4839,30 +5310,60 @@ def detect_vcp(
 
 
 def _find_recent_pullback_window(data: pd.DataFrame, config: V9PatternConfig) -> Optional[pd.DataFrame]:
-    """Find a recent 2-10 day pullback before the current candle."""
+    """Find a completed pullback after a recent, confirmed swing high.
+
+    Only bars before the signal define the swing. Choose the most recent valid
+    anchor, not the deepest overlapping range and not the best resulting R:R.
+    The anchor candle itself is not a pullback/support candle. An older low
+    before this upswing must not silently become the current trade's stop.
+    """
     if len(data) < config.pullback_max_days + 30:
         return None
 
-    # Try different pullback lengths and choose the one with a reasonable depth.
-    current_close = latest_value(data, "Close")
-    if current_close is None:
-        return None
-
-    best: Optional[pd.DataFrame] = None
-    best_depth = -1.0
+    # All indexing below excludes the current signal candle. Two preceding
+    # bars establish the left side; the pullback establishes the right side.
     for days in range(config.pullback_min_days, config.pullback_max_days + 1):
-        window = data.iloc[-1 - days:-1]
-        if window.empty:
+        anchor_pos = len(data) - days - 2
+        if anchor_pos < 2:
             continue
+        anchor = data.iloc[anchor_pos]
+        anchor_high = safe_float(anchor.get("High"))
+        anchor_close = safe_float(anchor.get("Close"))
+        left_high = safe_float(data["High"].iloc[anchor_pos - 2:anchor_pos].max())
+        window = data.iloc[anchor_pos + 1:-1]
         pullback_high = safe_float(window["High"].max())
         pullback_low = safe_float(window["Low"].min())
-        if pullback_high is None or pullback_low is None or pullback_high <= 0:
+        last_close = latest_value(window, "Close")
+        if any(value is None for value in (anchor_high, anchor_close, left_high,
+                                            pullback_high, pullback_low, last_close)):
             continue
-        depth = (pullback_high - pullback_low) / pullback_high * 100.0
-        if config.pullback_min_depth_pct <= depth <= config.pullback_max_depth_pct and depth > best_depth:
-            best = window
-            best_depth = depth
-    return best
+        if anchor_high <= 0 or pullback_low <= 0:
+            continue
+        if anchor_high < left_high or anchor_high < pullback_high:
+            continue
+        # A wide trading range during an advance is not a pullback. Require a
+        # net decline from the swing close. The anchor may be a wide up candle;
+        # its low is not a support level that the pullback must undercut.
+        if last_close >= anchor_close:
+            continue
+        depth = (anchor_high - pullback_low) / anchor_high * 100.0
+        if not config.pullback_min_depth_pct <= depth <= config.pullback_max_depth_pct:
+            continue
+        touches = any(
+            col in window.columns and _range_touched_band(window, window[col], config.ema_touch_tolerance_pct)
+            for col in ("EMA21", "MA50")
+        )
+        if not touches:
+            continue
+        selected = window.copy()
+        selected.attrs["pullback_anchor"] = {
+            "date": pd.Timestamp(data.index[anchor_pos]).isoformat(),
+            "high": anchor_high,
+            "close": anchor_close,
+            "selection": "MOST_RECENT_VALID_SWING_BEFORE_SIGNAL",
+        }
+        return selected
+    return None
 
 
 def detect_ema_pullback_bounce(
@@ -4895,7 +5396,8 @@ def detect_ema_pullback_bounce(
     if pullback is None or pullback.empty:
         return None
 
-    pullback_high = safe_float(pullback["High"].max())
+    anchor = pullback.attrs.get("pullback_anchor", {})
+    pullback_high = safe_float(anchor.get("high")) or safe_float(pullback["High"].max())
     pullback_low = safe_float(pullback["Low"].min())
     if pullback_high is None or pullback_low is None or pullback_high <= 0:
         return None
@@ -4945,7 +5447,13 @@ def detect_ema_pullback_bounce(
 
     pivot = prev_high
     entry = close
-    stop = pullback_low * 0.995
+    signal_low = latest_value(data, "Low")
+    if signal_low is None or signal_low <= 0:
+        return None
+    # A bounce that undercuts the previous pullback must include that known
+    # low in the invalidation level; never tighten a stop merely to pass R:R.
+    support_low = min(pullback_low, signal_low)
+    stop = support_low * 0.995
     # Preserve a reachable prior swing high; use an explicit 2.5R scenario only without one.
     prior_swing_high = safe_float(data["High"].iloc[-45:-1 - len(pullback)].max()) if len(data) > 50 else None
     target_by_r = entry + (entry - stop) * 2.5 if entry > stop else None
@@ -4974,6 +5482,9 @@ def detect_ema_pullback_bounce(
             "pullback_days": len(pullback),
             "pullback_high": pullback_high,
             "pullback_low": pullback_low,
+            "support_low": support_low,
+            "stop_anchor": "PULLBACK_AND_SIGNAL_LOW",
+            "pullback_anchor": anchor,
             "touched_ema21": touched_ema21,
             "touched_ma50": touched_ma50,
             "bounce_confirmed": bounce_confirmed,
@@ -5361,8 +5872,10 @@ def append_v9_pattern_candidates(symbol: str, df: pd.DataFrame, candidates: list
             return 0
 
         added = 0
-        max_candidates = max(1, int(V9_MAX_CANDIDATES_PER_TICKER))
-        for candidate in v9_candidates[:max_candidates]:
+        # Preliminary detector scores use a different checklist from Entry/Pro.
+        # Cutting this list can hide the only candidate that passes the final
+        # gates. Evaluate every detected family; cap emails only after quality.
+        for candidate in v9_candidates:
             if candidate.status == REJECTED and not V9_INCLUDE_REJECTED_DEBUG:
                 continue
             candidates.append(_v9_pattern_candidate_to_alert(candidate))
@@ -5804,6 +6317,7 @@ def log_professional_quality_decision(alert: dict, pro: dict) -> None:
             "risk_score": (comps.get("risk", {}) or {}).get("score"),
             "blockers": " | ".join(pro.get("blockers", []) or []),
         }
+        row = _redact_log_value(row)
         file_exists = os.path.exists(PRO_QUALITY_LOG)
         parent = os.path.dirname(PRO_QUALITY_LOG)
         if parent:
@@ -7027,8 +7541,9 @@ def _get_spy_returns() -> dict:
 
 def compute_rs_score(ticker: str, df: pd.DataFrame) -> dict:
     """
-    RS Score (0-100) ביחס ל-SPY.
-    משמש לתצוגה במייל בלבד (פילטר RS בוטל).
+    Custom weighted excess-return score versus SPY, also used by entry gates.
+    This tanh transformation is not a cross-sectional percentile or IBD RS Rating.
+    The existing formula and thresholds are preserved.
     """
     result = {
         "rs_score":  None,
@@ -7404,8 +7919,7 @@ def _save_positions(positions: list[dict]) -> None:
         parent = os.path.dirname(POSITIONS_FILE)
         if parent:
             os.makedirs(parent, exist_ok=True)
-        with open(POSITIONS_FILE, "w") as f:
-            json.dump(positions, f, indent=2, default=str)
+        _atomic_write_text(POSITIONS_FILE, json.dumps(positions, indent=2, default=str))
     except Exception as e:
         log(f"save_positions error: {e}")
 
@@ -7955,65 +8469,51 @@ def run_position_tracker(send_exit_email_fn=None) -> list[dict]:
     return exit_alerts
 
 
-def send_exit_email(exit_alerts: list[dict]) -> None:
+@_nonfatal_mail
+def send_exit_email(exit_alerts: list[dict]) -> dict:
     """שולח מייל כאשר Stop המקורי או Exit Intelligence אישרו יציאה."""
     if not exit_alerts:
-        return
+        return _mail_status("skipped")
     try:
         cards = []
         for a in exit_alerts:
-            pnl = float(a.get("pnl_pct", 0) or 0)
+            pnl = _mail_float(a.get("pnl_pct", 0) or 0)
             pnl_col = "#15803d" if pnl >= 0 else "#b91c1c"
             pnl_bg = "#f0fdf4" if pnl >= 0 else "#fef2f2"
             floor = a.get("profit_floor")
-            floor_txt = f"${float(floor):.2f}" if _is_finite_number(floor) else "—"
+            floor_txt = f"${_mail_float(floor):.2f}" if _is_finite_number(floor) else "—"
             sigs = a.get("exit_signals", []) or []
-            sig_html = "".join(f"<li>{x}</li>" for x in sigs[:6]) or "<li>Stop Loss מקורי</li>"
-            cards.append(f"""
-<div dir="rtl" style="font-family:Arial,sans-serif;max-width:560px;margin:12px auto;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;background:#fff;">
-  <div style="padding:14px 16px;background:{pnl_bg};border-bottom:1px solid #e5e7eb;">
-    <div style="font-size:18px;font-weight:700;color:{pnl_col};">{a['emoji']} {a['ticker']} — {'+' if pnl>=0 else ''}{pnl:.1f}%</div>
-    <div style="font-size:12px;color:#374151;margin-top:4px;">{a['reason']}</div>
-  </div>
-  <div style="padding:12px 16px;font-size:12px;color:#374151;">
-    <table style="width:100%;border-collapse:collapse;">
-      <tr><td style="padding:3px 0;font-weight:600;">כניסה</td><td>${a['entry']:.2f}</td><td style="font-weight:600;">יציאה</td><td>${a['exit_price']:.2f}</td></tr>
-      <tr><td style="padding:3px 0;font-weight:600;">Stop מקורי</td><td>${a['stop']:.2f}</td><td style="font-weight:600;">Profit Floor</td><td>{floor_txt}</td></tr>
-      <tr><td style="padding:3px 0;font-weight:600;">Target 1 (ייחוס)</td><td>${float(a.get('target',0) or 0):.2f}</td><td style="font-weight:600;">Max profit</td><td>{float(a.get('max_profit_pct',0) or 0):+.1f}%</td></tr>
-      <tr><td style="padding:3px 0;font-weight:600;">Reversal score</td><td>{float(a.get('exit_score',0) or 0):.0f}/100</td><td style="font-weight:600;">זמן פתוח</td><td>{a['days_open']} ימים</td></tr>
-    </table>
-    <div style="margin-top:8px;font-weight:700;">אותות יציאה:</div><ul style="margin-top:4px;">{sig_html}</ul>
-  </div>
-</div>""")
+            cards.append(_mail_exit_card(a, pnl, floor_txt, sigs))
 
-        html_body = "\n".join(cards)
+        html_body = _mail_document("עדכוני יציאה", datetime.now().strftime("%d/%m/%Y"),
+                                   "".join(cards), eyebrow="EXIT INTELLIGENCE",
+                                   preheader=f"{len(exit_alerts)} עדכוני יציאה מפוזיציות במעקב")
         subject = f"🔔 Exit Intelligence — יציאה מ-{len(exit_alerts)} פוזיציה/ות"
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
         msg["From"] = FROM_EMAIL
         msg["To"] = ", ".join(TO_EMAILS) if isinstance(TO_EMAILS, list) else TO_EMAILS
-        msg.attach(MIMEText(html_body, "html", "utf-8"))
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as s:
-            s.login(FROM_EMAIL, APP_PASSWORD)
-            s.send_message(msg)
-        log(f"📧 Exit Intelligence email sent: {len(exit_alerts)} positions closed")
+        _attach_mail_content(msg, html_body)
+        return _smtp_deliver(msg, "exits")
     except Exception as e:
         log(f"send_exit_email error: {e}")
+        return _mail_status("failed", refused=len(TO_EMAILS))
 
 
-def send_positions_status_email() -> None:
+@_nonfatal_mail
+def send_positions_status_email() -> dict:
     """דוח יומי: סטופ מקורי, Profit Floor, Reversal Score והאם להמשיך לרכב על המגמה."""
     if not SEND_POSITIONS_STATUS_EMAIL:
-        return
+        return _mail_status("skipped")
     if not APP_PASSWORD:
         log("APP_PASSWORD not set — positions status email disabled.")
-        return
+        return _mail_status("skipped")
     try:
         positions = _load_positions()
         open_pos = [p for p in positions if isinstance(p, dict) and not p.get("closed")]
         if not open_pos:
             log("📭 Positions status: no open positions.")
-            return
+            return _mail_status("skipped")
 
         cards = []
         today_str = datetime.now().strftime("%d/%m/%Y")
@@ -8022,26 +8522,26 @@ def send_positions_status_email() -> None:
             if not ticker:
                 continue
             try:
-                price_now = float(p.get("last_tracker_price", 0) or 0)
+                price_now = _mail_float(p.get("last_tracker_price", 0) or 0)
                 if not _is_finite_number(price_now) or price_now <= 0:
                     df = _normalize_yfinance_df(yf.download(ticker, period="5d", interval="1d", progress=False, auto_adjust=True))
-                    price_now = _last_finite(df["close"]) if df is not None and not df.empty else float("nan")
-                entry = float(p.get("entry", 0) or 0)
-                stop = float(p.get("stop_initial", p.get("stop_current", 0)) or 0)
-                target = float(p.get("target", p.get("target_reference", 0)) or 0)
+                    price_now = _last_finite(df["close"]) if df is not None and not df.empty else _mail_float("nan")
+                entry = _mail_float(p.get("entry", 0) or 0)
+                stop = _mail_float(p.get("stop_initial", p.get("stop_current", 0)) or 0)
+                target = _mail_float(p.get("target", p.get("target_reference", 0)) or 0)
                 if not all(_is_finite_number(v) for v in (price_now, entry, stop)):
-                    cards.append(f"<div dir='rtl' style='font-family:Arial;padding:14px;border:1px solid #e5e7eb;border-radius:10px;margin:10px;'>⚠️ {ticker} — אין נתוני מחיר תקינים.</div>")
+                    cards.append(_mail_card(ticker, "<p style='color:#f4bf64;'>אין נתוני מחיר תקינים.</p>", "נתוני המעקב אינם זמינים"))
                     continue
 
                 pnl_pct = ((price_now - entry) / max(entry, 1e-9)) * 100.0
-                highest = float(p.get("highest_price", entry) or entry)
-                max_profit = float(p.get("max_profit_pct", (highest-entry)/max(entry,1e-9)*100) or 0)
+                highest = _mail_float(p.get("highest_price", entry) or entry)
+                max_profit = _mail_float(p.get("max_profit_pct", (highest-entry)/max(entry,1e-9)*100) or 0)
                 intel = p.get("exit_intelligence", {}) if isinstance(p.get("exit_intelligence", {}), dict) else {}
                 status = str(intel.get("status", "BUILDING"))
-                score = float(intel.get("score", 0) or 0)
+                score = _mail_float(intel.get("score", 0) or 0)
                 signals = intel.get("signals", []) or []
                 floor = p.get("profit_exit_floor")
-                floor_txt = f"${float(floor):.2f}" if _is_finite_number(floor) else "ממתין ל-+5%"
+                floor_txt = f"${_mail_float(floor):.2f}" if _is_finite_number(floor) else "ממתין ל-+5%"
                 target_reached = bool(p.get("target_reached", False))
 
                 if status == "WATCH":
@@ -8064,48 +8564,35 @@ def send_positions_status_email() -> None:
                     days_open = "N/A"
                 pnl_color = "#15803d" if pnl_pct >= 0 else "#b91c1c"
 
-                cards.append(f"""
-<div dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:12px auto;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;background:#fff;">
-  <div style="padding:14px 16px;background:{status_bg};border-bottom:1px solid #e5e7eb;">
-    <div style="font-size:19px;font-weight:700;color:{status_color};">{status_emoji} {ticker} — {status_text}</div>
-    <div style="font-size:12px;color:#374151;margin-top:4px;">{p.get('pattern','')} | פתוח {days_open} ימים | Exit score {score:.0f}/100</div>
-  </div>
-  <div style="padding:12px 16px;font-size:13px;color:#374151;">
-    <table style="width:100%;border-collapse:collapse;">
-      <tr><td style="padding:4px 0;font-weight:600;">כניסה</td><td>${entry:.2f}</td><td style="font-weight:600;">מחיר עכשיו</td><td>${price_now:.2f}</td></tr>
-      <tr><td style="padding:4px 0;font-weight:600;">Stop מקורי וקבוע</td><td>${stop:.2f}</td><td style="font-weight:600;">Profit Floor</td><td>{floor_txt}</td></tr>
-      <tr><td style="padding:4px 0;font-weight:600;">רווח/הפסד</td><td style="color:{pnl_color};font-weight:700;">{pnl_pct:+.1f}%</td><td style="font-weight:600;">Max profit</td><td>{max_profit:+.1f}%</td></tr>
-      <tr><td style="padding:4px 0;font-weight:600;">Target 1 (ייחוס)</td><td>${target:.2f}</td><td style="font-weight:600;">סטטוס יעד</td><td>{target_note}</td></tr>
-    </table>
-    <div style="margin-top:8px;font-weight:700;">Exit Intelligence:</div><ul style="margin-top:4px;">{sig_html}</ul>
-  </div>
-</div>""")
+                cards.append(_mail_position_card({
+                    "ticker": ticker, "pattern": p.get("pattern", ""), "date_open": date_open,
+                    "days_open": days_open, "entry": entry, "price_now": price_now, "stop": stop,
+                    "floor_txt": floor_txt, "pnl_pct": pnl_pct, "max_profit": max_profit,
+                    "target": target, "target_note": target_note, "score": score,
+                    "status": status, "status_text": status_text, "signals": signals,
+                }))
             except Exception as e:
-                cards.append(f"<div dir='rtl' style='font-family:Arial;padding:14px;border:1px solid #e5e7eb;border-radius:10px;margin:10px;'>⚠️ {ticker} — שגיאה בדוח: {e}</div>")
+                cards.append(_mail_card(ticker, "<p style='color:#f4bf64;'>לא ניתן להציג את נתוני הפוזיציה.</p>", "נתוני המעקב אינם זמינים"))
 
         _save_positions(positions)
         if not cards:
-            return
-        html_body = f"""
-<html><body style="background:#f8fafc;padding:18px;">
-  <div dir="rtl" style="font-family:Arial,sans-serif;max-width:680px;margin:auto;">
-    <h2 style="text-align:center;color:#111827;margin:0 0 14px;">📊 Exit Intelligence — פוזיציות פתוחות — {today_str}</h2>
-    <p style="text-align:center;color:#6b7280;margin:0 0 16px;">Target הוא יעד ייחוס. Stop המקורי נשאר קבוע; אחרי +5% מופעל Profit Protection והיציאה מתבססת על שינוי כיוון מאושר.</p>
-    {''.join(cards)}
-  </div>
-</body></html>"""
+            return _mail_status("skipped")
+        policy = ("Target הוא יעד ייחוס. Stop המקורי נשאר קבוע; אחרי +5% מופעל Profit Protection "
+                  "והיציאה מתבססת על שינוי כיוון מאושר.")
+        policy_html = f'<p style="margin:0 0 20px;color:#a9b6ca;font-size:12px;line-height:1.9;">{_mail_text(policy)}</p>'
+        html_body = _mail_document("הפוזיציות במעקב", f"{len(open_pos)} פוזיציות פתוחות · {today_str}",
+                                   policy_html + ''.join(cards), eyebrow="POSITION MONITOR",
+                                   preheader=f"עדכון מעקב: {len(open_pos)} פוזיציות פתוחות")
         subject = f"📊 Exit Intelligence — {len(open_pos)} פוזיציות — {today_str}"
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
         msg["From"] = FROM_EMAIL
         msg["To"] = ", ".join(TO_EMAILS) if isinstance(TO_EMAILS, list) else TO_EMAILS
-        msg.attach(MIMEText(html_body, "html", "utf-8"))
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as s:
-            s.login(FROM_EMAIL, APP_PASSWORD)
-            s.send_message(msg)
-        log(f"📧 Exit Intelligence status email sent: {len(open_pos)} open positions")
+        _attach_mail_content(msg, html_body)
+        return _smtp_deliver(msg, "positions")
     except Exception as e:
         log(f"send_positions_status_email error: {e}")
+        return _mail_status("failed", refused=len(TO_EMAILS))
 
 def _load_learned_params() -> dict:
     """טוען פרמטרים שנלמדו מקובץ JSON. אם לא קיים — מחזיר ריק."""
@@ -8121,8 +8608,7 @@ def _save_learned_params(params: dict) -> None:
     """שומר פרמטרים שנלמדו לקובץ JSON."""
     try:
         params["last_updated"] = datetime.now().isoformat()
-        with open(LEARNING_CONFIG_FILE, "w") as f:
-            json.dump(params, f, indent=2)
+        _atomic_write_text(LEARNING_CONFIG_FILE, json.dumps(params, indent=2))
         log(f"💾 Learned params saved → {LEARNING_CONFIG_FILE}")
     except Exception as e:
         log(f"save_learned_params error: {e}")
@@ -9314,291 +9800,413 @@ def get_deep_intelligence(ticker: str, df=None) -> dict:
         "congress":  congress,
     }
 
-def _build_html_card(alert: dict, company: dict, send_date: str, sector: dict | None = None, intel: dict | None = None, catalyst: dict | None = None, rs: dict | None = None) -> str:
-    ticker  = alert.get("ticker","")
-    score   = float(alert.get("score", 0))
-    rr      = float(alert.get("rr_ratio", 0))
-    entry   = float(alert.get("breakout_level", 0))
-    stop    = float(alert.get("stop_loss", 0))
-    target  = float(alert.get("target", 0))
+def _mail_text(value, limit: int = 4000) -> str:
+    """Escape provider/state text at the HTML boundary; never accept raw markup."""
+    from html import escape
+    return escape(str(value if value is not None else "")[:limit], quote=True)
+
+
+def _mail_number(value, decimals: int = 2, prefix: str = "", suffix: str = "",
+                 signed: bool = False, scale: float = 1.0) -> str:
+    """Presentation only: missing/nonfinite values stay missing, including zero P&L."""
+    if value is None or isinstance(value, bool):
+        return "—"
+    try:
+        number = _mail_float(value) * scale
+        if not math.isfinite(number):
+            return "—"
+        spec = f"{'+' if signed else ''},.{decimals}f"
+        return f"{prefix}{number:{spec}}{suffix}"
+    except (ValueError, TypeError, OverflowError):
+        return "—"
+
+
+def _mail_tone(tone: str = "blue") -> tuple[str, str]:
+    return {
+        "blue": ("#8bb5ff", "#18253c"),
+        "green": ("#52d7b2", "#132f2b"),
+        "red": ("#ff8793", "#351e29"),
+        "amber": ("#f4bf64", "#322b1e"),
+        "muted": ("#a9b6ca", "#1c2331"),
+    }.get(tone, ("#8bb5ff", "#18253c"))
+
+
+def _mail_pill(text, tone: str = "blue") -> str:
+    color, bg = _mail_tone(tone)
+    direction = "rtl" if re.search(r"[\u0590-\u08ff]", str(text)) else "ltr"
+    return (f'<span dir="{direction}" style="direction:{direction};unicode-bidi:embed;display:inline-block;background-color:{bg};color:{color};'
+            f'border:1px solid {bg};border-radius:6px;padding:5px 9px;font-size:11px;'
+            f'font-weight:bold;line-height:1.5;">{_mail_text(text, 250)}</span>')
+
+
+def _mail_metrics(items: list[tuple]) -> str:
+    """Four numeric columns on desktop; two per row in supporting mobile clients."""
+    cells = []
+    width = 100 // max(1, len(items))
+    for label, value, tone in items:
+        color, _ = _mail_tone(tone)
+        cells.append(
+            f'<td class="mail-metric" width="{width}%" valign="top" '
+            'style="padding:15px 8px;text-align:center;border:1px solid #263044;'
+            'background-color:#0d111b;box-sizing:border-box;">'
+            f'<div style="font-size:11px;color:#a9b6ca;line-height:1.7;">{_mail_text(label, 100)}</div>'
+            f'<div dir="ltr" class="mail-value" style="direction:ltr;unicode-bidi:embed;'
+            f'font-size:22px;font-weight:bold;line-height:1.6;color:{color};'
+            f'font-variant-numeric:tabular-nums;white-space:nowrap;">{_mail_text(value, 100)}</div></td>')
+    return ('<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+            'style="width:100%;border-collapse:collapse;table-layout:fixed;margin:14px 0;">'
+            '<tr class="mail-metric-row">' + ''.join(cells) + '</tr></table>')
+
+
+def _mail_rows(rows: list[tuple]) -> str:
+    parts = []
+    for row in rows:
+        label, value = row[:2]
+        direction = "rtl" if re.search(r"[\u0590-\u08ff]", str(value)) else "ltr"
+        extra = row[2] if len(row) > 2 else ""
+        hint = (f'<div style="font-size:11px;color:#a9b6ca;margin-top:3px;">{_mail_text(extra)}</div>'
+                if extra else "")
+        parts.append(
+            '<tr><td valign="top" style="width:45%;padding:9px 0 9px 12px;'
+            'border-bottom:1px solid #263044;color:#a9b6ca;line-height:1.65;">'
+            f'{_mail_text(label)}{hint}</td>'
+            '<td valign="top" style="padding:9px 0;border-bottom:1px solid #263044;'
+            'color:#edf2fa;font-weight:bold;line-height:1.65;overflow-wrap:anywhere;word-break:break-word;">'
+            f'<span dir="{direction}" style="direction:{direction};unicode-bidi:embed;">'
+            f'{_mail_text(value).replace(chr(10), "<br>")}</span></td></tr>')
+    return ('<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+            'style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:12px;">'
+            + ''.join(parts) + '</table>')
+
+
+def _mail_list(items, fallback: str = "", limit: int = 8) -> str:
+    values = items if isinstance(items, (list, tuple)) else []
+    if not values:
+        values = [fallback] if fallback else []
+    return ('<ul style="margin:8px 0 0;padding:0 18px 0 0;color:#c5d0e0;'
+            'font-size:12px;line-height:1.9;">'
+            + ''.join(f'<li style="margin:3px 0;">{_mail_text(v)}</li>' for v in values[:limit])
+            + '</ul>')
+
+
+def _mail_section(title: str, body: str, tone: str = "blue") -> str:
+    color, _ = _mail_tone(tone)
+    return (f'<div style="border-top:1px solid #263044;margin-top:18px;padding-top:16px;">'
+            f'<h3 style="margin:0 0 9px;color:{color};font-size:13px;line-height:1.6;">'
+            f'{_mail_text(title)}</h3>{body}</div>')
+
+
+def _mail_card(title: str, body: str, subtitle: str = "", badge: str = "") -> str:
+    return (
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+        'style="width:100%;margin:0 0 18px;border-collapse:separate;border:1px solid #263044;'
+        'border-radius:12px;background-color:#121621;color:#edf2fa;">'
+        '<tr><td class="mail-card-pad" style="padding:24px;overflow-wrap:anywhere;word-break:break-word;">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+        'style="width:100%;table-layout:fixed;"><tr><td valign="top" style="width:72%;">'
+        f'<h2 style="margin:0;color:#ffffff;font-size:26px;line-height:1.25;">{_mail_text(title)}</h2>'
+        f'<div style="margin-top:6px;color:#a9b6ca;font-size:12px;line-height:1.65;">{_mail_text(subtitle)}</div>'
+        f'</td><td align="left" valign="top" style="text-align:left;">{badge}</td></tr></table>'
+        f'{body}</td></tr></table>')
+
+
+def _mail_document(title: str, subtitle: str, content: str, *,
+                   eyebrow: str = "DAILY INTELLIGENCE", preheader: str = "") -> str:
+    """Inline-first table layout; CSS only enhances the 320px+ mobile layout."""
+    return f'''<!doctype html>
+<html lang="he" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark">
+<title>{_mail_text(title)}</title>
+<style>
+body,table,td{{font-family:Arial,Helvetica,sans-serif;}}
+table{{mso-table-lspace:0pt;mso-table-rspace:0pt;}}
+img{{border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;}}
+a[x-apple-data-detectors]{{color:inherit!important;text-decoration:none!important;}}
+@media screen and (max-width:520px){{
+ .mail-outer{{padding:12px 8px!important;}}
+ .mail-card-pad{{padding:18px 14px!important;}}
+ .mail-title{{font-size:26px!important;}}
+ .mail-metric-row{{display:block!important;font-size:0!important;}}
+ .mail-metric{{display:inline-block!important;width:50%!important;vertical-align:top!important;}}
+ .mail-value{{font-size:21px!important;}}
+}}
+</style></head>
+<body bgcolor="#090b10" dir="rtl" style="margin:0;padding:0;background-color:#090b10;color:#edf2fa;direction:rtl;">
+<div data-email-preheader="true" style="display:none;font-size:1px;line-height:1px;color:#090b10;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">{_mail_text(preheader or subtitle, 220)}</div>
+<table role="presentation" width="100%" bgcolor="#090b10" cellpadding="0" cellspacing="0" style="width:100%;background-color:#090b10;"><tr>
+<td class="mail-outer" align="center" style="padding:30px 16px;">
+<!--[if mso]><table role="presentation" width="760" align="center"><tr><td><![endif]-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" dir="rtl" style="width:100%;max-width:760px;text-align:right;direction:rtl;">
+<tr><td style="padding:0 2px 24px;border-bottom:1px solid #263044;">
+<div dir="ltr" style="direction:ltr;text-align:left;font-size:13px;font-weight:bold;letter-spacing:2px;color:#8bb5ff;">STOCK SCANNER <span style="color:#526580;">/</span> INTELLIGENCE</div>
+<div dir="ltr" style="direction:ltr;text-align:left;font-size:10px;letter-spacing:1.4px;color:#a9b6ca;margin-top:8px;">{_mail_text(eyebrow, 100)}</div>
+<h1 class="mail-title" style="font-size:32px;line-height:1.35;margin:23px 0 8px;color:#ffffff;">{_mail_text(title)}</h1>
+<p style="font-size:13px;line-height:1.8;margin:0;color:#a9b6ca;">{_mail_text(subtitle)}</p>
+</td></tr><tr><td style="padding-top:24px;">{content}</td></tr>
+<tr><td style="padding:18px 8px 6px;border-top:1px solid #263044;text-align:center;">
+<div style="font-size:10px;letter-spacing:1.5px;color:#8b9ab1;" dir="ltr">STOCK SCANNER · ENTRY &amp; EXIT INTELLIGENCE</div>
+<p style="font-size:11px;line-height:1.8;color:#8b9ab1;margin:9px 0 0;">הודעה אוטומטית — אינה מהווה ייעוץ פיננסי.</p>
+</td></tr></table><!--[if mso]></td></tr></table><![endif]-->
+</td></tr></table></body></html>'''
+
+
+def _mail_plain_text(document: str) -> str:
+    from html.parser import HTMLParser
+    class TextOnly(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.parts, self.hidden = [], 0
+        def handle_starttag(self, tag, attrs):
+            if tag in {"head", "style", "script"}:
+                self.hidden += 1
+            if not self.hidden and tag in {"br", "p", "div", "h1", "h2", "h3", "tr", "li"}:
+                self.parts.append("\n")
+        def handle_endtag(self, tag):
+            if tag in {"head", "style", "script"}:
+                self.hidden = max(0, self.hidden - 1)
+            if not self.hidden and tag in {"td", "th"}:
+                self.parts.append(" | ")
+            elif not self.hidden and tag in {"p", "div", "h1", "h2", "h3", "tr", "li"}:
+                self.parts.append("\n")
+        def handle_data(self, data):
+            if not self.hidden:
+                self.parts.append(data)
+    parser = TextOnly()
+    parser.feed(document)
+    parser.close()
+    return re.sub(r"\n[ \t|]*\n(?:[ \t|]*\n)+", "\n\n", ''.join(parser.parts)).strip()
+
+
+def _attach_mail_content(message, document: str) -> None:
+    """Keep CID images in related; put text/plain before text/html alternatives."""
+    target = message
+    if message.get_content_subtype() == "related":
+        target = MIMEMultipart("alternative")
+        message.attach(target)
+    target.attach(MIMEText(_mail_plain_text(document), "plain", "utf-8"))
+    target.attach(MIMEText(document, "html", "utf-8"))
+
+
+def _build_html_card(alert: dict, company: dict, send_date: str, sector: dict | None = None,
+                     intel: dict | None = None, catalyst: dict | None = None,
+                     rs: dict | None = None) -> str:
+    """Render existing signal fields without recalculating scores or trade levels."""
+    company = company if isinstance(company, dict) else {}
+    meta = alert.get("meta") if isinstance(alert.get("meta"), dict) else {}
+    ticker = str(alert.get("ticker", ""))
+    entry = alert.get("planned_entry", alert.get("breakout_level"))
+    stop, target = alert.get("stop_loss"), alert.get("target")
+    quality = alert.get("entry_quality") if isinstance(alert.get("entry_quality"), dict) else meta.get("entry_quality", {})
+    quality = quality if isinstance(quality, dict) else {}
+    qm = quality.get("metrics") if isinstance(quality.get("metrics"), dict) else {}
+    pro = alert.get("professional_quality") if isinstance(alert.get("professional_quality"), dict) else {}
     exit_plan = _ensure_exit_plan(alert)
-    meta    = alert.get("meta", {}) or {}
-    reasons = meta.get("score_reasons", []) or []
-    fails   = meta.get("fail_reasons", []) or []
-    size    = int(meta.get("position_size", 0) or 0)
-    risk_ps = abs(entry - stop)
-    color   = "#15803d" if score >= 70.0 else "#a16207"
-    quality = alert.get("entry_quality", {}) if isinstance(alert.get("entry_quality", {}), dict) else meta.get("entry_quality", {}) if isinstance(meta.get("entry_quality", {}), dict) else {}
-    q_status = quality.get("status", "ENTRY_READY")
-    q_reasons = quality.get("reasons", [])[:8] if isinstance(quality.get("reasons", []), list) else []
-    q_fails = quality.get("blocking_fails", [])[:6] if isinstance(quality.get("blocking_fails", []), list) else []
-    q_metrics = quality.get("metrics", {}) if isinstance(quality.get("metrics", {}), dict) else {}
-    q_line = (
-        f"Volume ×{q_metrics.get('volume_ratio'):.2f}" if isinstance(q_metrics.get('volume_ratio'), (int, float)) else "Volume N/A"
-    ) + " | " + (
-        f"RS {q_metrics.get('rs_score'):.0f}" if isinstance(q_metrics.get('rs_score'), (int, float)) else "RS N/A"
-    ) + " | " + (
-        f"52W {q_metrics.get('high52_proximity')*100:.0f}%" if isinstance(q_metrics.get('high52_proximity'), (int, float)) else "52W N/A"
-    )
-    quality_lis = "".join(f"<li>✅ {r}</li>" for r in q_reasons) or "<li>✅ עבר שכבת Entry Ready</li>"
-    quality_bad = "".join(f"<li>⚠️ {r}</li>" for r in q_fails)
-    quality_html = f'''
-  <div style="padding:14px;border-bottom:1px solid #e5e7eb;background:#f0fdf4;">
-    <h3 style="margin:0 0 8px;color:#166534;">🚀 Entry Ready Quality</h3>
-    <div style="font-size:12px;color:#374151;margin-bottom:6px;"><b>{q_status}</b> · {q_line}</div>
-    <ul style="margin:0;padding-right:16px;font-size:12px;">{quality_lis}{quality_bad}</ul>
-  </div>'''
-
-    pro = alert.get("professional_quality", {}) if isinstance(alert.get("professional_quality", {}), dict) else {}
-    pro_components = pro.get("components", {}) if isinstance(pro.get("components", {}), dict) else {}
-    def _pc(name):
-        try:
-            return float((pro_components.get(name, {}) or {}).get("score", 0) or 0)
-        except Exception:
-            return 0.0
-    pro_html = ""
+    model = meta.get("target_model")
+    target_model_text = {"R_MULTIPLE_SCENARIO": "תרחיש לפי מכפלת R · אינו יעד מבני",
+                         "PRIOR_SWING_HIGH": "שיא מקומי קודם", "MEASURED_MOVE": "מהלך מדוד של התבנית",
+                         "LEGACY_TARGET_REFERENCE": "יעד ייחוס מהגרסה הקודמת"}.get(model, model or "לא נרשם")
+    score = pro.get("professional_score", alert.get("score"))
+    pattern = alert.get("display_pattern_name", alert.get("pattern_type", ""))
+    body = (f'<div style="margin:16px 0 6px;color:#d4deee;font-size:14px;font-weight:bold;line-height:1.7;">'
+            f'{_mail_text(pattern)}</div>')
+    body += _mail_metrics([
+        ("כניסה מתוכננת", _mail_number(entry, prefix="$"), "blue"),
+        ("Stop Loss · מקורי", _mail_number(stop, prefix="$"), "red"),
+        ("Target 1 · ייחוס", _mail_number(target, prefix="$"), "green"),
+        ("יחס סיכוי / סיכון", _mail_number(alert.get("rr_ratio"), suffix=":1"), "amber"),
+    ])
+    body += _mail_rows([
+        ("נפח ביחס לממוצע", _mail_number(qm.get("volume_ratio"), suffix="×")),
+        ("RS Score", _mail_number(qm.get("rs_score"), 0)),
+        ("קרבה לשיא 52 שבועות", _mail_number(qm.get("high52_proximity"), 0, suffix="%", scale=100)),
+        ("תאריך נר האיתות", meta.get("signal_date") or "לא נרשם"),
+    ])
+    body += '<!-- scanner-chart -->'
+    # Risk per share is display arithmetic only; use the exact existing levels.
+    try:
+        risk = abs(_mail_float(entry) - _mail_float(stop))
+    except (ValueError, TypeError, OverflowError):
+        risk = None
+    body += _mail_section("פרטי העסקה", _mail_rows([
+        ("סיכון למניה", _mail_number(risk, prefix="$")),
+        ("גודל פוזיציה מחושב", _mail_number(meta.get("position_size"), 0)),
+        ("Pivot התבנית", _mail_number(alert.get("pattern_pivot", meta.get("pattern_pivot")), prefix="$")),
+        ("מחיר ייחוס בעת האיתות", _mail_number(alert.get("reference_price", meta.get("reference_price")), prefix="$")),
+        ("מודל היעד", target_model_text),
+    ]) + '<p style="font-size:11px;color:#a9b6ca;line-height:1.7;margin:10px 0 0;">כניסה מתוכננת היא מחיר ייחוס של האיתות; אינה אישור לביצוע עסקה.</p>')
+    body += _mail_section("Entry Ready · אימות הכניסה",
+        _mail_rows([("סטטוס", quality.get("status", "ENTRY_READY")),
+                    ("ציון Entry", _mail_number(quality.get("quality_score"), 0, suffix="/100"))])
+        + _mail_list(quality.get("reasons"), "עבר שכבת Entry Ready")
+        + _mail_list(quality.get("blocking_fails"), limit=6), "green")
     if pro:
-        pro_html = f'''
-  <div style="padding:14px;border-bottom:1px solid #e5e7eb;background:#eff6ff;">
-    <h3 style="margin:0 0 8px;color:#1d4ed8;">🧠 Professional Trade Quality</h3>
-    <div style="font-size:20px;font-weight:900;color:#1d4ed8;">{float(pro.get("professional_score",0) or 0):.0f}/100 · {pro.get("label","QUALIFIED")}</div>
-    <div style="font-size:11px;color:#374151;margin-top:6px;line-height:1.7;">
-      Trend {_pc("trend"):.0f} · Multi-RS {_pc("rs"):.0f} · Sector {_pc("sector"):.0f} · Accumulation {_pc("accumulation"):.0f} · Execution {_pc("execution"):.0f} · Risk {_pc("risk"):.0f} · Market {_pc("market"):.0f}
-    </div>
-  </div>'''
+        components = pro.get("components") if isinstance(pro.get("components"), dict) else {}
+        rows = [("ציון Professional", _mail_number(pro.get("professional_score"), 0, suffix="/100")),
+                ("סיווג", pro.get("label") or "לא נרשם")]
+        for key, label in [("trend", "Trend"), ("rs", "Multi-RS"), ("sector", "Sector"),
+                           ("accumulation", "Accumulation"), ("execution", "Execution"),
+                           ("risk", "Risk"), ("market", "Market")]:
+            component = components.get(key) if isinstance(components.get(key), dict) else {}
+            if component:
+                rows.append((label, _mail_number(component.get("score"), 0)))
+        body += _mail_section("Professional · איכות הסטאפ", _mail_rows(rows))
+    if meta.get("score_reasons"):
+        body += _mail_section("קריטריונים שאומתו", _mail_list(meta["score_reasons"], limit=16), "green")
+    if meta.get("fail_reasons"):
+        body += _mail_section("אזהרות", _mail_list(meta["fail_reasons"], limit=16), "amber")
+    protection = _mail_number(exit_plan.get("profit_protection_trigger_pct"), 0, prefix="+", suffix="%")
+    trigger = _mail_number(exit_plan.get("profit_protection_trigger_price"), prefix="$")
+    atr = _mail_number(exit_plan.get("chandelier_atr_mult"), 1)
+    body += _mail_section("Exit Intelligence · תוכנית היציאה", _mail_list([
+        f"Stop Loss המקורי נשאר קבוע: {_mail_number(stop, prefix='$')}",
+        f"Profit Protection מתחיל ב-{protection}, סביב {trigger}.",
+        f"לאחר ההפעלה: Profit Floor = Highest High − {atr}×ATR14; הרצפה רק עולה.",
+        f"Target 1 ({_mail_number(target, prefix='$')}) הוא יעד ייחוס בלבד ואינו גורם ליציאה אוטומטית.",
+        "יציאה על שינוי כיוון דורשת כמה אישורים יחד; Doji לבדו הוא אזהרה ולא SELL.",
+        "אותות Reversal יומיים נבדקים רק על נר סגור.",
+    ]))
+    desc = str(company.get("description") or "")
+    company_body = (f'<p style="font-size:12px;color:#c5d0e0;line-height:1.8;margin:0 0 8px;">'
+                    f'{_mail_text(desc[:300] + ("…" if len(desc) > 300 else ""))}</p>' if desc else "")
+    company_body += _mail_rows([
+        ("סקטור", company.get("sector") or "לא זמין"),
+        ("שווי שוק", _mail_number(company.get("market_cap_b"), 1, prefix="$", suffix="B")),
+        ("EPS", _mail_number(company.get("eps"), prefix="$")),
+        ("מועד דוח", company.get("earnings_date") or "לא ידוע"),
+    ])
+    body += _mail_section("פרטי החברה", company_body, "muted")
+    if isinstance(sector, dict) and sector:
+        rotation = (_sector_rotation_cache or {}).get(sector.get("sector", ""), {})
+        sector_rows = [("סיכום סקטור", sector.get("summary") or "לא זמין"),
+                       ("סנטימנט", sector.get("sentiment") or "לא זמין")]
+        if rotation:
+            sector_rows += [("Rotation", rotation.get("rank", "—")),
+                            ("RS vs SPY", _mail_number(rotation.get("rs_spy"), 1, suffix="%", signed=True))]
+        body += _mail_section("סקטור ורוטציה", _mail_rows(sector_rows) + _mail_list(sector.get("news"), limit=3))
+    intelligence = intel if isinstance(intel, dict) else {}
+    intel_rows = []
+    if isinstance(rs, dict) and rs.get("rs_score") is not None:
+        intel_rows.append(("RS Score", rs.get("summary", "")))
+    for key, label in [("weekly", "שבועי"), ("accum", "A/D Score"), ("insider", "Insider"),
+                       ("short", "Short"), ("options", "Options"),
+                       ("darkpool", "Narrow-range volume proxy"), ("inst", "13F"),
+                       ("sentiment", "Sentiment"), ("congress", "Congress")]:
+        item = intelligence.get(key) if isinstance(intelligence.get(key), dict) else {}
+        if item.get("summary"):
+            intel_rows.append((label, item["summary"]))
+    if intel_rows:
+        body += _mail_section("ניתוח משלים", _mail_rows(intel_rows), "muted")
+    if isinstance(catalyst, dict) and catalyst:
+        catalyst_rows = [("סיווג", catalyst.get("catalyst_label") or "לא זמין")]
+        if catalyst.get("earnings_str"):
+            catalyst_rows.append(("דוח", catalyst["earnings_str"]))
+        for key, label in [("sector_strength", "סקטור"), ("analyst", "אנליסטים"), ("insider", "Insider")]:
+            item = catalyst.get(key) if isinstance(catalyst.get(key), dict) else {}
+            if item.get("summary"):
+                catalyst_rows.append((label, item["summary"]))
+        body += _mail_section("Catalyst · מידע תומך", _mail_rows(catalyst_rows), "muted")
+    body += f'<p style="font-size:11px;color:#8b9ab1;margin:18px 0 0;">תאריך השליחה: {_mail_text(send_date)}</p>'
+    return _mail_card(ticker, body, company.get("name") or ticker,
+                      _mail_pill(_mail_number(score, 0, suffix="/100") + " · איכות", "green"))
 
-    ok_lis  = "".join(f'<li>✅ {r}</li>' for r in reasons) or "<li>✅ ללא פירוט</li>"
-    bad_lis = "".join(f'<li>⚠️ {r}</li>' for r in fails)
-    warns   = (f'<div style="padding:12px 16px;"><h3 style="color:#b91c1c">אזהרות</h3>'
-               f'<ul>{bad_lis}</ul></div>') if fails else ""
 
-    # Company card
-    name        = company.get("name", ticker)
-    sector      = company.get("sector", "N/A")
-    desc        = company.get("description", "") or ""
-    eps         = company.get("eps")
-    mc_b        = company.get("market_cap_b")
-    edate       = company.get("earnings_date")
-    eps_str     = f"${eps:.2f}" if eps is not None else "N/A"
-    mc_str      = f"${mc_b}B" if mc_b else "N/A"
-    earn_str    = str(edate) if edate else "לא ידוע"
-    desc_html   = f'<p style="margin:6px 0;font-size:12px;color:#374151;line-height:1.5;">{desc[:300]}{"..." if len(desc)>300 else ""}</p>' if desc else ""
+def _mail_chart(cid: str, ticker: str) -> str:
+    return ('<div style="margin-top:18px;">'
+            '<div style="color:#a9b6ca;font-size:11px;margin-bottom:8px;">גרף האיתות · נתוני הסורק</div>'
+            f'<img src="cid:{_mail_text(cid, 100)}" alt="גרף {_mail_text(ticker, 50)}" '
+            'width="700" style="display:block;width:100%;max-width:700px;height:auto;'
+            'border:1px solid #263044;border-radius:8px;background-color:#ffffff;"></div>')
 
-    company_html = f'''
-  <div style="padding:12px 16px;border-bottom:1px solid #e5e7eb;background:#f8fafc;">
-    <div style="font-size:13px;font-weight:700;color:#1e40af;margin-bottom:4px;">{name} · {sector}</div>
-    {desc_html}
-    <div style="display:flex;gap:16px;margin-top:6px;font-size:12px;color:#6b7280;">
-      <span>📊 EPS: <b style="color:#111">{eps_str}</b></span>
-      <span>💰 שווי: <b style="color:#111">{mc_str}</b></span>
-      <span>📅 דוח: <b style="color:#111">{earn_str}</b></span>
-    </div>
-  </div>'''
 
-    # Sector HTML
-    sector_html = ""
-    if sector and isinstance(sector, dict):
-        sent = sector.get("sentiment", "NEUTRAL")
-        sent_color = {"STRONG": "#15803d", "WEAK": "#b91c1c", "NEUTRAL": "#92400e"}.get(sent, "#92400e")
-        sent_bg    = {"STRONG": "#f0fdf4", "WEAK": "#fef2f2", "NEUTRAL": "#fffbeb"}.get(sent, "#fffbeb")
-        news_items = sector.get("news", [])
-        news_html  = "".join(f'<li style="font-size:11px;color:#374151;margin-bottom:3px;">📰 {h}</li>'
-                             for h in news_items[:3])
+def _mail_position_card(values: dict) -> str:
+    v = values
+    tone = "green" if v["pnl_pct"] >= 0 else "red"
+    body = (f'<p style="margin:16px 0 0;color:#c5d0e0;font-size:13px;line-height:1.8;">'
+            f'{_mail_text(v["status_text"])}</p>')
+    body += '<div style="margin-top:10px;">' + _mail_pill(v["status"], "amber" if v["status"] == "WATCH" else "blue") + '</div>'
+    body += _mail_metrics([
+        ("כניסה", _mail_number(v["entry"], prefix="$"), "blue"),
+        ("מחיר מעקב אחרון", _mail_number(v["price_now"], prefix="$"), "blue"),
+        ("Stop מקורי וקבוע", _mail_number(v["stop"], prefix="$"), "red"),
+        ("Profit Floor", v["floor_txt"] if str(v["floor_txt"]).startswith("$") else "—", "green"),
+    ])
+    body += _mail_rows([
+        ("תבנית", v["pattern"]), ("פתיחה", v["date_open"] or "לא נרשם"),
+        ("זמן פתוח", f'{v["days_open"]} ימים'),
+        ("מצב Profit Floor", v["floor_txt"]),
+        ("Max profit", _mail_number(v["max_profit"], 1, suffix="%", signed=True)),
+        ("Target 1 · ייחוס", _mail_number(v["target"], prefix="$")),
+        ("סטטוס יעד", v["target_note"]),
+        ("Reversal score", _mail_number(v["score"], 0, suffix="/100")),
+        ("סטטוס מנוע", v["status"]),
+    ])
+    body += _mail_section("Exit Intelligence", _mail_list(v["signals"], "אין אותות Reversal משמעותיים", 6),
+                          "amber" if v["status"] == "WATCH" else "blue")
+    return _mail_card(v["ticker"], body, "מעקב פוזיציה פתוחה",
+                      _mail_pill(_mail_number(v["pnl_pct"], 1, suffix="%", signed=True), tone))
 
-        # הוסף נתוני רוטציה אם קיימים
-        rotation_map = _sector_rotation_cache or {}
-        sector_name  = sector.get("sector", "")
-        rot_data     = rotation_map.get(sector_name, {})
-        rot_rank     = rot_data.get("rank", "")
-        rot_rs       = rot_data.get("rs_spy")
-        rot_line     = ""
-        if rot_rank:
-            rank_emoji = {"HOT": "🔥", "WARM": "🟢", "NEUTRAL": "🟡", "COLD": "🔴", "FROZEN": "❄️"}.get(rot_rank, "")
-            rs_str     = f" | RS vs SPY: {rot_rs:+.1f}%" if rot_rs is not None else ""
-            rot_line   = f'<div style="font-size:11px;color:#374151;margin-top:4px;">{rank_emoji} Rotation: <b>{rot_rank}</b>{rs_str}</div>'
-        sector_html = f'''
-  <div style="padding:12px 16px;border-bottom:1px solid #e5e7eb;background:{sent_bg};">
-    <div style="font-size:12px;font-weight:700;color:{sent_color};margin-bottom:6px;">
-      📊 {sector.get("summary","N/A")}
-    </div>
-    {rot_line}
-    {f'<ul style="margin:4px 0 0;padding-right:16px;">{news_html}</ul>' if news_html else ""}
-  </div>'''
 
-    # ── Deep Intelligence HTML ─────────────────────────
-    intel_html = ""
-    if (intel and isinstance(intel, dict)) or (rs and isinstance(rs, dict)):
-        weekly  = (intel or {}).get("weekly",  {}) or {}
-        accum   = (intel or {}).get("accum",   {}) or {}
-        insider = (intel or {}).get("insider", {}) or {}
-        short   = (intel or {}).get("short",   {}) or {}
-        options = (intel or {}).get("options",  {}) or {}
-        darkpool= (intel or {}).get("darkpool", {}) or {}
-        inst    = (intel or {}).get("inst",      {}) or {}
-        sentiment=(intel or {}).get("sentiment", {}) or {}
-        congress = (intel or {}).get("congress",  {}) or {}
+def _mail_exit_card(a: dict, pnl: float, floor_txt: str, sigs: list) -> str:
+    body = _mail_metrics([
+        ("כניסה", _mail_number(a.get("entry"), prefix="$"), "blue"),
+        ("יציאה", _mail_number(a.get("exit_price"), prefix="$"), "green" if pnl >= 0 else "red"),
+        ("Stop מקורי", _mail_number(a.get("stop"), prefix="$"), "red"),
+        ("Profit Floor", floor_txt, "green"),
+    ])
+    body += _mail_rows([
+        ("סיבת יציאה", a.get("reason", "")),
+        ("Target 1 · ייחוס", _mail_number(a.get("target"), prefix="$")),
+        ("Max profit", _mail_number(a.get("max_profit_pct"), 1, suffix="%", signed=True)),
+        ("Reversal score", _mail_number(a.get("exit_score"), 0, suffix="/100")),
+        ("זמן פתוח", f'{a.get("days_open", "—")} ימים'),
+    ])
+    body += _mail_section("אותות היציאה", _mail_list(sigs, "Stop Loss מקורי", 6), "amber")
+    return _mail_card(a.get("ticker", ""), body, a.get("reason", ""),
+                      _mail_pill(_mail_number(pnl, 1, suffix="%", signed=True), "green" if pnl >= 0 else "red"))
 
-        rows = []
-        # RS Score — תמיד בראש
-        if rs and isinstance(rs, dict) and rs.get("rs_score") is not None:
-            rs_sum = rs.get("summary", "")
-            rows.append(f'<tr><td style="padding:5px 8px;font-weight:600;color:#374151;width:120px;">📊 RS Score</td>'
-                       f'<td style="padding:5px 8px;color:#111;">{rs_sum}</td></tr>')
-        if weekly.get("summary"):
-            rows.append(f'<tr><td style="padding:5px 8px;font-weight:600;color:#374151;width:120px;">📈 שבועי</td>'
-                       f'<td style="padding:5px 8px;color:#111;">{weekly["summary"]}</td></tr>')
-        if accum.get("summary"):
-            rows.append(f'<tr><td style="padding:5px 8px;font-weight:600;color:#374151;width:120px;">📦 A/D Score</td>'
-                       f'<td style="padding:5px 8px;color:#111;">{accum["summary"]}</td></tr>')
-        if insider.get("summary"):
-            rows.append(f'<tr><td style="padding:5px 8px;font-weight:600;color:#374151;">👔 Insider</td>'
-                       f'<td style="padding:5px 8px;color:#111;">{insider["summary"]}</td></tr>')
-        if short.get("summary"):
-            rows.append(f'<tr><td style="padding:5px 8px;font-weight:600;color:#374151;">📉 Short</td>'
-                       f'<td style="padding:5px 8px;color:#111;">{short["summary"]}</td></tr>')
-        # Options Flow
-        opt_sum = options.get("summary", "")
-        if opt_sum and opt_sum != "אין נתוני אופציות" and opt_sum != "אין פעילות חריגה":
-            opt_emoji = "🔥" if options.get("bullish_flow") else "📊"
-            rows.append(f'<tr><td style="padding:5px 8px;font-weight:600;color:#374151;width:120px;">{opt_emoji} Options</td>'
-                       f'<td style="padding:5px 8px;color:#111;">{opt_sum}</td></tr>')
-        # Narrow-range volume proxy
-        dp_sum = darkpool.get("summary", "")
-        if dp_sum and "אין Narrow-range volume proxy" not in dp_sum and "שגיאה" not in dp_sum:
-            dp_emoji = "🟢" if darkpool.get("net_bias") == "BULLISH" else "🔴" if darkpool.get("net_bias") == "BEARISH" else "🏊"
-            rows.append(f'<tr><td style="padding:5px 8px;font-weight:600;color:#374151;width:120px;">{dp_emoji} Narrow-range volume proxy</td>'
-                       f'<td style="padding:5px 8px;color:#111;">{dp_sum}</td></tr>')
-        # 13F מוסדיים
-        inst_sum = inst.get("summary", "")
-        if inst_sum and "אין" not in inst_sum and "שגיאה" not in inst_sum:
-            inst_emoji = "⭐" if inst.get("bullish_signal") else "🏛️"
-            rows.append(f'<tr><td style="padding:5px 8px;font-weight:600;color:#374151;width:120px;">{inst_emoji} 13F</td>'
-                       f'<td style="padding:5px 8px;color:#111;">{inst_sum}</td></tr>')
-        # Social Sentiment
-        sent_sum = sentiment.get("summary", "")
-        if sent_sum and "שגיאה" not in sent_sum and sentiment.get("total_articles", 0) >= 3:
-            sent_col = {"BULLISH": "#15803d", "BEARISH": "#b91c1c", "NEUTRAL": "#92400e"}.get(sentiment.get("sentiment",""), "#374151")
-            rows.append(f'<tr><td style="padding:5px 8px;font-weight:600;color:#374151;width:120px;">💬 Sentiment</td>'
-                       f'<td style="padding:5px 8px;color:{sent_col};font-weight:600;">{sent_sum}</td></tr>')
-        # Congressional Trading
-        cong_sum = congress.get("summary", "")
-        if cong_sum and "שגיאה" not in cong_sum and "אין" not in cong_sum:
-            cong_emoji = "🟢" if congress.get("bullish") else "🔴" if congress.get("net_bias") == "SELL" else "🏛️"
-            rows.append(f'<tr><td style="padding:5px 8px;font-weight:600;color:#374151;width:120px;">{cong_emoji} Congress</td>'
-                       f'<td style="padding:5px 8px;color:#111;">{cong_sum}</td></tr>')
 
-        if rows:
-            rows_html = "".join(rows)
-            intel_html = f'''
-  <div style="padding:12px 16px;border-bottom:1px solid #e5e7eb;background:#fafafa;">
-    <div style="font-size:12px;font-weight:700;color:#1e40af;margin-bottom:8px;">🔬 ניתוח מעמיק</div>
-    <table style="width:100%;font-size:12px;border-collapse:collapse;">
-      {rows_html}
-    </table>
-  </div>'''
-
-    # ── Catalyst Engine HTML ────────────────────────────────
-    catalyst_html = ""
-    if catalyst and isinstance(catalyst, dict):
-        c_label  = catalyst.get("catalyst_label", "")
-        c_score  = catalyst.get("catalyst_score", 0)
-        earn_str = catalyst.get("earnings_str", "")
-        sect_sum = catalyst.get("sector_strength", {}).get("summary", "")
-        anal_sum = catalyst.get("analyst", {}).get("summary", "")
-        insd_sum = catalyst.get("insider", {}).get("summary", "")
-
-        bg_color = {0: "#f9fafb", 1: "#fffbeb", 2: "#fff7ed", 3: "#f0fdf4", 4: "#ecfdf5"}.get(c_score, "#f9fafb")
-        hd_color = {0: "#6b7280", 1: "#92400e", 2: "#c2410c", 3: "#15803d", 4: "#065f46"}.get(c_score, "#374151")
-
-        rows_c = []
-        if earn_str:
-            rows_c.append(f'<tr><td style="padding:5px 8px;font-weight:600;color:#374151;width:120px;">🗓️ דוח</td>'
-                         f'<td style="padding:5px 8px;color:#111;">{earn_str}</td></tr>')
-        if sect_sum:
-            rows_c.append(f'<tr><td style="padding:5px 8px;font-weight:600;color:#374151;">📊 סקטור</td>'
-                         f'<td style="padding:5px 8px;color:#111;">{sect_sum}</td></tr>')
-        if anal_sum and anal_sum != "אין מידע אנליסטים":
-            rows_c.append(f'<tr><td style="padding:5px 8px;font-weight:600;color:#374151;">🎯 אנליסטים</td>'
-                         f'<td style="padding:5px 8px;color:#111;">{anal_sum}</td></tr>')
-        if insd_sum and "אין" not in insd_sum:
-            rows_c.append(f'<tr><td style="padding:5px 8px;font-weight:600;color:#374151;">👔 Insider</td>'
-                         f'<td style="padding:5px 8px;color:#111;">{insd_sum}</td></tr>')
-
-        if rows_c:
-            rows_html_c = "".join(rows_c)
-            catalyst_html = f'''
-  <div style="padding:12px 16px;border-bottom:1px solid #e5e7eb;background:{bg_color};">
-    <div style="font-size:13px;font-weight:700;color:{hd_color};margin-bottom:8px;">💡 מנוע הסברה — {c_label}</div>
-    <table style="width:100%;font-size:12px;border-collapse:collapse;">
-      {rows_html_c}
-    </table>
-  </div>'''
-
-    return f"""
-<div dir="rtl" style="font-family:Arial,sans-serif;max-width:860px;margin:0 auto 24px;
-     border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;background:#fff;">
-  <div style="background:{color};color:#fff;padding:14px;text-align:center;">
-    <div style="font-size:26px;font-weight:800;">{ticker}</div>
-    <div style="opacity:.9;margin-top:4px;">{alert.get('pattern_type','')}</div>
-  </div>
-  {company_html}
-  <div style="display:flex;gap:10px;padding:14px;border-bottom:1px solid #e5e7eb;">
-    <div style="flex:1;background:#ecfdf5;border:2px solid #22c55e;border-radius:8px;
-                padding:10px;text-align:center;">
-      <div style="font-size:11px;color:#374151;font-weight:700;">ציון</div>
-      <div style="font-size:26px;font-weight:900;color:#166534;">{score:.0f}/100</div>
-    </div>
-    <div style="flex:1;background:#fffbeb;border:2px solid #f59e0b;border-radius:8px;
-                padding:10px;text-align:center;">
-      <div style="font-size:11px;color:#374151;font-weight:700;">R:R</div>
-      <div style="font-size:26px;font-weight:900;color:#92400e;">{rr:.2f}:1</div>
-    </div>
-    <div style="flex:1;background:#eff6ff;border:2px solid #3b82f6;border-radius:8px;
-                padding:10px;text-align:center;">
-      <div style="font-size:11px;color:#374151;font-weight:700;">כניסה</div>
-      <div style="font-size:26px;font-weight:900;color:#1d4ed8;">${entry:.2f}</div>
-    </div>
-  </div>
-  <div style="padding:14px;border-bottom:1px solid #e5e7eb;">
-    <h3 style="margin:0 0 8px;color:#1d4ed8;">ניהול סיכונים</h3>
-    <table style="width:100%;font-size:13px;border-collapse:collapse;">
-      <tr>
-        <td style="padding:6px;border-bottom:1px solid #f3f4f6;">סטופ-לוס</td>
-        <td style="padding:6px;border-bottom:1px solid #f3f4f6;font-weight:800;color:#b91c1c;">${stop:.2f}</td>
-        <td style="padding:6px;border-bottom:1px solid #f3f4f6;">סיכון/מניה: <b>${risk_ps:.2f}</b></td>
-      </tr>
-      <tr>
-        <td style="padding:6px;">Target 1 (יעד ייחוס)</td>
-        <td style="padding:6px;font-weight:800;color:#166534;">${target:.2f}</td>
-        <td style="padding:6px;">גודל פוזיציה: <b>{size:,}</b></td>
-      </tr>
-    </table>
-  </div>
-  <div style="padding:14px;border-bottom:1px solid #e5e7eb;background:#f8fafc;">
-    <h3 style="margin:0 0 8px;color:#0f766e;">🧭 Exit Intelligence Plan</h3>
-    <ul style="margin:0;padding-right:16px;font-size:12px;line-height:1.7;">
-      <li>🛑 Stop Loss המקורי נשאר קבוע: <b>${stop:.2f}</b></li>
-      <li>🛡️ Profit Protection מתחיל רק ב-<b>+{float(exit_plan.get('profit_protection_trigger_pct',5)):.0f}%</b> (סביב ${float(exit_plan.get('profit_protection_trigger_price') or 0):.2f})</li>
-      <li>📏 לאחר ההפעלה: Profit Floor = Highest High − <b>{float(exit_plan.get('chandelier_atr_mult',3)):.1f}×ATR14</b>, ורק עולה</li>
-      <li>🎯 Target 1 (${target:.2f}) הוא יעד ייחוס בלבד — אינו סוגר אוטומטית מניה שהמגמה שלה עדיין בריאה</li>
-      <li>🔄 יציאה על שינוי כיוון דורשת כמה אישורים יחד; Doji לבדו הוא אזהרה ולא SELL</li>
-      <li>🕯️ אותות Reversal יומיים נבדקים רק על נר סגור</li>
-    </ul>
-  </div>
-  <div style="padding:14px;border-bottom:1px solid #e5e7eb;">
-    <h3 style="margin:0 0 8px;color:#1d4ed8;">קריטריונים שאומתו</h3>
-    <ul style="margin:0;padding-right:16px;">{ok_lis}</ul>
-  </div>
-  {quality_html}
-  {pro_html}
-  {warns}
-  {sector_html}
-  {intel_html}
-  {catalyst_html}
-  <div style="padding:10px;text-align:center;font-size:11px;color:#6b7280;">
-    נשלח: <b>{send_date}</b>
-  </div>
-</div>"""
+def _mail_daily_summary(stats: dict, filter_stats: dict, regime: dict,
+                        prefilter_stats: dict, note: str, now_str: str) -> str:
+    skipped = regime.get("allow_trading", True) is False
+    errors = _infra_int(stats.get("errors", 0))
+    headline = "הסריקה דולגה לפי מצב השוק" if skipped else "אין סטאפים לשליחה היום"
+    tone = "amber" if skipped or errors else "muted"
+    body = _mail_pill("מצב שוק" if skipped else "ללא סטאפים", tone)
+    body += f'<p style="color:#c5d0e0;font-size:13px;line-height:1.9;margin:16px 0;">{_mail_text(note or headline)}</p>'
+    body += _mail_metrics([
+        ("נסרקו בפועל", _mail_number(stats.get("scanned", 0), 0), "blue"),
+        ("התראות שנשלחו", _mail_number(stats.get("sent", 0), 0), "green"),
+        ("שגיאות קריטיות", _mail_number(stats.get("errors", 0), 0), "red" if errors else "muted"),
+        ("אחרי Universe", _mail_number(prefilter_stats.get("total"), 0), "muted"),
+    ])
+    run_rows = [
+        ("מניות אחרי Universe", prefilter_stats.get("total", "N/A")),
+        ("עברו EMA28 Pre-filter", prefilter_stats.get("passed", "N/A")),
+        ("נדחו ב־Pre-filter EMA28", prefilter_stats.get("failed", "N/A")),
+        ("נדחו ב־Market Cap Pre-check (<$1B)", _infra_int(prefilter_stats.get("market_cap_known_reject", 0) or 0) + _infra_int(prefilter_stats.get("market_cap_verified_reject", 0) or 0)),
+        ("Market Cap חסר שאומת מעל $1B", prefilter_stats.get("market_cap_verified_pass", 0)),
+        ("Market Cap עדיין לא ידוע — fail-open", prefilter_stats.get("market_cap_unresolved_pass", 0), "ניסיון נוסף מתבצע בתוך Full Scan"),
+        ("עברו Market Cap והגיעו לסריקה מלאה", prefilter_stats.get("post_market_cap_passed", prefilter_stats.get("passed", "N/A"))),
+        ("באטצ׳ים שנכשלו והועברו הלאה", prefilter_stats.get("download_failed_batches", 0), "לא נמחקים — עוברים לסריקה מלאה"),
+        ("מניות בלי נתונים בבאטצ׳ והועברו הלאה", prefilter_stats.get("missing_tickers", 0), "לא פוסלים בגלל חוסר נתונים זמני"),
+    ]
+    reject_rows = [
+        ("Market Cap / No Data", _infra_int(filter_stats.get("market_cap", 0)) + _infra_int(filter_stats.get("no_data", 0))),
+        ("דוחות קרובים", filter_stats.get("earnings", 0)),
+        ("EMA28", filter_stats.get("ema28", 0)),
+        ("MA150 רחוק", filter_stats.get("ma150_dist", 0)),
+        ("MA לא קרוב ל־neckline", filter_stats.get("ma_neckline", 0)),
+        ("תבנית קיימת אבל לא Entry Ready — טיקרים", filter_stats.get("entry_quality_unique", filter_stats.get("entry_quality", 0)), f"{filter_stats.get('entry_quality', 0)} מועמדי תבנית נפסלו"),
+        ("עבר Entry Ready אך נפסל ב-Professional — טיקרים", filter_stats.get("professional_quality_unique", filter_stats.get("professional_quality", 0)), f"{filter_stats.get('professional_quality', 0)} מועמדי תבנית נפסלו"),
+        ("לא נמצאה תבנית", filter_stats.get("no_pattern", 0)),
+        ("Reverse Scanner", filter_stats.get("reverse_scan", 0)),
+    ]
+    body += _mail_section("משפך הסינון", _mail_rows(run_rows))
+    body += _mail_section("פירוט דחיות בסריקה מלאה", _mail_rows(reject_rows), "muted")
+    body += _mail_section("מצב השוק", f'<p style="font-size:13px;color:#c5d0e0;line-height:1.9;margin:0;">{_mail_text(regime.get("summary", "מצב שוק לא ידוע"))}</p>')
+    return _mail_document("סיכום הסריקה היומי", now_str, _mail_card(headline, body, "דוח פעילות הסורק"),
+                          eyebrow="DAILY SCAN REPORT", preheader=note or headline)
 
 def _canonical_pattern_name(alert: dict) -> str:
     return str(alert.get("pattern_type", "")).lstrip("🏆⭐ ")
@@ -9694,11 +10302,129 @@ def _evaluation_columns() -> list[str]:
     return cols
 
 
+def _entry_research_thresholds() -> dict:
+    return {"entry_min_score": ENTRY_READY_MIN_SCORE, "professional_min_score": PRO_MIN_SCORE,
+            "min_rr": ENTRY_MIN_RR, "min_rs_score": ENTRY_MIN_RS_SCORE,
+            "breakout_min_volume_ratio": ENTRY_MIN_VOLUME_RATIO,
+            "pullback_min_volume_ratio": ENTRY_PULLBACK_MIN_VOLUME_RATIO,
+            "retest_min_volume_ratio": ENTRY_RETEST_MIN_VOLUME_RATIO,
+            "min_close_position": ENTRY_MIN_CLOSE_POS, "min_body_ratio": ENTRY_MIN_BODY_RATIO,
+            "max_extension_pct": ENTRY_MAX_EXTENSION_PCT,
+            "earnings_exclusion_calendar_days": EARNINGS_FILTER_DAYS,
+            "require_verified_earnings": REQUIRE_VERIFIED_EARNINGS,
+            "rs_score_method": "WEIGHTED_EXCESS_VS_SPY_TANH_NOT_PERCENTILE"}
+
+
+def _capture_entry_research_diagnostics(alert: dict, stage: str, df=None) -> None:
+    """Record skipped-gate evidence; research scores never authorize a live alert.
+
+    DATA_WAIT originally short-circuits all technical gates. Compute a separate
+    diagnostic score on valid closed bars without replacing that live decision.
+    A bounded near-miss sample also receives a separate Professional score.
+    """
+    meta = alert.setdefault("meta", {})
+    try:
+        active_quality = alert.get("entry_quality") or {}
+        data_blockers = list(active_quality.get("blocking_fails", [])) if stage == "DATA_WAIT" else []
+        quality = active_quality
+        if stage == "DATA_WAIT" and df is not None and not df.empty:
+            if _validate_long_trade_levels(alert)[0]:
+                quality = evaluate_entry_quality(
+                    df=df, ticker=alert.get("ticker", ""),
+                    breakout_level=alert.get("breakout_level", 0), pattern_meta=meta,
+                    base_score=float(alert.get("base_score", alert.get("score", 0)) or 0),
+                    rr=alert.get("rr_ratio"), regime=get_market_regime())
+        audit = {"schema_version": 3, "signal_date": meta.get("signal_date"),
+                 "captured_at": datetime.now(timezone.utc).isoformat(),
+                 "active_stage": stage, "data_blockers": data_blockers,
+                 "entry_score": quality.get("quality_score"),
+                 "entry_blockers": list(quality.get("blocking_fails", [])),
+                 "technical_entry_ready": bool(quality.get("entry_ready")),
+                 "metrics": dict(quality.get("metrics", {})),
+                 "active_thresholds": _entry_research_thresholds(),
+                 "research_only": True}
+        # Separate from alert['professional_quality']; it is never used by main().
+        score = _to_float_or_none(quality.get("quality_score"))
+        if (stage == "ENTRY_REJECTED" and PRO_SHADOW_DIAGNOSTICS and not data_blockers
+                and df is not None and not df.empty and _validate_long_trade_levels(alert)[0]
+                and score is not None and score >= PRO_SHADOW_MIN_ENTRY_SCORE
+                and len(audit["entry_blockers"]) <= PRO_SHADOW_MAX_ENTRY_BLOCKERS):
+            shadow = evaluate_professional_trade_quality(
+                df=df, ticker=alert.get("ticker", ""), alert=alert,
+                entry_quality=quality, regime=get_market_regime())
+            audit["professional_shadow"] = {"score": shadow.get("professional_score"),
+                "blockers": list(shadow.get("blockers", [])),
+                "components": shadow.get("components", {}), "research_only": True}
+        professional = alert.get("professional_quality") or {}
+        if professional:
+            audit["active_professional"] = {"score": professional.get("professional_score"),
+                "blockers": list(professional.get("blockers", [])),
+                "components": professional.get("components", {})}
+        meta["entry_diagnostics_v3"] = audit
+    except Exception as exc:
+        # Diagnostics must not turn a rejected candidate into an alert or block a valid alert.
+        meta["entry_diagnostics_v3"] = {"schema_version": 3, "research_only": True,
+                                       "error_type": type(exc).__name__, "active_stage": stage}
+        log(f"Entry research diagnostics error: {type(exc).__name__}: {exc}")
+
+
+def _write_entry_funnel_audit() -> dict:
+    """Daily report, independent of Saturday's 20-session learning report.
+
+    Dates below are observation dates, including rejected candidates. Weekly
+    counts include only actual SENT records and do not establish complete-week coverage.
+    """
+    from collections import Counter
+    result = {"schema_version": 3, "code_version": CODE_VERSION,
+              "generated_at": datetime.now(timezone.utc).isoformat(),
+              "active_thresholds": _entry_research_thresholds(), "mode": "REPORT_ONLY",
+              "limitations": ["candidate rows are correlated", "not broker fills",
+                              "observation date is not evidence of email delivery",
+                              "weeks may be partial", "shadow scores never authorize alerts"]}
+    rows = []
+    if os.path.exists(SETUP_EVALUATIONS_CSV):
+        rows = pd.read_csv(SETUP_EVALUATIONS_CSV, dtype={"evaluation_id": str}).to_dict("records")
+    stages, blockers, data_wait_technical, weeks = Counter(), Counter(), Counter(), Counter()
+    full_audits = shadow_scores = diagnostic_errors = 0
+    ticker_sessions = set()
+    for row in rows:
+        stage = str(row.get("stage", ""))
+        stages[stage] += 1
+        ticker_sessions.add((str(row.get("ticker", "")), str(row.get("signal_date", ""))))
+        try:
+            blockers.update(set(json.loads(row.get("blockers") or "[]")))
+            meta = json.loads(row.get("metadata_json") or "{}")
+            audit = meta.get("entry_diagnostics_v3") or {}
+            full_audits += int(bool(audit.get("metrics")))
+            shadow_scores += int(bool(audit.get("professional_shadow")))
+            diagnostic_errors += int(bool(audit.get("error_type")))
+            if stage == "DATA_WAIT":
+                data_wait_technical.update(set(audit.get("entry_blockers", [])))
+            if stage == "SENT":
+                stamp = pd.Timestamp(row["observed_at"])
+                if stamp.tzinfo is None:
+                    stamp = stamp.tz_localize("UTC")
+                iso = stamp.tz_convert("America/New_York").date().isocalendar()
+                weeks[f"{iso.year}-W{iso.week:02d}"] += 1
+        except (ValueError, TypeError, KeyError):
+            diagnostic_errors += 1
+    result.update({"observations": len(rows), "unique_ticker_sessions": len(ticker_sessions),
+                   "stage_counts": dict(stages), "top_blockers": dict(blockers.most_common(20)),
+                   "data_wait_technical_blockers": dict(data_wait_technical.most_common(20)),
+                   "records_with_full_entry_metrics": full_audits,
+                   "records_with_professional_shadow": shadow_scores,
+                   "diagnostic_errors": diagnostic_errors, "sent_by_observed_week": dict(weeks)})
+    _atomic_write_json(ENTRY_AUDIT_FILE, result)
+    log(f"Daily entry audit saved: {len(rows)} candidates; full metrics={full_audits}; pro shadow={shadow_scores}")
+    return result
+
+
 def _record_setup_evaluation(alert: dict, stage: str, df: pd.DataFrame | None = None) -> None:
     """Buffer candidate-level evidence, including rejected, selected and SMTP-failed setups."""
     if not SHADOW_TRACKING_ENABLED and stage != "SENT":
         return
     try:
+        _capture_entry_research_diagnostics(alert, stage, df)
         meta = alert.get("meta") or {}
         signal = meta.get("signal_date")
         if df is not None and not df.empty:
@@ -9709,7 +10435,8 @@ def _record_setup_evaluation(alert: dict, stage: str, df: pd.DataFrame | None = 
         stop = _to_float_or_none(alert.get("stop_loss"))
         target = _to_float_or_none(alert.get("target"))
         pattern = _canonical_pattern_name(alert)
-        signature = [CODE_VERSION, alert.get("ticker"), pattern, signal, entry, stop, target]
+        signature = [CODE_VERSION, alert.get("ticker"), pattern, signal, entry, stop, target,
+                     RESEARCH_SLIPPAGE_BPS]
         evaluation_id = hashlib.sha256(json.dumps(signature, default=str).encode()).hexdigest()[:24]
         previous = _EVALUATION_BUFFER.get(evaluation_id, {})
         stamp = alert.get("sent_at") if stage == "SENT" else previous.get("observed_at")
@@ -9730,8 +10457,8 @@ def _record_setup_evaluation(alert: dict, stage: str, df: pd.DataFrame | None = 
                        "target_model": meta.get("target_model", "LEGACY_TARGET_REFERENCE"),
                        "entry_quality": quality.get("quality_score", alert.get("entry_quality_score")),
                        "professional_score": pro.get("professional_score", alert.get("professional_score")),
-                       "blockers": json.dumps(blockers, ensure_ascii=False, default=str),
-                       "metadata_json": json.dumps({k: v for k, v in meta.items() if k not in ("entry_quality", "professional_quality")}, ensure_ascii=False, default=str),
+                       "blockers": json.dumps(_redact_log_value(blockers), ensure_ascii=False, default=str),
+                       "metadata_json": json.dumps(_redact_log_value({k: v for k, v in meta.items() if k not in ("entry_quality", "professional_quality")}), ensure_ascii=False, default=str),
                        "execution_model": "COUNTERFACTUAL_NEXT_ELIGIBLE_OPEN",
                        "slippage_bps": RESEARCH_SLIPPAGE_BPS, "checked": False,
                        "evaluation_status": "PENDING"})
@@ -10001,150 +10728,153 @@ def _build_setup_chart_figure(ticker: str, df: pd.DataFrame, alert: dict):
 def create_chart(ticker: str, df: pd.DataFrame, alert: dict) -> str | None:
     if not PLOTLY_AVAILABLE or df is None:
         return None
+    path = None
+    exported = False
+    fig = None
     try:
         fig = _build_setup_chart_figure(ticker, df, alert)
-        path = os.path.join(CHARTS_DIR, f"{ticker}_{int(time.time())}.png")
+        directory = _MAIL_CHART_DIRECTORY.get() or CHARTS_DIR
+        os.makedirs(directory, exist_ok=True)
+        label = re.sub(r"[^A-Za-z0-9_-]", "_", str(ticker))[:24]
+        descriptor, path = tempfile.mkstemp(prefix=f"scanner-chart-{label}-", suffix=".png", dir=directory)
+        os.close(descriptor)
         pio.write_image(fig, path)
+        exported = True
         return path
     except Exception as exc:
         log(f"Chart export unavailable {ticker}: {type(exc).__name__}: {exc}")
         return None
-
-def send_email_alerts(alerts: list[dict]) -> dict:
-    if not alerts:
-        return {"success": False, "accepted": 0, "refused": 0, "status": "no_alerts"}
-    if not APP_PASSWORD or not TO_EMAILS:
-        log("Email configuration missing — email disabled.")
-        return {"success": False, "accepted": 0, "refused": len(TO_EMAILS), "status": "disabled"}
-
-    alerts = sorted(alerts, key=lambda a: float(a.get("score",0) or 0), reverse=True)
-    now_str   = datetime.now().strftime("%d/%m/%Y")
-    subj_str  = datetime.now().strftime("%Y-%m-%d %H:%M")
-    ci_cache  = {}
-    all_attachments = []
-
-    header = f"""<html><head><meta charset="utf-8"></head>
-<body dir="rtl" style="margin:0;padding:0;background:#f3f4f6;">
-<div style="max-width:900px;margin:0 auto;padding:12px;text-align:center;">
-  <h2 style="color:#1d4ed8;">🚀 סורק המניות — {len(alerts)} Entry Ready ({subj_str})</h2>
-</div>"""
-    footer = """<p style="text-align:center;font-size:11px;color:#6b7280;margin:20px 0;">
-  הודעה אוטומטית — אינה מהווה ייעוץ פיננסי.</p></body></html>"""
-
-    cards = ""
-    sector_cache: dict = {}
-    intel_cache:  dict = {}
-    for idx, alert in enumerate(alerts):
-        ticker = (alert.get("ticker") or "").strip().upper()
-        if not ticker:
-            continue
-        if ticker not in ci_cache:
-            ci_cache[ticker] = get_company_card(ticker)
-        company = ci_cache[ticker]
-
-        # ניתוח סקטור
-        if ticker not in sector_cache:
+    finally:
+        fig = None
+        if path and not exported:
             try:
-                result = get_sector_analysis(ticker)
-                sector_cache[ticker] = result if isinstance(result, dict) else {"summary": "N/A", "news": [], "sentiment": "NEUTRAL"}
-            except Exception:
-                sector_cache[ticker] = {"summary": "N/A", "news": [], "sentiment": "NEUTRAL"}
-        sector_data = sector_cache[ticker]
-        if not isinstance(sector_data, dict):
-            sector_data = {"summary": "N/A", "news": [], "sentiment": "NEUTRAL"}
-        alert["_sector"] = sector_data
-
-        # ── Deep Intelligence ──────────────────────────────────
-        if ticker not in intel_cache:
-            try:
-                df_for_intel = alert.get("_df")
-                intel_cache[ticker] = get_deep_intelligence(ticker, df_for_intel)
-            except Exception as e:
-                intel_cache[ticker] = {}
-        intel_data = intel_cache[ticker] if isinstance(intel_cache.get(ticker), dict) else {}
-
-        # ── Catalyst Engine ────────────────────────────────────
-        try:
-            catalyst_data = get_catalyst_engine(ticker, company)
-        except Exception as e:
-            log(f"catalyst_engine error {ticker}: {e}")
-            catalyst_data = {}
-
-        # ── RS Score ───────────────────────────────────────────
-        try:
-            df_for_rs = alert.get("_df")
-            rs_data   = compute_rs_score(ticker, df_for_rs) if df_for_rs is not None else {}
-        except Exception:
-            rs_data = {}
-
-        chart_path = None
-        df = alert.get("_df")  # retain the exact signal frame until selection/history finish
-        if df is None or (hasattr(df, "empty") and df.empty):
-            df = fetch_data_twelvedata(ticker, outputsize=TRIANGLE_LOOKBACK + 10)
-        if df is not None and not df.empty:
-            # חישוב אינדיקטורים רק אם חסרים (df מ-scan_ticker כבר מחושב)
-            if "atr14" not in df.columns:
-                try:
-                    add_technical_indicators(df)
-                except Exception:
-                    pass
-            chart_path = create_chart(ticker, df, alert)
-
-        cards += f'<div style="max-width:900px;margin:0 auto;padding:8px 0;">' \
-                 f'{_build_html_card(alert, company, now_str, sector_data, intel_data, catalyst_data, rs_data)}</div>'
-
-        if chart_path and os.path.exists(chart_path):
-            cid = f"chart_{ticker}_{idx}"
-            cards += (f'<div style="max-width:900px;margin:0 auto;text-align:center;padding-bottom:20px;">'
-                      f'<img src="cid:{cid}" alt="{ticker}" style="max-width:840px;border-radius:10px;"></div>')
-            try:
-                part = MIMEBase("image","png")
-                with open(chart_path,"rb") as fp:
-                    part.set_payload(fp.read())
-                encoders.encode_base64(part)
-                part.add_header("Content-ID", f"<{cid}>")
-                part.add_header("Content-Disposition","inline",filename=os.path.basename(chart_path))
-                all_attachments.append(part)
-            except Exception as e:
-                log(f"chart attach error: {e}")
-            try:
-                os.remove(chart_path)
-            except Exception:
+                os.unlink(path)
+            except FileNotFoundError:
                 pass
-        cards += '<hr style="border:1px solid #ddd;max-width:900px;margin:0 auto;">'
+            except OSError:
+                log("Incomplete chart cleanup deferred")
 
-    msg = MIMEMultipart("related")
-    msg["From"]    = FROM_EMAIL
-    msg["To"]      = ", ".join(TO_EMAILS)
-    if len(alerts) == 1:
-        a = alerts[0]
-        msg["Subject"] = f"⭐ PROFESSIONAL READY {a.get('ticker','')} | {a.get('pattern_type','')} | Quality {a.get('score',0):.1f}"
-    else:
-        msg["Subject"] = f"🚀 {len(alerts)} Entry Ready סטאפים — {subj_str}"
-    msg.attach(MIMEText(header + cards + footer, "html", "utf-8"))
-    for att in all_attachments:
-        msg.attach(att)
-
+@_nonfatal_mail
+def send_email_alerts(alerts: list[dict]) -> dict:
+    ci_cache, sector_cache, intel_cache = {}, {}, {}
+    all_attachments = []
     try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as srv:
-            srv.login(FROM_EMAIL, APP_PASSWORD)
-            refused = srv.sendmail(FROM_EMAIL, TO_EMAILS, msg.as_string()) or {}
-        accepted = len(TO_EMAILS) - len(refused)
-        log(f"Email server accepted {len(alerts)} alert(s) for {accepted}/{len(TO_EMAILS)} recipients; refused={len(refused)}")
-        return {"success": accepted > 0, "accepted": accepted, "refused": len(refused),
-                "status": "accepted" if not refused else "partial"}
-    except Exception as e:
-        log(f"Email send error: {type(e).__name__}: {e}")
-        return {"success": False, "accepted": 0, "refused": len(TO_EMAILS), "status": "failed"}
+        if not alerts:
+            return {"success": False, "accepted": 0, "refused": 0, "status": "no_alerts"}
+        if not APP_PASSWORD or not TO_EMAILS:
+            log("Email configuration missing — email disabled.")
+            return {"success": False, "accepted": 0, "refused": len(TO_EMAILS), "status": "disabled"}
+
+        alerts = sorted(alerts, key=lambda a: _infra_float(a.get("score",0), 0.0), reverse=True)
+        now_str   = datetime.now().strftime("%d/%m/%Y")
+        subj_str  = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+        cards = ""
+        for idx, alert in enumerate(alerts):
+            ticker = (alert.get("ticker") or "").strip().upper()
+            if not ticker:
+                continue
+            if ticker not in ci_cache:
+                ci_cache[ticker] = get_company_card(ticker)
+            company = ci_cache[ticker]
+
+            # ניתוח סקטור
+            if ticker not in sector_cache:
+                try:
+                    result = get_sector_analysis(ticker)
+                    sector_cache[ticker] = result if isinstance(result, dict) else {"summary": "N/A", "news": [], "sentiment": "NEUTRAL"}
+                except Exception:
+                    sector_cache[ticker] = {"summary": "N/A", "news": [], "sentiment": "NEUTRAL"}
+            sector_data = sector_cache[ticker]
+            if not isinstance(sector_data, dict):
+                sector_data = {"summary": "N/A", "news": [], "sentiment": "NEUTRAL"}
+            alert["_sector"] = sector_data
+
+            # ── Deep Intelligence ──────────────────────────────────
+            if ticker not in intel_cache:
+                try:
+                    df_for_intel = alert.get("_df")
+                    intel_cache[ticker] = get_deep_intelligence(ticker, df_for_intel)
+                except Exception as e:
+                    intel_cache[ticker] = {}
+            intel_data = intel_cache[ticker] if isinstance(intel_cache.get(ticker), dict) else {}
+
+            # ── Catalyst Engine ────────────────────────────────────
+            try:
+                catalyst_data = get_catalyst_engine(ticker, company)
+            except Exception as e:
+                log(f"catalyst_engine error {ticker}: {e}")
+                catalyst_data = {}
+
+            # ── RS Score ───────────────────────────────────────────
+            try:
+                df_for_rs = alert.get("_df")
+                rs_data   = compute_rs_score(ticker, df_for_rs) if df_for_rs is not None else {}
+            except Exception:
+                rs_data = {}
+
+            chart_path = None
+            df = alert.get("_df")  # retain the exact signal frame until selection/history finish
+            if df is None or (hasattr(df, "empty") and df.empty):
+                df = fetch_data_twelvedata(ticker, outputsize=TRIANGLE_LOOKBACK + 10)
+            if df is not None and not df.empty:
+                # חישוב אינדיקטורים רק אם חסרים (df מ-scan_ticker כבר מחושב)
+                if "atr14" not in df.columns:
+                    try:
+                        add_technical_indicators(df)
+                    except Exception:
+                        pass
+                chart_path = create_chart(ticker, df, alert)
+
+            card_html = _build_html_card(alert, company, now_str, sector_data, intel_data, catalyst_data, rs_data)
+            chart_html = '<p style="font-size:11px;color:#a9b6ca;margin:16px 0 0;">הגרף אינו זמין במייל זה.</p>'
+            if chart_path and _chart_in_mail_workspace(chart_path) and os.path.exists(chart_path):
+                # Do not derive Content-ID headers from external ticker text.
+                cid = f"scanner_chart_{idx}"
+                try:
+                    part = MIMEBase("image", "png")
+                    with open(chart_path, "rb") as fp:
+                        part.set_payload(fp.read())
+                    encoders.encode_base64(part)
+                    part.add_header("Content-ID", f"<{cid}>")
+                    part.add_header("Content-Disposition", "inline", filename=os.path.basename(chart_path))
+                    all_attachments.append(part)
+                    chart_html = _mail_chart(cid, ticker)
+                except Exception as e:
+                    log(f"chart attach error: {e}")
+            cards += card_html.replace('<!-- scanner-chart -->', chart_html)
+
+        msg = MIMEMultipart("related")
+        msg["From"]    = FROM_EMAIL
+        msg["To"]      = ", ".join(TO_EMAILS)
+        if len(alerts) == 1:
+            a = alerts[0]
+            msg["Subject"] = f"⭐ PROFESSIONAL READY {a.get('ticker','')} | {a.get('pattern_type','')} | Quality {_mail_float(a.get('score',0)):.1f}"
+        else:
+            msg["Subject"] = f"🚀 {len(alerts)} Entry Ready סטאפים — {subj_str}"
+        html_body = _mail_document("סטאפים חדשים", f"{len(alerts)} סטאפים לשליחה · {now_str}", cards,
+                                   eyebrow="ENTRY READY SETUPS",
+                                   preheader=f"{len(alerts)} סטאפים: " + ", ".join(str(a.get("ticker", "")) for a in alerts))
+        _attach_mail_content(msg, html_body)
+        for att in all_attachments:
+            msg.attach(att)
+
+        return _smtp_deliver(msg, "setups")
+    finally:
+        all_attachments.clear()
+        ci_cache.clear()
+        sector_cache.clear()
+        intel_cache.clear()
+@_nonfatal_mail
 def send_daily_summary_email(stats: dict, filter_stats: dict, regime: dict | None = None,
-                             prefilter_stats: dict | None = None, note: str = "") -> None:
+                             prefilter_stats: dict | None = None, note: str = "") -> dict:
     """
     שולח מייל יומי גם כשאין סטאפים.
     המטרה: לדעת שהסריקה באמת רצה, כמה מניות נבדקו, ומה נפסל בדרך.
     """
     if not APP_PASSWORD:
         log("APP_PASSWORD not set — daily summary email disabled.")
-        return
+        return _mail_status("disabled", refused=len(TO_EMAILS))
 
     stats = stats or {}
     filter_stats = filter_stats or {}
@@ -10152,96 +10882,15 @@ def send_daily_summary_email(stats: dict, filter_stats: dict, regime: dict | Non
     regime = regime or {}
 
     now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
-    regime_summary = regime.get("summary", "מצב שוק לא ידוע")
-
-    def row(label: str, value, extra: str = "") -> str:
-        return (
-            f"<tr>"
-            f"<td style='padding:8px 10px;border-bottom:1px solid #e5e7eb;color:#374151;'>{label}</td>"
-            f"<td style='padding:8px 10px;border-bottom:1px solid #e5e7eb;font-weight:700;text-align:left;'>{value}</td>"
-            f"<td style='padding:8px 10px;border-bottom:1px solid #e5e7eb;color:#6b7280;font-size:12px;'>{extra}</td>"
-            f"</tr>"
-        )
-
-    note_html = ""
-    if note:
-        note_html = f"""
-        <div style="background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:12px;margin:14px 0;color:#9a3412;">
-          <b>הערה:</b> {note}
-        </div>
-        """
-
-    html = f"""
-    <html>
-    <body dir="rtl" style="font-family:Arial,sans-serif;background:#f3f4f6;padding:18px;">
-      <div style="max-width:720px;margin:auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">
-        <div style="background:#16a34a;padding:20px;text-align:center;">
-          <h2 style="color:white;margin:0;">✅ סורק המניות רץ בהצלחה</h2>
-          <p style="color:rgba(255,255,255,0.9);margin:6px 0 0;">{now_str}</p>
-        </div>
-
-        <div style="padding:18px;">
-          <p style="font-size:15px;color:#111827;margin-top:0;">
-            לא נמצאו סטאפים מתאימים לשליחה היום.
-          </p>
-          {note_html}
-
-          <h3 style="margin-bottom:8px;color:#111827;">📊 סיכום ריצה</h3>
-          <table style="width:100%;border-collapse:collapse;background:white;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
-            {row("מניות אחרי Universe", prefilter_stats.get("total", "N/A"))}
-            {row("עברו EMA28 Pre-filter", prefilter_stats.get("passed", "N/A"))}
-            {row("נדחו ב־Pre-filter EMA28", prefilter_stats.get("failed", "N/A"))}
-            {row("נדחו ב־Market Cap Pre-check (<$1B)", int(prefilter_stats.get("market_cap_known_reject", 0) or 0) + int(prefilter_stats.get("market_cap_verified_reject", 0) or 0))}
-            {row("Market Cap חסר שאומת מעל $1B", prefilter_stats.get("market_cap_verified_pass", 0))}
-            {row("Market Cap עדיין לא ידוע — fail-open", prefilter_stats.get("market_cap_unresolved_pass", 0), "ניסיון נוסף מתבצע בתוך Full Scan")}
-            {row("עברו Market Cap והגיעו לסריקה מלאה", prefilter_stats.get("post_market_cap_passed", prefilter_stats.get("passed", "N/A")))}
-            {row("באטצ׳ים שנכשלו והועברו הלאה", prefilter_stats.get("download_failed_batches", 0), "לא נמחקים — עוברים לסריקה מלאה")}
-            {row("מניות בלי נתונים בבאטצ׳ והועברו הלאה", prefilter_stats.get("missing_tickers", 0), "לא פוסלים בגלל חוסר נתונים זמני")}
-            {row("מניות שנסרקו בפועל", stats.get("scanned", 0))}
-            {row("שגיאות קריטיות", stats.get("errors", 0))}
-            {row("התראות שנשלחו", stats.get("sent", 0))}
-          </table>
-
-          <h3 style="margin:18px 0 8px;color:#111827;">🔍 פירוט דחיות בסריקה מלאה</h3>
-          <table style="width:100%;border-collapse:collapse;background:white;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
-            {row("Market Cap / No Data", filter_stats.get("market_cap",0) + filter_stats.get("no_data",0))}
-            {row("דוחות קרובים", filter_stats.get("earnings",0))}
-            {row("EMA28", filter_stats.get("ema28",0))}
-            {row("MA150 רחוק", filter_stats.get("ma150_dist",0))}
-            {row("MA לא קרוב ל־neckline", filter_stats.get("ma_neckline",0))}
-            {row("תבנית קיימת אבל לא Entry Ready — טיקרים", filter_stats.get("entry_quality_unique", filter_stats.get("entry_quality",0)), f"{filter_stats.get('entry_quality',0)} מועמדי תבנית נפסלו") }
-            {row("עבר Entry Ready אך נפסל ב-Professional — טיקרים", filter_stats.get("professional_quality_unique", filter_stats.get("professional_quality",0)), f"{filter_stats.get('professional_quality',0)} מועמדי תבנית נפסלו") }
-            {row("לא נמצאה תבנית", filter_stats.get("no_pattern",0))}
-            {row("Reverse Scanner", filter_stats.get("reverse_scan",0))}
-          </table>
-
-          <h3 style="margin:18px 0 8px;color:#111827;">🌍 מצב שוק</h3>
-          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px;color:#374151;">
-            {regime_summary}
-          </div>
-
-          <p style="font-size:11px;color:#6b7280;margin-top:20px;text-align:center;">
-            הודעה אוטומטית — אינה מהווה ייעוץ פיננסי.
-          </p>
-        </div>
-      </div>
-    </body>
-    </html>
-    """
+    html = _mail_daily_summary(stats, filter_stats, regime, prefilter_stats, note, now_str)
 
     msg = MIMEMultipart("alternative")
     msg["From"] = FROM_EMAIL
     msg["To"] = ", ".join(TO_EMAILS)
     msg["Subject"] = f"✅ סורק המניות רץ — אין סטאפים היום — {now_str}"
-    msg.attach(MIMEText(html, "html", "utf-8"))
+    _attach_mail_content(msg, html)
 
-    try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as srv:
-            srv.login(FROM_EMAIL, APP_PASSWORD)
-            srv.sendmail(FROM_EMAIL, TO_EMAILS, msg.as_string())
-        log(f"Daily summary email sent to {len(TO_EMAILS)} recipients.")
-    except Exception as e:
-        log(f"Daily summary email error: {e}")
+    return _smtp_deliver(msg, "daily_summary")
 
 # ============================================================
 #  MAIN LOOP
@@ -10603,14 +11252,14 @@ def _run_saturday_maintenance_if_due() -> bool:
     result = run_self_learning()
     try:
         os.makedirs(os.path.dirname(SATURDAY_MAINTENANCE_STATE_FILE) or ".", exist_ok=True)
-        with open(SATURDAY_MAINTENANCE_STATE_FILE, "w", encoding="utf-8") as f:
-            f.write(today + "\n")
+        _atomic_write_text(SATURDAY_MAINTENANCE_STATE_FILE, today + "\n")
         log(f"💾 Saturday maintenance marker saved: {today}")
     except Exception as e:
         log(f"🧠 Saturday maintenance marker save error: {e}")
     return True
 
 
+@_managed_scanner_run
 def main() -> None:
     global tickers
 
@@ -10668,10 +11317,8 @@ def main() -> None:
         log(f"Position tracker error: {e}")
 
     # בדיקת תנאים הכרחיים לפני ריצה
-    if not APP_PASSWORD:
-        log("❌ FATAL: APP_PASSWORD לא הוגדר. הגדר את משתנה הסביבה APP_PASSWORD ואז הרץ שוב.")
-        log("   דוגמה: export APP_PASSWORD='xxxx xxxx xxxx xxxx'")
-        return
+    if not _email_configured():
+        log("Email delivery disabled: configuration incomplete; scanning continues.")
     if not API_KEYS:
         log("❌ FATAL: אין מפתחות TwelveData API. הגדר TWELVEDATA_API_KEYS.")
         return
@@ -10725,7 +11372,7 @@ def main() -> None:
     regime_name   = regime.get("regime", "NEUTRAL")
     log(f"🎯 MIN_ALERT_SCORE דינמי: {dynamic_score} (Regime={regime_name})")
     log(f"🚀 V9.3 Pattern-Aware Entry: min_quality={ENTRY_READY_MIN_SCORE:.1f}, breakout_volume×{ENTRY_MIN_VOLUME_RATIO:.2f}, pullback/retest_volume×{ENTRY_PULLBACK_MIN_VOLUME_RATIO:.2f}+, RS>={ENTRY_MIN_RS_SCORE:.0f}")
-    log(f"🧩 V9 Pattern Expansion: enabled={V9_PATTERN_ENGINE_ENABLED}, max_per_ticker={V9_MAX_CANDIDATES_PER_TICKER}, patterns=FlatBase/Darvas/VCP/EMA-Pullback/Retest")
+    log(f"🧩 V9 Pattern Expansion: enabled={V9_PATTERN_ENGINE_ENABLED}, all_detected_families_before_entry=True, email_limit={TOP_ALERTS_TO_SEND}, patterns=FlatBase/Darvas/VCP/EMA-Pullback/Retest")
     log(f"🧠 V9.1 Professional Quality: enabled={PRO_ENGINE_ENABLED}, min={PRO_MIN_SCORE:.1f}, trend>={PRO_MIN_TREND_SCORE:.0f}, multi-RS>={PRO_MIN_RS_PROFILE_SCORE:.0f}, max_stop={PRO_MAX_STOP_RISK_PCT*100:.0f}%")
     log(f"🧭 V9.2 Exit Intelligence: fixed_initial_stop=True, profit_protection=+{EXIT_PROFIT_ACTIVATE_PCT:.1f}%, chandelier={EXIT_CHANDELIER_ATR_MULT:.1f}ATR, watch>={EXIT_WATCH_SCORE:.0f}, exit>={EXIT_CONFIRM_SCORE:.0f}, target=reference-only")
 
@@ -10873,6 +11520,10 @@ def main() -> None:
             stats["entry_email_failed"] = True
 
     _flush_setup_evaluations()
+    try:
+        _write_entry_funnel_audit()
+    except Exception as exc:
+        log(f"Daily entry audit error: {type(exc).__name__}: {exc}")
 
     # נקה DataFrames מהזיכרון אחרי שסיימנו לשלוח מיילים וליצור גרפים
     for a in all_alerts:
@@ -10930,18 +11581,22 @@ def main() -> None:
 
     if stats.get("entry_email_failed"):
         log("Full scan finished, but entry email failed; market candle remains eligible for retry.")
-        raise RuntimeError("Entry email delivery failed")
-
-    try:
-        save_last_market_scan_date(market_session_date)
-    except Exception as e:
-        log(f"Market scan date save error: {e}")
+    else:
+        try:
+            save_last_market_scan_date(market_session_date)
+        except Exception as e:
+            log(f"Market scan date save error: {e}")
 
     # ── V9.1.3 Rolling history retention — רק היסטוריה, לא state חי ──
     try:
         cleanup_history_older_than_one_month()
     except Exception as e:
         log(f"History retention cleanup error: {type(e).__name__}: {e}")
+
+    if stats.get("entry_email_failed"):
+        log("Stock Scanner Unified — SCAN COMPLETE; ENTRY EMAIL FAILED")
+        return _mail_status("failed", refused=delivery.get("refused", 0),
+                            scan_completed=True, notification_pending=True)
 
     log("Stock Scanner Unified — DONE")
     log("=" * 60)
