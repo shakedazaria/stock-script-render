@@ -2,12 +2,10 @@ name: Stock Scanner Daily
 
 on:
   schedule:
-    # ניסיונות כל 15 דקות בערך בין 05:00 ל-09:59 לפי שעון ישראל.
-    # אין הגבלת ימים: ה-Python עצמו מחליט לפי נר השוק אם יש צורך ב-Full Scan.
+    # התזמון נשאר כפי שהיה. החסימה לפי היום והשעה נבדקת לפני checkout.
     - cron: "7,22,37,52 5-9 * * *"
       timezone: "Asia/Jerusalem"
 
-  # הפעלה ידנית תמיד אפשרית
   workflow_dispatch:
 
 concurrency:
@@ -37,34 +35,101 @@ jobs:
       SCAN_DELAY_SECONDS: "3"
 
     steps:
+      - name: Check Israel calendar before any scanner work
+        id: calendar
+        shell: bash
+        run: |
+          # העזר נכתב לתיקייה הזמנית של ה-runner, ואינו משנה את קוד הסורק.
+          # הוא משותף לבדיקה הראשונה ולבדיקה החוזרת ממש לפני הפעלת Python.
+          cat > "$RUNNER_TEMP/scanner-calendar.sh" <<'BASH'
+          scanner_calendar_check() {
+            CALENDAR_ALLOWED=false
+            CALENDAR_REASON="Calendar unavailable — scanner blocked."
+            CALENDAR_RUN_SECONDS=0
+            CALENDAR_LIMITED=false
+            CALENDAR_STOP_EPOCH=0
+
+            if [[ ! -r /usr/share/zoneinfo/Asia/Jerusalem ]]; then
+              return 1
+            fi
+            local now_epoch snapshot weekday hour tomorrow boundary remaining
+            if ! now_epoch=$(date +%s); then return 1; fi
+            if ! snapshot=$(TZ=Asia/Jerusalem date -d "@$now_epoch" '+%F %T %u %H'); then
+              return 1
+            fi
+            read -r CALENDAR_DATE CALENDAR_TIME weekday hour <<< "$snapshot"
+            if [[ ! "$weekday" =~ ^[1-7]$ || ! "$hour" =~ ^[0-9]{2}$ ]]; then
+              return 1
+            fi
+
+            # יום שבת כולו חסום. ביום שישי החסימה מסתיימת ב-16:00 בדיוק.
+            if [[ "$weekday" == 6 ]]; then
+              CALENDAR_REASON="Saturday in Israel — scanner blocked."
+              return 1
+            fi
+            if [[ "$weekday" == 5 ]] && (( 10#$hour < 16 )); then
+              CALENDAR_REASON="Friday before 16:00 in Israel — scanner blocked."
+              return 1
+            fi
+
+            CALENDAR_RUN_SECONDS=21600
+            # הגנה גם על ריצה ידנית או מאוחרת שחוצה אל פרק הזמן החסום.
+            # ביום חמישי הגבול הוא שישי 00:00; בשישי הוא שבת 00:00.
+            if [[ "$weekday" == 4 || "$weekday" == 5 ]]; then
+              if ! tomorrow=$(TZ=Asia/Jerusalem date -d "$CALENDAR_DATE +1 day" +%F); then
+                return 1
+              fi
+              if ! boundary=$(TZ=Asia/Jerusalem date -d "$tomorrow 00:00:00" +%s); then
+                return 1
+              fi
+              # השארת מרווח ל-TERM ואחריו KILL לפני תחילת הזמן החסום.
+              remaining=$((boundary - now_epoch - 10))
+              if (( remaining <= 0 )); then
+                CALENDAR_REASON="Blocked period is about to start — scanner blocked."
+                return 1
+              fi
+              if (( remaining < CALENDAR_RUN_SECONDS )); then
+                CALENDAR_RUN_SECONDS=$remaining
+                CALENDAR_LIMITED=true
+                CALENDAR_STOP_EPOCH=$((now_epoch + remaining))
+              fi
+            fi
+            CALENDAR_ALLOWED=true
+            CALENDAR_REASON="Calendar permits scanner execution."
+            return 0
+          }
+          BASH
+
+          source "$RUNNER_TEMP/scanner-calendar.sh"
+          if scanner_calendar_check; then
+            echo "allowed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "allowed=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Israel: ${CALENDAR_DATE:-UNKNOWN} ${CALENDAR_TIME:-UNKNOWN}"
+          echo "$CALENDAR_REASON"
+
       - name: Checkout repository
+        if: steps.calendar.outputs.allowed == 'true'
         uses: actions/checkout@v4
         with:
           persist-credentials: true
           fetch-depth: 0
 
-      # אין כאן בדיקת יום בשבוע ואין בדיקת שעה בפועל.
-      # גם אם GitHub מפעיל Run מתוזמן באיחור, הוא עדיין רשאי לנסות.
-      # רק Full Scan מוצלחת שכבר בוצעה היום חוסמת Full Scan נוספת.
       - name: Check daily full scan status
         id: dailycheck
+        if: steps.calendar.outputs.allowed == 'true'
         shell: bash
+        env:
+          TRIGGER_EVENT: ${{ github.event_name }}
         run: |
           mkdir -p scanner_state
-
           ISRAEL_DATE=$(TZ="Asia/Jerusalem" date +%F)
-          ISRAEL_TIME=$(TZ="Asia/Jerusalem" date +%H:%M)
           MARKER_FILE="scanner_state/last_successful_full_scan_date.txt"
 
-          echo "============================================================"
-          echo "Israel date: $ISRAEL_DATE"
-          echo "Israel time: $ISRAEL_TIME"
-          echo "Event: ${{ github.event_name }}"
-          echo "============================================================"
-
-          # Manual run תמיד עוקף את הנעילה היומית.
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "Manual run — bypassing daily Full Scan lock."
+          # ידני עוקף רק את הנעילה היומית. הוא אינו עוקף את חסימת הזמן.
+          if [ "$TRIGGER_EVENT" = "workflow_dispatch" ]; then
+            echo "Manual run — bypassing daily Full Scan lock. Calendar rules still apply."
             echo "should_run=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -73,7 +138,6 @@ jobs:
           if [ -f "$MARKER_FILE" ]; then
             LAST_SUCCESS=$(tr -d '\r\n ' < "$MARKER_FILE")
           fi
-
           echo "Last successful Full Scan: ${LAST_SUCCESS:-NONE}"
           echo "Today: $ISRAEL_DATE"
 
@@ -99,46 +163,65 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Make sure state folder exists
-        if: steps.dailycheck.outputs.should_run == 'true'
-        run: mkdir -p scanner_state
-
       - name: Run stock scanner
         id: scanner
         if: steps.dailycheck.outputs.should_run == 'true'
         shell: bash
         run: |
+          echo "full_scan_success=false" >> "$GITHUB_OUTPUT"
+          echo "execution_started=false" >> "$GITHUB_OUTPUT"
+
+          # בדיקה חוזרת לפי השעה בפועל, גם אם ההכנות או התור ארכו זמן.
+          source "$RUNNER_TEMP/scanner-calendar.sh"
+          if ! scanner_calendar_check; then
+            echo "$CALENDAR_REASON"
+            exit 0
+          fi
+
+          echo "execution_started=true" >> "$GITHUB_OUTPUT"
+          echo "Israel: $CALENDAR_DATE $CALENDAR_TIME"
+          echo "Maximum scanner runtime for this attempt: $CALENDAR_RUN_SECONDS seconds"
+          SCANNER_LOG="$RUNNER_TEMP/current_scanner_run.log"
+
           set +e
-
-          python stock_scanner_unified.py 2>&1 | tee current_scanner_run.log
-          PYTHON_EXIT=${PIPESTATUS[0]}
-
+          timeout --signal=TERM --kill-after=5s "${CALENDAR_RUN_SECONDS}s" \
+            python stock_scanner_unified.py 2>&1 | tee "$SCANNER_LOG"
+          RUN_RESULTS=("${PIPESTATUS[@]}")
           set -e
 
-          echo "Python exit code: $PYTHON_EXIT"
+          PYTHON_EXIT=${RUN_RESULTS[0]}
+          TEE_EXIT=${RUN_RESULTS[1]}
+          echo "Scanner process exit code: $PYTHON_EXIT"
+
+          if [ "$TEE_EXIT" -ne 0 ]; then
+            echo "Unable to capture scanner completion reliably. No daily lock created."
+            exit "$TEE_EXIT"
+          fi
+
+          if [[ "$CALENDAR_LIMITED" == true ]] &&
+             (( PYTHON_EXIT == 124 || PYTHON_EXIT == 137 )) &&
+             (( $(date +%s) >= CALENDAR_STOP_EPOCH )); then
+            echo "Scanner stopped before the blocked Israel calendar period."
+            echo "No successful Full Scan lock created."
+            exit 0
+          fi
 
           if [ "$PYTHON_EXIT" -ne 0 ]; then
-            echo "Scanner failed."
-            echo "full_scan_success=false" >> "$GITHUB_OUTPUT"
+            echo "Scanner failed. No successful Full Scan lock created."
             exit "$PYTHON_EXIT"
           fi
 
-          # Exit code 0 אינו מספיק: Market Day Guard יכול לדלג בלי Full Scan.
-          # רק DONE מסמן שהסריקה המלאה באמת הסתיימה.
-          if grep -Eq "Stock Scanner Unified.*DONE" current_scanner_run.log; then
+          # Exit code 0 לבדו אינו מספיק: דילוג אינו Full Scan מוצלחת.
+          if grep -Eq 'Stock Scanner Unified.*DONE' "$SCANNER_LOG"; then
             echo "FULL SCAN COMPLETED SUCCESSFULLY"
             echo "full_scan_success=true" >> "$GITHUB_OUTPUT"
           else
             echo "Python finished without Full Scan completion."
-            echo "Market Day Guard probably found no new/changed market candle."
-            echo "The next scheduled attempt remains allowed."
-            echo "full_scan_success=false" >> "$GITHUB_OUTPUT"
+            echo "The next allowed scheduled attempt remains permitted."
           fi
 
       - name: Mark successful full scan
-        if: >
-          steps.dailycheck.outputs.should_run == 'true' &&
-          steps.scanner.outputs.full_scan_success == 'true'
+        if: steps.scanner.outputs.full_scan_success == 'true'
         shell: bash
         run: |
           mkdir -p scanner_state
@@ -147,16 +230,15 @@ jobs:
           echo "Successful Full Scan locked for: $ISRAEL_DATE"
 
       - name: Remove temporary workflow log
-        if: steps.dailycheck.outputs.should_run == 'true' && always()
-        run: rm -f current_scanner_run.log
+        if: always() && steps.scanner.outputs.execution_started == 'true'
+        run: rm -f "$RUNNER_TEMP/current_scanner_run.log"
 
       - name: Commit scanner state to repository
-        if: steps.dailycheck.outputs.should_run == 'true' && always()
+        if: always() && steps.scanner.outputs.execution_started == 'true'
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
           mkdir -p scanner_state
           git add scanner_state/
 
@@ -169,15 +251,17 @@ jobs:
           fi
 
       - name: Upload scanner state artifact
-        if: steps.dailycheck.outputs.should_run == 'true' && always()
+        if: always() && steps.scanner.outputs.execution_started == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: scanner-state-${{ github.run_id }}
           path: scanner_state
           retention-days: 30
 
+      - name: Scanner blocked by Israel calendar
+        if: steps.calendar.outputs.allowed == 'false'
+        run: echo "Scanner skipped before checkout and Python setup — Israel calendar block."
+
       - name: Scanner already completed today
         if: steps.dailycheck.outputs.should_run == 'false'
-        run: |
-          echo "Full Scan already completed successfully today."
-          echo "No Python execution required."
+        run: echo "Full Scan already completed successfully today. No Python execution required."
