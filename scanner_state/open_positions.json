@@ -2854,25 +2854,27 @@
     "data_status": "ok",
     "highest_closed_price": 19.399999618530273,
     "profit_protection_active": true,
-    "profit_exit_floor": 17.6156,
+    "profit_exit_floor": 17.621,
     "exit_intelligence": {
       "status": "RIDE_WINNER",
       "score": 0.0,
       "signals": [],
       "categories": [],
       "profit_protection_active": true,
-      "profit_exit_floor": 17.6156,
+      "profit_exit_floor": 17.621,
       "max_profit_pct": 20.2,
-      "closed_bar_date": "2026-10-22",
+      "closed_bar_date": "2026-10-23",
       "target_reached": true,
       "exit_confirmed": false,
       "exit_reason": null
     },
     "max_profit_pct": 20.2,
     "target_reached": true,
-    "last_tracker_price": 19.350000381469727,
-    "last_tracker_date": "2026-10-23",
-    "soft_warnings": []
+    "last_tracker_price": 18.850000381469727,
+    "last_tracker_date": "2026-10-25",
+    "soft_warnings": [
+      "\u23f0 \u05e4\u05ea\u05d5\u05d7 30 \u05d9\u05de\u05d9\u05dd \u2014 review \u05d1\u05dc\u05d1\u05d3, \u05dc\u05d0 \u05d9\u05e6\u05d9\u05d0\u05d4 \u05d0\u05d5\u05d8\u05d5\u05de\u05d8\u05d9\u05ea"
+    ]
   },
   {
     "ticker": "SCSC",
@@ -2907,17 +2909,13 @@
     },
     "exit_intelligence": {
       "status": "HOLD",
-      "score": 10.0,
-      "signals": [
-        "\u05e1\u05d2\u05d9\u05e8\u05d4 \u05de\u05ea\u05d7\u05ea EMA10 (59.96 < 60.26)"
-      ],
-      "categories": [
-        "price"
-      ],
+      "score": 0.0,
+      "signals": [],
+      "categories": [],
       "profit_protection_active": true,
       "profit_exit_floor": 58.3621,
       "max_profit_pct": 9.01,
-      "closed_bar_date": "2026-10-22",
+      "closed_bar_date": "2026-10-23",
       "target_reached": false,
       "exit_confirmed": false,
       "exit_reason": null
@@ -2928,8 +2926,8 @@
     "close_date": null,
     "pnl_pct": null,
     "data_status": "ok",
-    "last_tracker_price": 59.959999084472656,
-    "last_tracker_date": "2026-10-23",
+    "last_tracker_price": 61.04999923706055,
+    "last_tracker_date": "2026-10-25",
     "soft_warnings": []
   },
   {
