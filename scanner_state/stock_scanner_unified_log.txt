@@ -2925,3 +2925,13 @@
 [2026-10-25 09:11:44] 🧪 V9.3 ENTRY FUNNEL — by pattern: Darvas Box Breakout: ready=0, watch=49 | VCP Breakout: ready=0, watch=39 | Flat Base / Rectangle Breakout: ready=0, watch=24 | EMA21/MA50 Pullback Bounce: ready=0, watch=12 | Falling Wedge: ready=0, watch=3
 [2026-10-25 09:11:44] 💾 Market scan date saved: 2026-10-23
 [2026-10-25 09:11:44] 💾 Market candle fingerprint saved: 3 source(s) → scanner_state/last_market_scan_state.json
+[2026-10-26 08:44:57] ============================================================
+[2026-10-26 08:44:57] Stock Scanner Unified — START
+[2026-10-26 08:44:57] Code version: 2026-10-23-v9.6.2-email-design
+[2026-10-26 08:44:57] Market cap threshold: $1.0B | Pipeline: screener cache → precheck unknowns → fail-open only if unresolved
+[2026-10-26 08:44:57] Entry Ready threshold: quality>=60.0 | candidate_score>=35.0
+[2026-10-26 08:44:57] RESET VERIFIED FIX FILE
+[2026-10-26 08:44:57] ============================================================
+[2026-10-26 08:45:07] 🛡️ Market Day Guard candles: Yahoo:SPY=2026-10-23 close=759.969971 vol=33377700, Yahoo:QQQ=2026-10-23 close=704.400024 vol=30138000, TwelveData:SPY=2026-10-23 close=759.96997 vol=33377700
+[2026-10-26 08:45:07] 🗓️ Market Day Guard: אין תאריך חדש ואין שינוי ב-OHLCV מאז הסריקה האחרונה (2026-10-23); אומת מול 2 מקור/ות זהים
+[2026-10-26 08:45:07] ⏸️ No new market session — exiting before scan to prevent duplicate alerts.
