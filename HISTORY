@@ -1,0 +1,261 @@
+# -*- coding: utf-8 -*-
+"""
+scanner_backtest.py — point-in-time research harness for stock_scanner_unified.py
+
+What it does
+------------
+Imports YOUR scanner file (no changes to it), then for every ticker and every
+trading day in the window it rebuilds the history *as it was on that day* and:
+  1. runs the V9 pattern detectors (Flat Base, Darvas, VCP, Pullback, Retest),
+  2. applies the scanner's own geometry sync, safety check and Entry gate
+     (evaluate_entry_quality) with point-in-time SPAY data (RS, RS-line, regime),
+  3. records the EMA28 global-filter verdict as a flag (not as a hard filter),
+  4. measures the outcome with the scanner's own evaluate_setup_path
+     (next-session open fill, stop/target bracket, 5/10/20 sessions).
+
+Output: one CSV row per detected candidate, plus a printed summary:
+  - candidates and ENTRY_READY signals per week,
+  - outcome by pattern, by EMA28 flag, by number of blockers,
+  - "single blocker" table: what each gate rejected when it was the ONLY blocker.
+
+NOT simulated (needs data that is not point-in-time on Yahoo):
+  earnings filter, market-cap filter, Reverse Scanner, Professional gate,
+  legacy patterns (Cup&Handle, Triangle, Double Bottom, Falling Wedge).
+These are reported as "not simulated", not silently assumed.
+
+Usage (in your own environment, where yfinance is installed):
+  python scanner_backtest.py --scanner stock_scanner_unified.py \
+      --tickers AAPL,MSFT,NVDA --start 2023-01-01 --end 2026-09-30 --out bt.csv
+  or --tickers-file tickers.txt (one symbol per line)
+
+Survivorship bias: a list of today's tickers excludes companies that were
+delisted. Treat results as relative comparisons between rules, not as an
+expected return.
+"""
+import argparse
+import importlib.util
+import os
+import sys
+import time
+from datetime import timedelta
+
+import numpy as np
+import pandas as pd
+
+
+def load_scanner(path):
+    os.environ.setdefault("TWELVEDATA_API_KEYS", "BACKTEST_NOT_USED")
+    os.environ.setdefault("STATE_DIR", os.path.join(os.path.dirname(os.path.abspath(path)), "backtest_state"))
+    os.environ.setdefault("CHARTS_DIR", os.path.join(os.environ["STATE_DIR"], "charts"))
+    spec = importlib.util.spec_from_file_location("scanner_under_test", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def download(symbol, start, end, yf):
+    df = yf.download(symbol, start=start, end=end, interval="1d", progress=False,
+                     auto_adjust=False, threads=False)
+    if df is None or df.empty:
+        return None
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = [str(c[0]).lower() for c in df.columns]
+    else:
+        df.columns = [str(c).lower() for c in df.columns]
+    df.index = pd.to_datetime(df.index).tz_localize(None)
+    need = ["open", "high", "low", "close", "volume"]
+    if not set(need).issubset(df.columns):
+        return None
+    return df[need].dropna(subset=["open", "high", "low", "close"]).copy()
+
+
+# ---------------------------------------------------------------- point-in-time patches
+class PointInTimeSPY:
+    """Replaces the scanner's live SPY lookups with history cut at the signal date."""
+
+    def __init__(self, spy_full):
+        self.full = spy_full
+        self.cut = spy_full
+
+    def set_date(self, day):
+        self.cut = self.full.loc[:day]
+
+    def spy_returns(self):
+        close = self.cut["close"]
+        now = float(close.iloc[-1])
+        out = {}
+        for key, n in (("1m", 21), ("3m", 63), ("6m", 126), ("12m", 252)):
+            out[key] = (now - float(close.iloc[-n])) / float(close.iloc[-n]) if len(close) >= n else None
+        return out
+
+    def regime(self, ma_period=50):
+        # Same rules as get_market_regime(): SPY vs MA50, MA50 slope, -3% band.
+        close = self.cut["close"]
+        if len(close) < ma_period + 2:
+            return {"regime": "UNKNOWN", "data_ok": False, "allow_trading": True, "summary": "UNKNOWN"}
+        ma = close.rolling(ma_period).mean()
+        price, ma50, prev = float(close.iloc[-1]), float(ma.iloc[-1]), float(ma.iloc[-2])
+        vs = round((price - ma50) / ma50 * 100.0, 2)
+        rising = ma50 > prev
+        if price > ma50 and rising:
+            name = "BULL"
+        elif price > ma50 and not rising:
+            name = "NEUTRAL"
+        elif price < ma50 and vs > -3:
+            name = "NEUTRAL"
+        else:
+            name = "BEAR"
+        return {"regime": name, "data_ok": True, "allow_trading": True, "vs_ma50_pct": vs,
+                "summary": f"{name} | SPY {vs:+.1f}% vs MA{ma_period}"}
+
+    def rs_line_new_high(self, df, lookback=63):
+        stock = pd.to_numeric(df["close"], errors="coerce").dropna()
+        joined = pd.concat([stock.rename("s"), self.cut["close"].rename("p")], axis=1).dropna()
+        if len(joined) < max(lookback, 30):
+            return None
+        line = (joined["s"] / joined["p"]).tail(lookback)
+        return bool(float(line.iloc[-1]) >= float(line.max()) * 0.995)
+
+
+def patch(m, pit):
+    m._get_spy_returns = pit.spy_returns
+    m._rs_line_new_high = lambda df, lookback=63: pit.rs_line_new_high(df, lookback)
+    m.get_market_regime = lambda: pit.regime(m.REGIME_MA_PERIOD)
+    m._regime_cache = None
+    m.log = lambda msg: None  # keep the console readable
+
+
+# ---------------------------------------------------------------- core loop
+def scan_history(m, symbol, df, spy, pit, start, end, horizons=(5, 10, 20), min_bars=260):
+    cfg = m._make_v9_pattern_config()
+    rows = []
+    dates = df.index
+    for i in range(min_bars, len(df) - 1):
+        day = dates[i]
+        if day < pd.Timestamp(start) or day > pd.Timestamp(end):
+            continue
+        hist = df.iloc[: i + 1].copy()
+        # cheap pre-screen: every V9 family needs price within ~15% of the 60-bar high
+        hi60 = float(hist["high"].iloc[-61:-1].max())
+        if float(hist["close"].iloc[-1]) < 0.85 * hi60:
+            continue
+        pit.set_date(day)
+        regime = pit.regime(m.REGIME_MA_PERIOD)
+        rs = m.compute_rs_score(symbol, hist).get("rs_score")
+        cands = m.find_v9_pattern_candidates(symbol, hist, rs_score=rs, market_regime=regime["regime"],
+                                             config=cfg, include_rejected=False)
+        if not cands:
+            continue
+        lower = hist.copy()
+        m.ensure_ma_columns(lower)
+        ema_ok, ema_reason = m._ema28_filter_ok(lower)
+        future = df.iloc[i + 1: i + 1 + max(horizons) + 2]
+        for c in cands:
+            alert = m._v9_pattern_candidate_to_alert(c)
+            m._sync_trade_geometry(alert, hist)
+            ok, problems, _ = m._validate_long_trade_levels(alert)
+            if not ok:
+                quality = {"entry_ready": False, "quality_score": 0.0, "blocking_fails": ["SAFETY: " + "; ".join(problems)]}
+            else:
+                quality = m.evaluate_entry_quality(df=lower.copy(), ticker=symbol,
+                                                   breakout_level=alert.get("breakout_level", 0),
+                                                   pattern_meta=alert.get("meta", {}),
+                                                   base_score=float(alert.get("score", 0) or 0),
+                                                   rr=alert.get("rr_ratio"), regime=regime)
+            obs = {"signal_date": day.date().isoformat(),
+                   "eligible_date": (day + timedelta(days=1)).date().isoformat(),
+                   "planned_entry": alert.get("planned_entry"), "stop": alert.get("stop_loss"),
+                   "target": alert.get("target"), "slippage_bps": m.RESEARCH_SLIPPAGE_BPS}
+            outcome = m.evaluate_setup_path(future, obs, horizons=horizons) if len(future) else {}
+            blockers = quality.get("blocking_fails", []) or []
+            row = {"ticker": symbol, "signal_date": obs["signal_date"], "pattern": c.pattern_name,
+                   "v9_status": c.status, "entry_ready": bool(quality.get("entry_ready")),
+                   "entry_quality": quality.get("quality_score"), "n_blockers": len(blockers),
+                   "blockers": " | ".join(blockers), "ema28_ok": ema_ok, "ema28_reason": ema_reason,
+                   "regime": regime["regime"], "rs_score": rs, "planned_entry": obs["planned_entry"],
+                   "stop": obs["stop"], "target": obs["target"], "rr": alert.get("rr_ratio")}
+            row.update({k: v for k, v in outcome.items() if not isinstance(v, (list, dict))})
+            rows.append(row)
+    return rows
+
+
+def summarize(res):
+    if res.empty:
+        print("No candidates.")
+        return
+    res = res.copy()
+    res["week"] = pd.to_datetime(res["signal_date"]).dt.to_period("W").astype(str)
+    # one row per setup episode: first day a ticker+pattern appears within 10 sessions
+    res = res.sort_values(["ticker", "pattern", "signal_date"])
+    first = res.groupby(["ticker", "pattern"])["signal_date"].transform(
+        lambda s: pd.to_datetime(s).diff().dt.days.fillna(999) > 14)
+    ep = res[first]
+    r20 = "bracket_net_r_20d"
+    weeks = ep["week"].nunique()
+    print(f"\nEpisodes: {len(ep)} | weeks covered: {weeks}")
+    print(f"ENTRY_READY episodes per week: {ep['entry_ready'].sum() / max(weeks, 1):.2f}")
+    print(f"ENTRY_READY & EMA28-ok per week (what the live scanner could send, before earnings/PRO): "
+          f"{(ep['entry_ready'] & ep['ema28_ok']).sum() / max(weeks, 1):.2f}")
+    if r20 in ep:
+        ep[r20] = pd.to_numeric(ep[r20], errors="coerce")
+        def table(group_col):
+            g = ep.dropna(subset=[r20]).groupby(group_col)[r20]
+            return pd.DataFrame({"n": g.size(), "mean_R_20d": g.mean().round(3),
+                                 "win_%": (g.apply(lambda s: (s > 0).mean()) * 100).round(1)})
+        print("\nBy pattern:\n", table("pattern").to_string())
+        print("\nBy entry_ready:\n", table("entry_ready").to_string())
+        print("\nBy EMA28 filter verdict:\n", table("ema28_ok").to_string())
+        ep["blockers_bucket"] = pd.cut(ep["n_blockers"], [-1, 0, 1, 2, 4, 99], labels=["0", "1", "2", "3-4", "5+"])
+        print("\nBy number of entry blockers:\n", table("blockers_bucket").to_string())
+        single = ep[ep["n_blockers"] == 1].copy()
+        if not single.empty:
+            single["only_blocker"] = single["blockers"].str.replace(r"\s*\(.*?\)", "", regex=True)
+            print("\nWhen a gate was the ONLY blocker:\n", table_single(single, r20).to_string())
+
+
+def table_single(single, r20):
+    g = single.dropna(subset=[r20]).groupby("only_blocker")[r20]
+    return pd.DataFrame({"n": g.size(), "mean_R_20d": g.mean().round(3),
+                         "win_%": (g.apply(lambda s: (s > 0).mean()) * 100).round(1)}).sort_values("n", ascending=False)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--scanner", required=True)
+    ap.add_argument("--tickers", default="")
+    ap.add_argument("--tickers-file", default="")
+    ap.add_argument("--start", required=True)
+    ap.add_argument("--end", required=True)
+    ap.add_argument("--out", default="scanner_backtest_results.csv")
+    args = ap.parse_args()
+
+    import yfinance as yf
+    m = load_scanner(args.scanner)
+    symbols = [s.strip().upper() for s in args.tickers.split(",") if s.strip()]
+    if args.tickers_file:
+        with open(args.tickers_file) as fh:
+            symbols += [ln.strip().upper() for ln in fh if ln.strip()]
+    hist_start = (pd.Timestamp(args.start) - pd.Timedelta(days=500)).date().isoformat()
+    hist_end = (pd.Timestamp(args.end) + pd.Timedelta(days=45)).date().isoformat()
+    spy = download("SPY", hist_start, hist_end, yf)
+    pit = PointInTimeSPY(spy)
+    patch(m, pit)
+
+    rows = []
+    for k, sym in enumerate(dict.fromkeys(symbols), 1):
+        t0 = time.time()
+        df = download(sym, hist_start, hist_end, yf)
+        if df is None or len(df) < 300:
+            print(f"[{k}/{len(symbols)}] {sym}: not enough data")
+            continue
+        got = scan_history(m, sym, df, spy, pit, args.start, args.end)
+        rows.extend(got)
+        print(f"[{k}/{len(symbols)}] {sym}: {len(got)} candidate-days in {time.time() - t0:.0f}s")
+    res = pd.DataFrame(rows)
+    res.to_csv(args.out, index=False)
+    print(f"\nSaved {len(res)} rows -> {args.out}")
+    summarize(res)
+
+
+if __name__ == "__main__":
+    main()
