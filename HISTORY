@@ -5,7 +5,7 @@ scanner_backtest.py — point-in-time research harness for stock_scanner_unified
 What it does
 ------------
 Imports YOUR scanner file (no changes to it), then for every ticker and every
-trading day in the window it rebuilds the history *as it was on that day* and:
+trading day in the window it rebuilds the history *as it was on that  day* and:
   1. runs the V9 pattern detectors (Flat Base, Darvas, VCP, Pullback, Retest),
   2. applies the scanner's own geometry sync, safety check and Entry gate
      (evaluate_entry_quality) with point-in-time SPAY data (RS, RS-line, regime),
