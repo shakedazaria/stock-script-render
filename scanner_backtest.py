@@ -5,12 +5,11 @@ scanner_backtest.py — point-in-time research harness for stock_scanner_unified
 What it does
 ------------
 Imports YOUR scanner file (no changes to it), then for every ticker and every
-trading day in the window it rebuilds the history *as it was on that  day* and:
+trading day in the window it rebuilds the history *as it was on that day* and:
   1. runs the V9 pattern detectors (Flat Base, Darvas, VCP, Pullback, Retest),
   2. applies the scanner's own geometry sync, safety check and Entry gate
-     (evaluate_entry_quality) with point-in-time SPAY data (RS, RS-line, regime),
-  3. records the EMA28 global-filter verdict as a flag
-(not as a hard filter),
+     (evaluate_entry_quality) with point-in-time SPY data (RS, RS-line, regime),
+  3. records the EMA28 global-filter verdict as a flag (not as a hard filter),
   4. measures the outcome with the scanner's own evaluate_setup_path
      (next-session open fill, stop/target bracket, 5/10/20 sessions).
 
@@ -190,7 +189,7 @@ def summarize(res):
     res = res.sort_values(["ticker", "pattern", "signal_date"])
     first = res.groupby(["ticker", "pattern"])["signal_date"].transform(
         lambda s: pd.to_datetime(s).diff().dt.days.fillna(999) > 14)
-    ep = res[first]
+    ep = res[first].copy()
     r20 = "bracket_net_r_20d"
     weeks = ep["week"].nunique()
     print(f"\nEpisodes: {len(ep)} | weeks covered: {weeks}")
@@ -214,6 +213,24 @@ def summarize(res):
             print("\nWhen a gate was the ONLY blocker:\n", table_single(single, r20).to_string())
 
 
+def sample_universe(path, n, seed, min_cap):
+    """Random, reproducible sample of the scanner's real universe (known market cap >= min_cap only)."""
+    import json
+    import random
+    with open(path, encoding="utf-8") as fh:
+        cache = json.load(fh)
+    caps = cache.get("market_caps") or {}
+    pool = []
+    for t in cache.get("tickers", []):
+        sym = str(t).strip().upper()
+        cap = caps.get(sym)
+        if sym.isalpha() and len(sym) <= 5 and cap is not None and float(cap) >= min_cap:
+            pool.append(sym)
+    pool = sorted(set(pool))
+    random.Random(seed).shuffle(pool)
+    return pool[:max(0, n)]
+
+
 def table_single(single, r20):
     g = single.dropna(subset=[r20]).groupby("only_blocker")[r20]
     return pd.DataFrame({"n": g.size(), "mean_R_20d": g.mean().round(3),
@@ -228,6 +245,10 @@ def main():
     ap.add_argument("--start", required=True)
     ap.add_argument("--end", required=True)
     ap.add_argument("--out", default="scanner_backtest_results.csv")
+    ap.add_argument("--universe-cache", default="",
+                    help="scanner_state/universe_cache.json — used when no tickers are given")
+    ap.add_argument("--sample", type=int, default=150, help="random tickers drawn from the universe cache")
+    ap.add_argument("--seed", type=int, default=1, help="same seed = same sample (reproducible)")
     args = ap.parse_args()
 
     import yfinance as yf
@@ -236,6 +257,11 @@ def main():
     if args.tickers_file:
         with open(args.tickers_file) as fh:
             symbols += [ln.strip().upper() for ln in fh if ln.strip()]
+    if not symbols and args.universe_cache:
+        symbols = sample_universe(args.universe_cache, args.sample, args.seed, m.MIN_MARKET_CAP_USD)
+        print(f"Universe sample: {len(symbols)} tickers (seed={args.seed}) -> {','.join(symbols)}")
+    if not symbols:
+        sys.exit("No tickers: pass --tickers, --tickers-file or --universe-cache")
     hist_start = (pd.Timestamp(args.start) - pd.Timedelta(days=500)).date().isoformat()
     hist_end = (pd.Timestamp(args.end) + pd.Timedelta(days=45)).date().isoformat()
     spy = download("SPY", hist_start, hist_end, yf)
