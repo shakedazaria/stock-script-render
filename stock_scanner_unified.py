@@ -37,7 +37,7 @@ stock_scanner_unified.py
 # RESET VERIFIED FIX FILE — 2026-09-30 V9.3
 # This marker proves this is the rebuilt fixed file, not an old download copy.
 # ============================================================
-CODE_VERSION = "2026-10-23-v9.6.2-email-design"
+CODE_VERSION = "2026-10-26-v9.7-groupA"
 RESET_VERIFIED_FIX_FILE = True
 
 
@@ -1428,15 +1428,15 @@ def _is_probably_common_stock_row(row: dict) -> tuple[bool, str]:
         txt = " ".join(text_parts).lower()
 
         bad_phrases = (
-            " exchange traded fund", " etf", "etf ",
-            " exchange traded note", " etn", "etn ",
+            " exchange traded fund",
+            " exchange traded note",
             "closed end", "closed-end", "closed end fund", "closed-end fund",
             "mutual fund", "index fund", "income fund", "bond fund",
             "preferred", "preference", "depositary share", "depositary shares",
-            "warrant", "warrants", " right", " rights", " unit", " units",
+            "warrant", "warrants",
             "notes due", "senior notes", "subordinated notes", "baby bond", "debenture",
         )
-        if any(p in txt for p in bad_phrases):
+        if any(p in txt for p in bad_phrases) or re.search(r"\b(etf|etn|rights?|units?)\b", txt):
             return False, "fund_etf_preferred_unit_note"
 
         # קרנות סגורות רבות מופיעות כ-Trust בלי מילת Fund. לא נפסול REIT רגיל לפי Trust בלבד,
@@ -2913,9 +2913,9 @@ def ensure_ma_columns(df: pd.DataFrame) -> None:
     if "ma50" not in df.columns:
         df["ma50"] = close.rolling(window=50, min_periods=20).mean()
     if "ma150" not in df.columns:
-        df["ma150"] = close.rolling(window=150, min_periods=50).mean()
+        df["ma150"] = close.rolling(window=150, min_periods=150).mean()
     if "ma200" not in df.columns:
-        df["ma200"] = close.rolling(window=200, min_periods=80).mean()
+        df["ma200"] = close.rolling(window=200, min_periods=200).mean()
 
 def add_technical_indicators(df: pd.DataFrame) -> None:
     """מוסיף ATR14, OBV, RSI14, MACD-hist, ADX14, CCI20."""
@@ -5001,7 +5001,7 @@ def detect_flat_base_breakout(
     technical_target = base_high + (base_high - base_low)
     target_by_r = entry + (entry - stop) * config.min_rr if stop is not None and entry > stop else None
     if target_by_r is not None:
-        target = technical_target
+        target = max(technical_target, target_by_r)
     else:
         target = technical_target
 
@@ -5101,7 +5101,7 @@ def detect_darvas_box_breakout(
         technical_target = box_high + (box_high - box_low)
         target_by_r = close + (close - stop) * config.min_rr if stop is not None and close > stop else None
         if target_by_r is not None:
-            target = technical_target
+            target = max(technical_target, target_by_r)
         else:
             target = technical_target
 
@@ -6578,8 +6578,8 @@ def detect_bullish_triangle(df: pd.DataFrame) -> tuple[bool, float | None, dict]
 
                 # קו חייב להיות אופקי — slope קרוב ל-0
                 slope = (hp_j - hp_i) / max(pj - pi, 1)
-                max_slope = 0.003 * hp_i / max(n, 1)  # סטייה מקסימלית 0.3% לנר
-                if abs(slope) > max_slope:
+                # התנגדות אופקית: שתי הפסגות בטווח TRIANGLE_PRICE_TOL (1.5%) זו מזו
+                if abs(hp_j - hp_i) / max(hp_i, 1e-9) > TRIANGLE_PRICE_TOL:
                     continue  # לא אופקי מספיק
 
                 # neckline = ממוצע הפסגות (קו אופקי)
@@ -7057,6 +7057,13 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
         log(f"{symbol}: market cap too low (${mc/1e6:.0f}M < ${MIN_MARKET_CAP_USD/1e9:.1f}B). Skip."); _fs("market_cap"); return []
     # FIXED: אם mc=None (לא זמין) — ממשיכים, לא דוחים
 
+    # ── פילטר דוחות: לפני הורדת נתונים — חוסך קריאת API לכל מניה שנפסלת ──
+    earn_ok, earn_reason = earnings_filter_ok(symbol)
+    if not earn_ok:
+        log(f"{symbol}: ⏭️ Earnings filter — {earn_reason}"); _fs("earnings"); return []
+    elif DEBUG_SCAN_REASONS and "unknown" not in earn_reason:
+        log(f"{symbol}: 📅 {earn_reason}")
+
     # --- Data ---
     df = fetch_data_twelvedata(symbol, outputsize=500)
     if df is None or df.empty:
@@ -7071,13 +7078,6 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
     if _daily_data_problems(df):
         log(f"{symbol}: invalid/stale daily data: {'; '.join(_daily_data_problems(df))}")
         _fs("no_data"); return []
-
-    # ── פילטר דוחות: skip אם דוח קרוב ────────────────────────
-    earn_ok, earn_reason = earnings_filter_ok(symbol)
-    if not earn_ok:
-        log(f"{symbol}: ⏭️ Earnings filter — {earn_reason}"); _fs("earnings"); return []
-    elif DEBUG_SCAN_REASONS and "unknown" not in earn_reason:
-        log(f"{symbol}: 📅 {earn_reason}")
 
     # ── Double Bottom מוקדם — לפני EMA28 (תבנית שבונה מתחת לממוצע) ──
     # Double Bottom יכול להיבנות מתחת ל-EMA28 ולפרוץ ממנו — לכן בודקים לפני
@@ -7344,7 +7344,7 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
                 data_blockers = []
                 if mc is None:
                     data_blockers.append("Market cap לא אומת מעל $1B")
-                if REQUIRE_VERIFIED_EARNINGS and "unknown" in str(earn_reason).lower():
+                if REQUIRE_VERIFIED_EARNINGS and "earnings date unknown" in str(earn_reason).lower():
                     data_blockers.append("מועד דוחות לא אומת")
                 if data_blockers:
                     quality = {"entry_ready": False, "status": "DATA_WAIT", "quality_score": 0,
@@ -7576,6 +7576,9 @@ def compute_rs_score(ticker: str, df: pd.DataFrame) -> dict:
 
         # ביצועי SPY
         spy  = _get_spy_returns()
+        if not spy:
+            result["summary"] = "RS N/A — SPY unavailable"
+            return result
         s1m  = spy.get("1m",  0) or 0
         s3m  = spy.get("3m",  0) or 0
         s6m  = spy.get("6m",  0) or 0
@@ -7593,7 +7596,9 @@ def compute_rs_score(ticker: str, df: pd.DataFrame) -> dict:
 
         # ציון IBD משוקלל → tanh → 0-100
         import math
-        combined = 0.4 * r3m + 0.2 * r6m + 0.4 * r12m
+        _parts = [(w, r) for w, r, p in ((0.4, r3m, p3m), (0.2, r6m, p6m), (0.4, r12m, p12m)) if p is not None]
+        _wsum = sum(w for w, _ in _parts)
+        combined = (sum(w * r for w, r in _parts) / _wsum) if _wsum else 0.0  # identical to before when all windows exist
         rs = 50 + 50 * math.tanh(combined * 4)
         rs = round(max(1.0, min(99.0, rs)), 1)
         result["rs_score"] = rs
@@ -7708,7 +7713,7 @@ def get_market_regime() -> dict:
         })
         log(f"🌍 {result['summary']}")
         if not allow:
-            log("⛔ BEAR Market — trading suspended (set REGIME_ENABLED=False to override)")
+            log("⛔ BEAR Market — scan suspended (REGIME_ENABLED=True). Note: ENTRY_BLOCK_BEAR_REGIME also blocks entries in BEAR")
 
     except Exception as e:
         log(f"get_market_regime error: {e}")
@@ -8555,7 +8560,7 @@ def send_positions_status_email() -> dict:
                 else:
                     status_emoji, status_text, status_color, status_bg = "🟦", f"להישאר — Stop המקורי נשאר קבוע; Profit Protection יופעל ב-+{EXIT_PROFIT_ACTIVATE_PCT:.0f}%", "#1d4ed8", "#eff6ff"
 
-                sig_html = "".join(f"<li>{x}</li>" for x in signals[:6]) or "<li>אין אותות Reversal משמעותיים</li>"
+                sig_html = "".join(f"<li>{_mail_text(x)}</li>" for x in signals[:6]) or "<li>אין אותות Reversal משמעותיים</li>"
                 target_note = "✅ הושג — אינו גורם ליציאה אוטומטית" if target_reached else "טרם הושג"
                 date_open = p.get("date_open", "")
                 try:
@@ -9301,8 +9306,8 @@ def scan_for_institutional_selling(ticker: str, df: pd.DataFrame) -> dict:
 
         # ── בעלות מוסדית נמוכה ───────────────────────────────
         inst = get_institutional_ownership(ticker)
-        inst_pct = inst.get("inst_ownership_pct") or 0
-        if float(inst_pct) < 30:
+        inst_pct = inst.get("inst_ownership_pct")
+        if inst_pct is not None and float(inst_pct) < 30:
             score += 1
             signals.append(f"🔴 בעלות מוסדית נמוכה: {inst_pct:.0f}%")
 
@@ -10248,7 +10253,7 @@ def _sync_trade_geometry(alert: dict, df: pd.DataFrame | None = None) -> dict:
 def _daily_data_problems(df: pd.DataFrame) -> list[str]:
     issues = []
     try:
-        prices = df[["open", "high", "low", "close"]].apply(pd.to_numeric, errors="coerce")
+        prices = df[["open", "high", "low", "close"]].tail(260).apply(pd.to_numeric, errors="coerce")
         valid = np.isfinite(prices).all(axis=1) & (prices > 0).all(axis=1)
         valid &= prices["high"] >= prices[["open", "close", "low"]].max(axis=1)
         valid &= prices["low"] <= prices[["open", "close", "high"]].min(axis=1)
