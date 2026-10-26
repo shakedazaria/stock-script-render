@@ -9,7 +9,8 @@ trading day in the window it rebuilds the history *as it was on that  day* and:
   1. runs the V9 pattern detectors (Flat Base, Darvas, VCP, Pullback, Retest),
   2. applies the scanner's own geometry sync, safety check and Entry gate
      (evaluate_entry_quality) with point-in-time SPAY data (RS, RS-line, regime),
-  3. records the EMA28 global-filter verdict as a flag (not as a hard filter),
+  3. records the EMA28 global-filter verdict as a flag
+(not as a hard filter),
   4. measures the outcome with the scanner's own evaluate_setup_path
      (next-session open fill, stop/target bracket, 5/10/20 sessions).
 
