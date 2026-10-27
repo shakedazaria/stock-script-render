@@ -3,8 +3,14 @@ on:
   workflow_dispatch:
     inputs:
       tickers:
-        description: "Tickers, comma separated"
-        default: "AAPL,MSFT,NVDA,AMZN,META,GOOGL,AVGO,TSLA,JPM,V,MA,UNH,LLY,XOM,CVX,HD,COST,WMT,PG,KO,PEP,MRK,ABBV,ORCL,CRM,ADBE,AMD,QCOM,TXN,CAT,DE,GE,HON,LMT,UNP,NKE,MCD,DIS,NFLX,BKNG,GS,MS,BAC,AXP,BLK,SPGI,ISRG,NOW,PANW,ANET"
+        description: "Tickers, comma separated (leave EMPTY to sample from the scanner universe)"
+        default: ""
+      sample:
+        description: "How many random tickers from scanner_state/universe_cache.json"
+        default: "150"
+      seed:
+        description: "Random seed (same seed = same tickers)"
+        default: "1"
       start:
         description: "Start date (YYYY-MM-DD)"
         default: "2023-01-01"
@@ -16,7 +22,7 @@ permissions:
 jobs:
   backtest:
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    timeout-minutes: 330
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -27,12 +33,14 @@ jobs:
       - name: Run backtest
         env:
           TICKERS: ${{ inputs.tickers }}
+          SAMPLE: ${{ inputs.sample }}
+          SEED: ${{ inputs.seed }}
           START: ${{ inputs.start }}
           END: ${{ inputs.end }}
         run: |
           set -o pipefail
-          ls -la
-          python scanner_backtest.py --scanner stock_scanner_unified.py --tickers "$TICKERS" --start "$START" --end "$END" --out bt_results.csv 2>&1 | tee bt_summary.txt
+          ls -la scanner_state | head -20
+          python scanner_backtest.py --scanner stock_scanner_unified.py --tickers "$TICKERS" --universe-cache scanner_state/universe_cache.json --sample "$SAMPLE" --seed "$SEED" --start "$START" --end "$END" --out bt_results.csv 2>&1 | tee bt_summary.txt
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
