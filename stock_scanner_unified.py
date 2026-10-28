@@ -37,7 +37,7 @@ stock_scanner_unified.py
 # RESET VERIFIED FIX FILE — 2026-09-30 V9.3
 # This marker proves this is the rebuilt fixed file, not an old download copy.
 # ============================================================
-CODE_VERSION = "2026-10-28-v9.7.1-ema8"
+CODE_VERSION = "2026-10-28-v9.7.2-recent-earnings"
 RESET_VERIFIED_FIX_FILE = True
 
 
@@ -1162,6 +1162,7 @@ _EVALUATION_BUFFER: dict = {}
 _market_cap_diagnostics: dict = {}
 
 # --- סינון דוחות ---
+EARNINGS_RECENT_BLOCK_DAYS = int(os.getenv("EARNINGS_RECENT_BLOCK_DAYS", "3"))  # report in last N calendar days -> wait for post-earnings candles
 EARNINGS_FILTER_DAYS = int(os.getenv("EARNINGS_FILTER_DAYS", "14"))  # skip אם דוח ב-14 ימים
 
 # --- פילטרים חדשים: Quality Gate ---
@@ -2771,6 +2772,8 @@ def get_company_card(ticker: str) -> dict:
 
     # תאריך הדוח הבא — V9.3: רק תאריך עתידי; תאריך עבר נחשב stale ולא "next earnings".
     edate, _earn_status = _get_next_earnings_date(ticker)
+    if _earn_status != "verified_future":
+        edate = None  # v9.7.2: a just-reported (past) date is never shown as "next earnings"
 
     return {
         "name":          name,
@@ -2819,6 +2822,7 @@ def _get_next_earnings_date(ticker: str, today=None) -> tuple[object, str]:
         return _earnings_date_cache[cache_key]
     candidates = []
     saw_past = False
+    past_dates = []
     try:
         obj = yf.Ticker(t)
         try:
@@ -2842,6 +2846,7 @@ def _get_next_earnings_date(ticker: str, today=None) -> tuple[object, str]:
                 dd = pd.Timestamp(d).date()
                 if dd < today:
                     saw_past = True
+                    past_dates.append(dd)
                 else:
                     clean.append(dd)
             except Exception:
@@ -2853,11 +2858,16 @@ def _get_next_earnings_date(ticker: str, today=None) -> tuple[object, str]:
                     dd = pd.Timestamp(d).date()
                     if dd < today:
                         saw_past = True
+                        past_dates.append(dd)
                     else:
                         clean.append(dd)
             except Exception:
                 pass
-        if clean:
+        last_past = max(past_dates) if past_dates else None
+        if last_past is not None and (today - last_past).days <= EARNINGS_RECENT_BLOCK_DAYS:
+            # Report after the signal candle (e.g. after-close yesterday): the price reaction is not in the data yet.
+            result = (last_past, "recent_past")
+        elif clean:
             result = (min(clean), "verified_future")
         elif saw_past:
             result = (None, "stale_past_only")
@@ -2872,6 +2882,8 @@ def earnings_filter_ok(ticker: str) -> tuple[bool, str]:
     """מסנן דוח קרוב; מידע stale/unknown לא מוצג כתאריך עתידי תקין."""
     try:
         edate, status = _get_next_earnings_date(ticker)
+        if status == "recent_past" and edate is not None:
+            return False, f"earnings just reported ({edate}) — waiting for post-earnings candles"
         if edate is None:
             if status == "stale_past_only":
                 return True, "earnings data stale (past dates only) — allowing as UNKNOWN"
