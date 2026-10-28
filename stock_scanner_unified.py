@@ -37,7 +37,7 @@ stock_scanner_unified.py
 # RESET VERIFIED FIX FILE — 2026-09-30 V9.3
 # This marker proves this is the rebuilt fixed file, not an old download copy.
 # ============================================================
-CODE_VERSION = "2026-10-26-v9.7-groupA"
+CODE_VERSION = "2026-10-28-v9.7.1-ema8"
 RESET_VERIFIED_FIX_FILE = True
 
 
@@ -752,7 +752,7 @@ ALERT_DEDUP_LEVEL_PCT = float(os.getenv("ALERT_DEDUP_LEVEL_PCT", "0.015"))
 
 # --- EMA28 (תנאי גלובלי) ---
 # הסגירה חייבת להיות לא יותר מ-3% מעל EMA28
-EMA28_MAX_DIST_PCT    = float(os.getenv("EMA28_MAX_DIST_PCT", "0.03"))   # 3%
+EMA28_MAX_DIST_PCT    = float(os.getenv("EMA28_MAX_DIST_PCT", "0.08"))   # 8% (v9.7.1, backtest 2026-10-27; was 3%)
 # EMA28 חייב בשיפוע עולה (הערך היום > אתמול)
 EMA28_REQUIRE_RISING  = os.getenv("EMA28_REQUIRE_RISING", "True").lower() in ("1","true","yes")
 
