@@ -6,11 +6,14 @@ on:
         description: "Tickers, comma separated (leave EMPTY to sample from the scanner universe)"
         default: ""
       sample:
-        description: "How many random tickers from scanner_state/universe_cache.json"
+        description: "Tickers per shard"
         default: "150"
+      shards:
+        description: "How many shards run in parallel (1-3). Each shard = a different set of tickers"
+        default: "3"
       seed:
-        description: "Random seed (same seed = same tickers)"
-        default: "1"
+        description: "Random seed for the shuffled universe (same seed + shards = same tickers)"
+        default: "7"
       start:
         description: "Start date (YYYY-MM-DD)"
         default: "2023-01-01"
@@ -20,9 +23,31 @@ on:
 permissions:
   contents: read
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      shards: ${{ steps.p.outputs.shards }}
+    steps:
+      - id: p
+        env:
+          N: ${{ inputs.shards }}
+          TICKERS: ${{ inputs.tickers }}
+        run: |
+          if [ -n "$TICKERS" ]; then N=1; fi
+          case "$N" in
+            1) echo 'shards=[0]' >> "$GITHUB_OUTPUT" ;;
+            2) echo 'shards=[0,1]' >> "$GITHUB_OUTPUT" ;;
+            *) echo 'shards=[0,1,2]' >> "$GITHUB_OUTPUT" ;;
+          esac
   backtest:
+    needs: plan
     runs-on: ubuntu-latest
     timeout-minutes: 330
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -37,15 +62,18 @@ jobs:
           SEED: ${{ inputs.seed }}
           START: ${{ inputs.start }}
           END: ${{ inputs.end }}
+          SHARD: ${{ matrix.shard }}
         run: |
           set -o pipefail
-          ls -la scanner_state | head -20
-          python scanner_backtest.py --scanner stock_scanner_unified.py --tickers "$TICKERS" --universe-cache scanner_state/universe_cache.json --sample "$SAMPLE" --seed "$SEED" --start "$START" --end "$END" --out bt_results.csv 2>&1 | tee bt_summary.txt
+          OFFSET=$(( SHARD * SAMPLE ))
+          echo "shard=$SHARD offset=$OFFSET sample=$SAMPLE seed=$SEED"
+          python scanner_backtest.py --scanner stock_scanner_unified.py --tickers "$TICKERS" --universe-cache scanner_state/universe_cache.json --sample "$SAMPLE" --seed "$SEED" --offset "$OFFSET" --start "$START" --end "$END" --out bt_results.csv 2>&1 | tee bt_summary.txt
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: backtest-results
+          name: backtest-results-shard${{ matrix.shard }}
           path: |
             bt_results.csv
             bt_summary.txt
           retention-days: 7
+          if-no-files-found: ignore
