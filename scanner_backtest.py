@@ -23,6 +23,11 @@ NOT simulated (needs data that is not point-in-time on Yahoo):
   legacy patterns (Cup&Handle, Triangle, Double Bottom, Falling Wedge).
 These are reported as "not simulated", not silently assumed.
 
+v2 (2026-10-29): adds point-in-time distance columns (EMA10/21/28, MA50/150/200,
+ATR%, 20-day gain, 52-week high, stop risk, distance above the pivot) and disjoint
+universe shards (--offset). Speed: the V9 indicator frame is computed once per day
+instead of six times (identical signals, about 2x faster).
+
 Usage (in your own environment, where yfinance is installed):
   python scanner_backtest.py --scanner stock_scanner_unified.py \
       --tickers AAPL,MSFT,NVDA --start 2023-01-01 --end 2026-09-30 --out bt.csv
@@ -117,7 +122,21 @@ class PointInTimeSPY:
         return bool(float(line.iloc[-1]) >= float(line.max()) * 0.995)
 
 
-def patch(m, pit):
+def patch(m, pit, reuse_indicators=True):
+    if reuse_indicators and not getattr(m, "_bt_indicator_reuse", False):
+        # find_v9_pattern_candidates computes the V9 indicators once and then every detector
+        # recomputes them from that same frame. Recomputing an already-computed frame gives the
+        # same numbers (verified), so hand back a copy instead: same signals, about 2x faster.
+        original = m.add_v9_indicators
+        last = {"out": None}
+        def add_v9_indicators_reused(df):
+            if last["out"] is not None and df is last["out"]:
+                return last["out"].copy()
+            out = original(df)
+            last["out"] = out
+            return out
+        m.add_v9_indicators = add_v9_indicators_reused
+        m._bt_indicator_reuse = True
     m._get_spy_returns = pit.spy_returns
     m._rs_line_new_high = lambda df, lookback=63: pit.rs_line_new_high(df, lookback)
     m.get_market_regime = lambda: pit.regime(m.REGIME_MA_PERIOD)
@@ -125,16 +144,62 @@ def patch(m, pit):
     m.log = lambda msg: None  # keep the console readable
 
 
+# ---------------------------------------------------------------- point-in-time features
+def compute_features(df):
+    """Indicator series on the full history. Value at day i uses only bars <= i (no look-ahead)."""
+    c = pd.to_numeric(df["close"], errors="coerce")
+    h = pd.to_numeric(df["high"], errors="coerce")
+    lo = pd.to_numeric(df["low"], errors="coerce")
+    f = pd.DataFrame(index=df.index)
+    for n in (10, 21, 28):
+        f[f"ema{n}"] = c.ewm(span=n, adjust=False).mean()
+    for n in (50, 150, 200):
+        f[f"ma{n}"] = c.rolling(n, min_periods=n).mean()
+    tr = pd.concat([h - lo, (h - c.shift()).abs(), (lo - c.shift()).abs()], axis=1).max(axis=1)
+    f["atr14"] = tr.rolling(14, min_periods=14).mean()
+    f["hi252"] = h.rolling(252, min_periods=200).max()
+    f["close_20ago"] = c.shift(20)
+    f["close"] = c
+    return f
+
+
+def feature_row(f, day, alert):
+    def pct(a, b):
+        try:
+            a, b = float(a), float(b)
+            return round((a / b - 1.0) * 100.0, 3) if b > 0 and np.isfinite(a) and np.isfinite(b) else None
+        except (TypeError, ValueError):
+            return None
+    r = f.loc[day]
+    close = r["close"]
+    out = {f"dist_{k}_pct": pct(close, r[k]) for k in ("ema10", "ema21", "ema28", "ma50", "ma150", "ma200")}
+    atr = r["atr14"]
+    out["atr_pct"] = round(float(atr) / float(close) * 100.0, 3) if pd.notna(atr) and close > 0 else None
+    out["ma50_dist_in_atr"] = round((float(close) - float(r["ma50"])) / float(atr), 2) if pd.notna(atr) and atr > 0 and pd.notna(r["ma50"]) else None
+    out["gain_20d_pct"] = pct(close, r["close_20ago"])
+    out["from_52w_high_pct"] = pct(close, r["hi252"])
+    entry, stop = alert.get("planned_entry"), alert.get("stop_loss")
+    try:
+        out["risk_pct"] = round((float(entry) - float(stop)) / float(entry) * 100.0, 3) if entry and stop else None
+    except (TypeError, ValueError):
+        out["risk_pct"] = None
+    pivot = (alert.get("meta") or {}).get("pattern_pivot")
+    out["above_pivot_pct"] = pct(close, pivot) if pivot else None
+    return out
+
+
 # ---------------------------------------------------------------- core loop
-def scan_history(m, symbol, df, spy, pit, start, end, horizons=(5, 10, 20), min_bars=260):
+def scan_history(m, symbol, df, spy, pit, start, end, horizons=(5, 10, 20), min_bars=260, window_bars=320):
     cfg = m._make_v9_pattern_config()
     rows = []
     dates = df.index
+    feats = compute_features(df)
     for i in range(min_bars, len(df) - 1):
         day = dates[i]
         if day < pd.Timestamp(start) or day > pd.Timestamp(end):
             continue
-        hist = df.iloc[: i + 1].copy()
+        first = max(0, i + 1 - window_bars) if window_bars and window_bars > 0 else 0
+        hist = df.iloc[first: i + 1].copy()
         # cheap pre-screen: every V9 family needs price within ~15% of the 60-bar high
         hi60 = float(hist["high"].iloc[-61:-1].max())
         if float(hist["close"].iloc[-1]) < 0.85 * hi60:
@@ -174,6 +239,7 @@ def scan_history(m, symbol, df, spy, pit, start, end, horizons=(5, 10, 20), min_
                    "blockers": " | ".join(blockers), "ema28_ok": ema_ok, "ema28_reason": ema_reason,
                    "regime": regime["regime"], "rs_score": rs, "planned_entry": obs["planned_entry"],
                    "stop": obs["stop"], "target": obs["target"], "rr": alert.get("rr_ratio")}
+            row.update(feature_row(feats, day, alert))
             row.update({k: v for k, v in outcome.items() if not isinstance(v, (list, dict))})
             rows.append(row)
     return rows
@@ -213,8 +279,9 @@ def summarize(res):
             print("\nWhen a gate was the ONLY blocker:\n", table_single(single, r20).to_string())
 
 
-def sample_universe(path, n, seed, min_cap):
-    """Random, reproducible sample of the scanner's real universe (known market cap >= min_cap only)."""
+def sample_universe(path, n, seed, min_cap, offset=0):
+    """Random, reproducible sample of the scanner's real universe (known market cap >= min_cap only).
+    Same seed + different offsets = disjoint shards of one shuffled list."""
     import json
     import random
     with open(path, encoding="utf-8") as fh:
@@ -228,7 +295,8 @@ def sample_universe(path, n, seed, min_cap):
             pool.append(sym)
     pool = sorted(set(pool))
     random.Random(seed).shuffle(pool)
-    return pool[:max(0, n)]
+    offset = max(0, int(offset))
+    return pool[offset: offset + max(0, n)]
 
 
 def table_single(single, r20):
@@ -249,7 +317,10 @@ def main():
                     help="scanner_state/universe_cache.json — used when no tickers are given")
     ap.add_argument("--sample", type=int, default=150, help="random tickers drawn from the universe cache")
     ap.add_argument("--seed", type=int, default=1, help="same seed = same sample (reproducible)")
+    ap.add_argument("--offset", type=int, default=0, help="skip this many tickers of the shuffled list (disjoint shards)")
+    ap.add_argument("--window-bars", type=int, default=0, help="bars of history per signal day (0 = all, the default)")
     args = ap.parse_args()
+    run_t0 = time.time()
 
     import yfinance as yf
     m = load_scanner(args.scanner)
@@ -258,8 +329,8 @@ def main():
         with open(args.tickers_file) as fh:
             symbols += [ln.strip().upper() for ln in fh if ln.strip()]
     if not symbols and args.universe_cache:
-        symbols = sample_universe(args.universe_cache, args.sample, args.seed, m.MIN_MARKET_CAP_USD)
-        print(f"Universe sample: {len(symbols)} tickers (seed={args.seed}) -> {','.join(symbols)}")
+        symbols = sample_universe(args.universe_cache, args.sample, args.seed, m.MIN_MARKET_CAP_USD, args.offset)
+        print(f"Universe sample: {len(symbols)} tickers (seed={args.seed}, offset={args.offset}) -> {','.join(symbols)}")
     if not symbols:
         sys.exit("No tickers: pass --tickers, --tickers-file or --universe-cache")
     hist_start = (pd.Timestamp(args.start) - pd.Timedelta(days=500)).date().isoformat()
@@ -275,12 +346,12 @@ def main():
         if df is None or len(df) < 300:
             print(f"[{k}/{len(symbols)}] {sym}: not enough data")
             continue
-        got = scan_history(m, sym, df, spy, pit, args.start, args.end)
+        got = scan_history(m, sym, df, spy, pit, args.start, args.end, window_bars=args.window_bars)
         rows.extend(got)
         print(f"[{k}/{len(symbols)}] {sym}: {len(got)} candidate-days in {time.time() - t0:.0f}s")
     res = pd.DataFrame(rows)
     res.to_csv(args.out, index=False)
-    print(f"\nSaved {len(res)} rows -> {args.out}")
+    print(f"\nSaved {len(res)} rows -> {args.out} | scanner {getattr(m, 'CODE_VERSION', '?')} | total {time.time() - run_t0:.0f}s")
     summarize(res)
 
 
