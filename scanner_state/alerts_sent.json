@@ -53,5 +53,16 @@
       }
     ]
   },
-  "NOV_Darvas Box Breakout_66": "2026-10-28T10:56:16.887195"
+  "NOV_Darvas Box Breakout_66": "2026-10-28T10:56:16.887195",
+  "RS": {
+    "time": 1793272068.822279,
+    "patterns": [
+      {
+        "name": "Flat Base / Rectangle Breakout",
+        "level": 437.17999,
+        "time": 1793272068.822279
+      }
+    ]
+  },
+  "RS_Flat Base / Rectangle Breakout_66": "2026-10-29T11:07:48.822281"
 }
