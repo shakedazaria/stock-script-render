@@ -37,7 +37,7 @@ stock_scanner_unified.py
 # RESET VERIFIED FIX FILE — 2026-09-30 V9.3
 # This marker proves this is the rebuilt fixed file, not an old download copy.
 # ============================================================
-CODE_VERSION = "2026-10-28-v9.7.2-recent-earnings"
+CODE_VERSION = "2026-10-29-v9.7.3-ema6"
 RESET_VERIFIED_FIX_FILE = True
 
 
@@ -119,6 +119,18 @@ _SECRET_REPLACEMENTS = ()
 _SECRET_NAME = re.compile(r"(?:^|_)(?:api_?keys?|keys?|tokens?|secrets?|passwords?|passwd|pass|pwd|credentials?|authorization|cookie|private_key|client_secret|emails?)(?:_|$)", re.I)
 # A linear token pass avoids catastrophic backtracking on long provider errors.
 _EMAIL_TOKEN_PATTERN = re.compile(r"[^\s<>\"',;]+")
+
+
+def _redact_email_token(match):
+    """v9.7.3: mask tokens that look like an address; a bare "@" (e.g. "RS @ 437.18") stays."""
+    token = match.group(0)
+    low = token.lower()
+    for marker in ("@", "%40", "%2540", "\\u0040"):
+        if marker in low and re.search(r"[a-z0-9]", low.replace(marker, "")):
+            return "[REDACTED_EMAIL]"
+    return token
+
+
 _CREDENTIAL_LABEL = r"(?:api[_-]?key|access[_-]?token|refresh[_-]?token|token|app[_-]?password|password|passwd|client[_-]?secret|authorization)"
 _QUOTED_CREDENTIAL = re.compile(r"(" + _CREDENTIAL_LABEL + r"[\"']?\s*(?:=|:|%3d|%253d)\s*)([\"'])(.*?)\2", re.I | re.S)
 _PLAIN_CREDENTIAL = re.compile(r"(" + _CREDENTIAL_LABEL + r"[\"']?\s*(?:=|:|%3d|%253d)\s*)[^\s&\"',;)}\]]+", re.I)
@@ -176,9 +188,7 @@ def _redact_sensitive(value):
         text = _PLAIN_CREDENTIAL.sub(lambda m: m.group(1) + "[REDACTED]", text)
         text = _BEARER.sub(lambda m: m.group(1) + " [REDACTED]", text)
         text = _URL_AUTH.sub(r"\1[REDACTED]@", text)
-        result = _EMAIL_TOKEN_PATTERN.sub(
-            lambda match: "[REDACTED_EMAIL]" if any(marker in match.group(0).lower()
-                for marker in ("@", "%40", "%2540", "\\u0040")) else match.group(0), text)
+        result = _EMAIL_TOKEN_PATTERN.sub(_redact_email_token, text)
         # Even the masking marker must not accidentally equal a configured secret.
         return "" if any(secret in result for secret in replacements) else result
     except Exception:
@@ -752,7 +762,7 @@ ALERT_DEDUP_LEVEL_PCT = float(os.getenv("ALERT_DEDUP_LEVEL_PCT", "0.015"))
 
 # --- EMA28 (תנאי גלובלי) ---
 # הסגירה חייבת להיות לא יותר מ-3% מעל EMA28
-EMA28_MAX_DIST_PCT    = float(os.getenv("EMA28_MAX_DIST_PCT", "0.08"))   # 8% (v9.7.1, backtest 2026-10-27; was 3%)
+EMA28_MAX_DIST_PCT    = float(os.getenv("EMA28_MAX_DIST_PCT", "0.06"))   # 6% (v9.7.3, 2026-10-29; was 8% in v9.7.1, 3% before)
 # EMA28 חייב בשיפוע עולה (הערך היום > אתמול)
 EMA28_REQUIRE_RISING  = os.getenv("EMA28_REQUIRE_RISING", "True").lower() in ("1","true","yes")
 
@@ -1162,7 +1172,11 @@ _EVALUATION_BUFFER: dict = {}
 _market_cap_diagnostics: dict = {}
 
 # --- סינון דוחות ---
-EARNINGS_RECENT_BLOCK_DAYS = int(os.getenv("EARNINGS_RECENT_BLOCK_DAYS", "3"))  # report in last N calendar days -> wait for post-earnings candles
+EARNINGS_RECENT_BLOCK_DAYS = int(os.getenv("EARNINGS_RECENT_BLOCK_DAYS", "3"))  # used only when EARNINGS_RECENT_MODE=days
+# v9.7.3: "candle" = block until there is at least one full daily candle after the report (default);
+#         "days"   = the v9.7.2 rule (block N calendar days after the report).
+EARNINGS_RECENT_MODE = (os.getenv("EARNINGS_RECENT_MODE", "candle") or "candle").strip().lower()
+POSITION_EARNINGS_WARN_DAYS = int(os.getenv("POSITION_EARNINGS_WARN_DAYS", "14"))
 EARNINGS_FILTER_DAYS = int(os.getenv("EARNINGS_FILTER_DAYS", "14"))  # skip אם דוח ב-14 ימים
 
 # --- פילטרים חדשים: Quality Gate ---
@@ -2813,6 +2827,88 @@ def _coerce_earnings_dates(raw) -> list:
         pass
     return values
 
+def _calendar_earnings_dates(cal) -> list:
+    """v9.7.3: only the earnings-date fields of yfinance's calendar.
+
+    yfinance's calendar also carries 'Dividend Date', 'Ex-Dividend Date' and
+    numeric estimates; reading every value made dividend dates look like
+    earnings dates (e.g. RS on 2026-10-29: 'next earnings 2026-11-20' was the ex-dividend date).
+    """
+    out = []
+    if cal is None:
+        return out
+    try:
+        def is_earn_key(k) -> bool:
+            k = str(k).lower()
+            return "earning" in k and "date" in k
+        if isinstance(cal, dict):
+            for key, value in cal.items():
+                if is_earn_key(key):
+                    out.extend(_coerce_earnings_dates(value))
+            return out
+        if isinstance(cal, pd.DataFrame):
+            for idx in cal.index:
+                if is_earn_key(idx):
+                    out.extend(_coerce_earnings_dates(list(cal.loc[idx].values)))
+            for col in cal.columns:
+                if is_earn_key(col):
+                    out.extend(_coerce_earnings_dates(list(cal[col].dropna())))
+            return out
+    except Exception:
+        return out
+    return out
+
+
+_LAST_SESSION_DATE = None  # v9.7.3: date of the newest finished daily candle (set by main)
+
+
+def _set_last_session_date(value) -> None:
+    global _LAST_SESSION_DATE
+    try:
+        _LAST_SESSION_DATE = pd.Timestamp(value).date() if value else None
+    except Exception:
+        _LAST_SESSION_DATE = None
+
+
+def _recent_report_blocks(last_past, today) -> bool:
+    """True when the last report has no full post-earnings candle in the data yet."""
+    if last_past is None:
+        return False
+    if EARNINGS_RECENT_MODE == "candle" and _LAST_SESSION_DATE is not None:
+        # A report dated on/after the newest candle (e.g. after the close) has no reaction candle yet.
+        return last_past >= _LAST_SESSION_DATE
+    return (today - last_past).days <= EARNINGS_RECENT_BLOCK_DAYS
+
+
+def _position_earnings_note(ticker: str) -> str | None:
+    """v9.7.3: upcoming report for an open position (Hebrew, for the positions email)."""
+    try:
+        edate, status = _get_next_earnings_date(ticker)
+        if status == "verified_future" and edate is not None:
+            days = (edate - datetime.now().date()).days
+            if 0 <= days <= POSITION_EARNINGS_WARN_DAYS:
+                return f"דוח בעוד {days} ימים ({edate})" if days else f"דוח היום ({edate})"
+        elif status == "recent_past" and edate is not None:
+            return f"דוח פורסם ב-{edate}"
+    except Exception:
+        return None
+    return None
+
+
+def _position_earnings_log(ticker: str) -> str:
+    try:
+        edate, status = _get_next_earnings_date(ticker)
+        if status == "verified_future" and edate is not None:
+            days = (edate - datetime.now().date()).days
+            if 0 <= days <= POSITION_EARNINGS_WARN_DAYS:
+                return f" | 📅 EARNINGS in {days}d ({edate})"
+        elif status == "recent_past" and edate is not None:
+            return f" | 📅 earnings reported {edate}"
+    except Exception:
+        return ""
+    return ""
+
+
 def _get_next_earnings_date(ticker: str, today=None) -> tuple[object, str]:
     """מחזיר רק earnings עתידי; past-only מסומן stale ולא מוצג כ-next earnings."""
     t = str(ticker or "").strip().upper()
@@ -2826,7 +2922,7 @@ def _get_next_earnings_date(ticker: str, today=None) -> tuple[object, str]:
     try:
         obj = yf.Ticker(t)
         try:
-            candidates.extend(_coerce_earnings_dates(obj.calendar))
+            candidates.extend(_calendar_earnings_dates(obj.calendar))  # v9.7.3: no dividend dates
         except Exception:
             pass
         try:
@@ -2844,6 +2940,8 @@ def _get_next_earnings_date(ticker: str, today=None) -> tuple[object, str]:
         for d in candidates:
             try:
                 dd = pd.Timestamp(d).date()
+                if dd.year < 2000:  # v9.7.3: numeric estimates parsed as 1970 dates
+                    continue
                 if dd < today:
                     saw_past = True
                     past_dates.append(dd)
@@ -2856,6 +2954,8 @@ def _get_next_earnings_date(ticker: str, today=None) -> tuple[object, str]:
                 hist = obj.get_earnings_dates(limit=8)
                 for d in _coerce_earnings_dates(hist):
                     dd = pd.Timestamp(d).date()
+                    if dd.year < 2000:
+                        continue
                     if dd < today:
                         saw_past = True
                         past_dates.append(dd)
@@ -2864,7 +2964,7 @@ def _get_next_earnings_date(ticker: str, today=None) -> tuple[object, str]:
             except Exception:
                 pass
         last_past = max(past_dates) if past_dates else None
-        if last_past is not None and (today - last_past).days <= EARNINGS_RECENT_BLOCK_DAYS:
+        if _recent_report_blocks(last_past, today):
             # Report after the signal candle (e.g. after-close yesterday): the price reaction is not in the data yet.
             result = (last_past, "recent_past")
         elif clean:
@@ -2883,7 +2983,7 @@ def earnings_filter_ok(ticker: str) -> tuple[bool, str]:
     try:
         edate, status = _get_next_earnings_date(ticker)
         if status == "recent_past" and edate is not None:
-            return False, f"earnings just reported ({edate}) — waiting for post-earnings candles"
+            return False, f"earnings just reported ({edate}) — waiting for a post-earnings candle"
         if edate is None:
             if status == "stale_past_only":
                 return True, "earnings data stale (past dates only) — allowing as UNKNOWN"
@@ -8470,7 +8570,7 @@ def run_position_tracker(send_exit_email_fn=None) -> list[dict]:
                 sig_txt = "; ".join(signals[:3]) if signals else "none"
                 log(
                     f"   📈 {ticker}: {price_now:.2f} | P&L={pnl_pct:+.1f}% | max={float(p.get('max_profit_pct',0) or 0):+.1f}% | "
-                    f"initial_stop={stop_initial:.2f} | profit_floor={floor_txt} | exit={status} score={float(intel.get('score',0) or 0):.0f}{target_flag} | signals={sig_txt}"
+                    f"initial_stop={stop_initial:.2f} | profit_floor={floor_txt} | exit={status} score={float(intel.get('score',0) or 0):.0f}{target_flag} | signals={sig_txt}{_position_earnings_log(ticker)}"
                 )
 
         except Exception as e:
@@ -8587,6 +8687,7 @@ def send_positions_status_email() -> dict:
                     "floor_txt": floor_txt, "pnl_pct": pnl_pct, "max_profit": max_profit,
                     "target": target, "target_note": target_note, "score": score,
                     "status": status, "status_text": status_text, "signals": signals,
+                    "earnings_note": _position_earnings_note(ticker),
                 }))
             except Exception as e:
                 cards.append(_mail_card(ticker, "<p style='color:#f4bf64;'>לא ניתן להציג את נתוני הפוזיציה.</p>", "נתוני המעקב אינם זמינים"))
@@ -10158,6 +10259,9 @@ def _mail_position_card(values: dict) -> str:
         ("Reversal score", _mail_number(v["score"], 0, suffix="/100")),
         ("סטטוס מנוע", v["status"]),
     ])
+    if v.get("earnings_note"):
+        body += _mail_section("📅 דוח קרוב", _mail_list([v["earnings_note"],
+                              "פוזיציה פתוחה לפני דוח: התנודה ביום הדוח יכולה לעבור את הסטופ בפער פתיחה."]), "red")
     body += _mail_section("Exit Intelligence", _mail_list(v["signals"], "אין אותות Reversal משמעותיים", 6),
                           "amber" if v["status"] == "WATCH" else "blue")
     return _mail_card(v["ticker"], body, "מעקב פוזיציה פתוחה",
@@ -10596,6 +10700,43 @@ def evaluate_setup_path(price_df: pd.DataFrame, observation: dict, horizons=None
     return result
 
 
+RESEARCH_BATCH_SIZE = int(os.getenv("RESEARCH_BATCH_SIZE", "40"))
+
+
+def _research_batch_download(tickers: list) -> dict:
+    """v9.7.3: same data as the per-ticker research download, fetched in batches."""
+    out = {}
+    if not tickers:
+        return out
+    size = max(1, RESEARCH_BATCH_SIZE)
+    for start in range(0, len(tickers), size):
+        batch = tickers[start:start + size]
+        try:
+            raw = yf.download(batch, period="1y", interval="1d", progress=False, auto_adjust=False,
+                              actions=True, keepna=True, group_by="ticker", threads=False, timeout=30)
+        except Exception as exc:
+            log(f"Research batch {start + 1}-{start + len(batch)} failed: {type(exc).__name__}")
+            continue
+        for ticker in batch:
+            frame = _extract_prefilter_ticker_frame(raw, ticker)
+            if frame is None or getattr(frame, "empty", True):
+                continue
+            # Drop only the leading all-empty rows that a multi-ticker download adds before a listing date.
+            ohlc = [c for c in frame.columns if str(c).lower() in ("open", "high", "low", "close")]
+            if ohlc:
+                valid = frame[ohlc].notna().any(axis=1)
+                if not valid.any():
+                    continue
+                frame = frame.loc[valid.idxmax():]
+            normalized = _closed_daily_frame(_normalize_yfinance_df(frame, drop_invalid_close=False))
+            if normalized is not None and not normalized.empty:
+                out[ticker] = normalized
+        if start + size < len(tickers):
+            time.sleep(1.0)
+    log(f"Research batch download: {len(out)}/{len(tickers)} tickers in {((len(tickers) - 1) // size) + 1} request(s)")
+    return out
+
+
 def _update_setup_evaluations() -> None:
     if not os.path.exists(SETUP_EVALUATIONS_CSV):
         return
@@ -10604,6 +10745,14 @@ def _update_setup_evaluations() -> None:
         return
     cache = {}
     changed = False
+    # v9.7.3: batch-download all pending tickers (one Yahoo request per ~40 tickers instead of
+    # one per ticker). Tickers missing from a batch fall back to the old single download below.
+    try:
+        pending = sorted({str(r.get("ticker", "")).strip().upper() for _, r in observations.iterrows()
+                          if str(r.get("ticker", "")).strip() and str(r.get("checked", "")).lower() != "true"})
+        cache.update(_research_batch_download(pending))
+    except Exception as exc:
+        log(f"Research batch download unavailable: {type(exc).__name__}")
     for index, row in observations.iterrows():
         if str(row.get("checked", "")).lower() == "true":
             continue
@@ -11315,6 +11464,9 @@ def main() -> None:
     except Exception as e:
         log(f"Market Day Guard failed — continuing scan: {e}")
         market_session_date = None
+
+    _set_last_session_date(market_session_date)  # v9.7.3 earnings rule
+    log(f"📅 Earnings rule: recent-report mode={EARNINGS_RECENT_MODE}, newest candle={_LAST_SESSION_DATE}")
 
     # ── טען פרמטרים שנלמדו מריצות קודמות ──────────────────
     _apply_learned_params()
