@@ -37,7 +37,7 @@ stock_scanner_unified.py
 # RESET VERIFIED FIX FILE — 2026-09-30 V9.3
 # This marker proves this is the rebuilt fixed file, not an old download copy.
 # ============================================================
-CODE_VERSION = "2026-10-29-v9.7.3-ema6"
+CODE_VERSION = "2026-10-30-v9.7.5-swing"
 RESET_VERIFIED_FIX_FILE = True
 
 
@@ -824,6 +824,12 @@ PRO_MIN_TREND_SCORE           = float(os.getenv("PRO_MIN_TREND_SCORE", "55.0"))
 PRO_MIN_RS_PROFILE_SCORE      = float(os.getenv("PRO_MIN_RS_PROFILE_SCORE", "65.0"))
 PRO_MIN_MARKET_CONTEXT_SCORE  = float(os.getenv("PRO_MIN_MARKET_CONTEXT_SCORE", "25.0"))
 PRO_MAX_STOP_RISK_PCT         = float(os.getenv("PRO_MAX_STOP_RISK_PCT", "0.12"))
+# v9.7.4 (backtest 2026-10-30, 543 tickers, 2023-2026): for Flat Base / Darvas / VCP breakouts the
+# stop distance 7%-10% gave the highest share of trades in profit after 20 sessions in both samples
+# and both periods. Tighter stops were shaken out more often; wider stops meant looser bases.
+BREAKOUT_MIN_STOP_RISK_PCT    = float(os.getenv("BREAKOUT_MIN_STOP_RISK_PCT", "0.07"))
+BREAKOUT_MAX_STOP_RISK_PCT    = float(os.getenv("BREAKOUT_MAX_STOP_RISK_PCT", "0.10"))
+_BREAKOUT_STOP_FAMILIES       = ("Flat Base", "Darvas", "VCP")
 PRO_BLOCK_FROZEN_SECTOR       = os.getenv("PRO_BLOCK_FROZEN_SECTOR", "True").lower() in ("1", "true", "yes")
 PRO_BLOCK_DISTRIBUTION        = os.getenv("PRO_BLOCK_DISTRIBUTION", "True").lower() in ("1", "true", "yes")
 PRO_QUALITY_LOG               = _state_path(os.getenv("PRO_QUALITY_LOG", "professional_quality_log.csv"))
@@ -3029,6 +3035,27 @@ def ensure_ma_columns(df: pd.DataFrame) -> None:
     if "ma200" not in df.columns:
         df["ma200"] = close.rolling(window=200, min_periods=200).mean()
 
+def _prior_avg_volume(df: pd.DataFrame, idx: int) -> float | None:
+    """Mean volume of the VOLUME_AVG_LOOKBACK bars BEFORE bar `idx` (the bar itself excluded). Negative idx allowed.
+    Reads the vectorised column written by add_technical_indicators(); falls back to the slice if it is missing/NaN."""
+    try:
+        n = len(df)
+        if idx < 0:
+            idx += n
+        if idx < VOLUME_AVG_LOOKBACK or idx >= n:
+            return None
+        if "vol_avg_prior" in df.columns:
+            v = df["vol_avg_prior"].iloc[idx]
+            if pd.notna(v) and np.isfinite(v):
+                return float(v)
+        if "volume" in df.columns:
+            sl = pd.to_numeric(df["volume"].iloc[idx - VOLUME_AVG_LOOKBACK:idx], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+            return float(sl.mean()) if len(sl) else None
+    except Exception:
+        pass
+    return None
+
+
 def add_technical_indicators(df: pd.DataFrame) -> None:
     """מוסיף ATR14, OBV, RSI14, MACD-hist, ADX14, CCI20."""
     try:
@@ -3048,6 +3075,13 @@ def add_technical_indicators(df: pd.DataFrame) -> None:
         signed_vol = price_diff * df["volume"].values
         df["obv"]     = np.cumsum(signed_vol)
         df["obv_ema5"] = df["obv"].ewm(span=5, adjust=False).mean()
+
+        # One causal volume baseline for the whole pipeline: prior N bars, the bar itself excluded (computed once).
+        if "volume" in df.columns:
+            _vol = pd.to_numeric(df["volume"], errors="coerce")
+            _prior = _vol.shift(1).rolling(VOLUME_AVG_LOOKBACK, min_periods=VOLUME_AVG_LOOKBACK).mean()
+            df["vol_avg_prior"] = _prior
+            df["vol_ratio_prior"] = _vol / _prior.replace(0, np.nan)
 
         # RSI
         delta  = close.diff()
@@ -3334,8 +3368,8 @@ def compute_setup_score(df: pd.DataFrame, ticker: str,
     total += pts
 
     # A5) נפח ביום הפריצה (מקס 4)
-    if "volume" in df.columns and break_index >= VOLUME_AVG_LOOKBACK:
-        avg_v = float(df["volume"].iloc[break_index - VOLUME_AVG_LOOKBACK:break_index].mean())
+    avg_v = _prior_avg_volume(df, break_index) if "volume" in df.columns else None
+    if avg_v is not None:
         vol_p = float(df["volume"].iloc[break_index])
         if avg_v > 0:
             ratio = vol_p / avg_v
@@ -3581,8 +3615,8 @@ def compute_setup_score(df: pd.DataFrame, ticker: str,
         pass
 
     # E3) נפח ממוצע נמוך — סיכון נזילות (-2)
-    if "volume" in df.columns and break_index >= VOLUME_AVG_LOOKBACK:
-        avg_v = float(df["volume"].iloc[break_index - VOLUME_AVG_LOOKBACK:break_index].mean())
+    avg_v = _prior_avg_volume(df, break_index) if "volume" in df.columns else None
+    if avg_v is not None:
         if avg_v < MIN_AVG_VOLUME:
             total -= 2.0; reasons.append(f"E3 ⚠️ נפח נמוך ({avg_v:,.0f}) (-2)")
         else:
@@ -4079,11 +4113,7 @@ def _entry_quality_metrics(df: pd.DataFrame, ticker: str, breakout_level: float,
             metrics["body_ratio"] = None
             metrics["green_candle"] = None
 
-        if "volume" in df.columns and len(df) >= VOLUME_AVG_LOOKBACK + 1:
-            prev_vol = pd.to_numeric(df["volume"].iloc[-(VOLUME_AVG_LOOKBACK + 1):-1], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
-            avg_vol20 = float(prev_vol.mean()) if len(prev_vol) else None
-        else:
-            avg_vol20 = None
+        avg_vol20 = _prior_avg_volume(df, -1) if ("volume" in df.columns and len(df) >= VOLUME_AVG_LOOKBACK + 1) else None
         metrics["avg_volume20"] = avg_vol20
         if vol and avg_vol20 and avg_vol20 > 0:
             metrics["volume_ratio"] = vol / avg_vol20
@@ -6111,6 +6141,9 @@ def _professional_rs_profile(ticker: str, df: pd.DataFrame) -> dict:
             reasons.append(f"מנצח SPY ב-{positive}/{available} חלונות")
         if rs_high is True:
             reasons.append("קו RS בשיא/קרוב לשיא")
+        _dec = _to_float_or_none(rs.get("rs_decay_1m_vs_3m")) if isinstance(rs, dict) else None
+        if _dec is not None and _dec <= -RS_DECAY_DEADBAND * 100:
+            reasons.append(f"RS קצר דועך ({_dec:+.1f}% מול קצב 3M)")
         out = {
             "score": _pro_clamp(score),
             "reasons": reasons,
@@ -6338,6 +6371,11 @@ def _professional_risk_profile(alert: dict, df: pd.DataFrame, entry_quality: dic
 
         if risk_pct > PRO_MAX_STOP_RISK_PCT:
             blockers.append(f"סטופ רחב מדי ({risk_pct*100:.1f}% > {PRO_MAX_STOP_RISK_PCT*100:.1f}%)")
+        if any(f in _canonical_pattern_name(alert) for f in _BREAKOUT_STOP_FAMILIES):
+            if risk_pct > BREAKOUT_MAX_STOP_RISK_PCT + 1e-12 and risk_pct <= PRO_MAX_STOP_RISK_PCT:
+                blockers.append(f"סטופ רחב מדי לפריצה ({risk_pct*100:.1f}% > {BREAKOUT_MAX_STOP_RISK_PCT*100:.1f}%)")
+            if risk_pct < BREAKOUT_MIN_STOP_RISK_PCT - 1e-12:
+                blockers.append(f"סטופ צמוד מדי לפריצה ({risk_pct*100:.1f}% < {BREAKOUT_MIN_STOP_RISK_PCT*100:.1f}%)")
         if not _rr_at_least(rr_calc, ENTRY_MIN_RR):
             blockers.append(f"R:R מחושב נמוך ({rr_calc:.2f} < {ENTRY_MIN_RR:.2f})")
         reasons = [f"Risk {risk_pct*100:.1f}%", f"R:R calculated {rr_calc:.2f}"]
@@ -6380,6 +6418,7 @@ def evaluate_professional_trade_quality(df: pd.DataFrame, ticker: str, alert: di
         )
         score = _pro_clamp(score)
         blockers = list(risk.get("blockers", []) or [])
+        weekly_ctx = None
         if trend.get("score", 0) < PRO_MIN_TREND_SCORE:
             blockers.append(f"Trend score נמוך ({trend.get('score',0):.0f} < {PRO_MIN_TREND_SCORE:.0f})")
         if rs.get("score", 0) < PRO_MIN_RS_PROFILE_SCORE:
@@ -6392,6 +6431,13 @@ def evaluate_professional_trade_quality(df: pd.DataFrame, ticker: str, alert: di
             blockers.append("Institutional distribution חזקה")
         if score < PRO_MIN_SCORE:
             blockers.append(f"Professional Quality נמוך ({score:.1f} < {PRO_MIN_SCORE:.1f})")
+        if WEEKLY_ALIGN_MODE in ("warn", "block"):
+            weekly_ctx = weekly_context_from_daily(df)
+            if weekly_ctx.get("aligned") is False:      # unknown (None) never blocks
+                if WEEKLY_ALIGN_MODE == "block":
+                    blockers.append(f"שבועי לא מיושר עם הפריצה ({weekly_ctx.get('reason')})")
+                else:
+                    log(f"   ⚠️ {ticker}: weekly not aligned — {weekly_ctx.get('reason')}")
 
         label = "ELITE" if score >= 88 else "STRONG" if score >= 82 else "QUALIFIED" if score >= PRO_MIN_SCORE else "WATCHLIST"
         ready = bool(PRO_ENGINE_ENABLED and not blockers)
@@ -6401,7 +6447,8 @@ def evaluate_professional_trade_quality(df: pd.DataFrame, ticker: str, alert: di
             "professional_score": score,
             "label": label,
             "blockers": list(dict.fromkeys(blockers)),
-            "components": {"trend": trend, "rs": rs, "sector": sector, "market": market, "accumulation": accumulation, "execution": execution, "risk": risk},
+            "components": {"trend": trend, "rs": rs, "sector": sector, "market": market, "accumulation": accumulation, "execution": execution, "risk": risk,
+                           **({"weekly": weekly_ctx} if weekly_ctx else {})},
         }
     except Exception as e:
         return {"status": "PRO_WATCHLIST", "professional_ready": False, "professional_score": 0.0, "label": "ERROR", "blockers": [f"Professional engine error: {type(e).__name__}: {e}"], "components": {}}
@@ -7622,6 +7669,20 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
 
 _rs_spy_cache: dict = {}
 
+# v9.7.5: RS_MODE=legacy keeps the original 3M/6M/12M formula bit-for-bit. RS_MODE=swing re-weights towards the
+# 1M/3M windows and penalises decaying short-term relative strength. The defaults are hypotheses to be validated
+# with the backtest columns exc_1m / exc_3m / rs_decay / rsl_vs_ema21 before switching it on for the gate.
+RS_MODE = os.getenv("RS_MODE", "legacy").strip().lower()
+RS_SWING_W_1M = float(os.getenv("RS_SWING_W_1M", "0.30"))
+RS_SWING_W_3M = float(os.getenv("RS_SWING_W_3M", "0.40"))
+RS_SWING_W_6M = float(os.getenv("RS_SWING_W_6M", "0.20"))
+RS_SWING_W_12M = float(os.getenv("RS_SWING_W_12M", "0.10"))
+RS_DECAY_K = float(os.getenv("RS_DECAY_K", "1.0"))                       # penalty = K x (1M excess - 3M excess / 3), only when negative
+RS_DECAY_DEADBAND = float(os.getenv("RS_DECAY_DEADBAND", "0.02"))         # ignore decay smaller than 2 points (compounding artefact)
+RS_DECAY_MAX = float(os.getenv("RS_DECAY_MAX", "0.15"))                   # cap on that penalty (excess-return units, 0.15 = 15 points)
+RS_LINE_BELOW_EMA_PENALTY = float(os.getenv("RS_LINE_BELOW_EMA_PENALTY", "0.03"))
+RS_LINE_EMA_SPAN = int(os.getenv("RS_LINE_EMA_SPAN", "21"))
+
 
 def _get_spy_returns() -> dict:
     """Cache יומי לביצועי SPY ל-3/6/12 חודשים."""
@@ -7646,9 +7707,64 @@ def _get_spy_returns() -> dict:
         }
         _rs_spy_cache["date"]    = today
         _rs_spy_cache["returns"] = ret
+        _rs_spy_cache["close"]   = close      # same download, kept for the RS-line check (no extra request)
         return ret
     except Exception:
         return {}
+
+
+def _get_spy_close():
+    """SPY daily closes from the once-per-day cache (None when unavailable)."""
+    _get_spy_returns()
+    return _rs_spy_cache.get("close")
+
+
+def _naive_day_index(series: pd.Series) -> pd.Series:
+    out = pd.to_numeric(series, errors="coerce").copy()
+    idx = pd.DatetimeIndex(out.index)
+    if idx.tz is not None:
+        idx = idx.tz_localize(None)
+    out.index = idx.normalize()
+    return out[~out.index.duplicated(keep="last")]
+
+
+def _rs_line_vs_ema(stock_close: pd.Series, span: int | None = None) -> float | None:
+    """(stock / SPY) relative line vs its own EMA, as a fraction. Negative = the relative line has rolled over."""
+    try:
+        span = span or RS_LINE_EMA_SPAN
+        spy = _get_spy_close()
+        if spy is None or stock_close is None:
+            return None
+        joined = pd.concat([_naive_day_index(stock_close).rename("s"), _naive_day_index(spy).rename("m")],
+                           axis=1, join="inner").dropna()
+        if len(joined) < span + 5:
+            return None
+        line = joined["s"] / joined["m"].replace(0, np.nan)
+        val = float(line.iloc[-1] / line.ewm(span=span, adjust=False).mean().iloc[-1] - 1.0)
+        return val if np.isfinite(val) else None
+    except Exception:
+        return None
+
+
+def _rs_swing_combined(stock_close, p: dict, r: dict) -> tuple[float, dict]:
+    """Swing-horizon combined excess return (fraction) + diagnostics.
+    p / r: window -> stock return / excess return vs SPY (None when the window is missing)."""
+    weights = {"1m": RS_SWING_W_1M, "3m": RS_SWING_W_3M, "6m": RS_SWING_W_6M, "12m": RS_SWING_W_12M}
+    parts = [(w, r[k]) for k, w in weights.items() if p.get(k) is not None]
+    wsum = sum(w for w, _ in parts)
+    combined = (sum(w * x for w, x in parts) / wsum) if wsum else 0.0
+    info: dict = {"rs_mode": "swing"}
+    if p.get("1m") is not None and p.get("3m") is not None:
+        decay = r["1m"] - r["3m"] / 3.0           # last month vs the monthly pace of the last quarter
+        info["rs_decay_1m_vs_3m"] = round(decay * 100, 2)
+        if decay < -RS_DECAY_DEADBAND:
+            combined += RS_DECAY_K * max(decay + RS_DECAY_DEADBAND, -RS_DECAY_MAX)
+    state = _rs_line_vs_ema(stock_close)
+    if state is not None:
+        info["rs_line_vs_ema_pct"] = round(state * 100, 2)
+        if state < 0:
+            combined -= RS_LINE_BELOW_EMA_PENALTY
+    return combined, info
 
 
 def compute_rs_score(ticker: str, df: pd.DataFrame) -> dict:
@@ -7708,9 +7824,14 @@ def compute_rs_score(ticker: str, df: pd.DataFrame) -> dict:
 
         # ציון IBD משוקלל → tanh → 0-100
         import math
-        _parts = [(w, r) for w, r, p in ((0.4, r3m, p3m), (0.2, r6m, p6m), (0.4, r12m, p12m)) if p is not None]
-        _wsum = sum(w for w, _ in _parts)
-        combined = (sum(w * r for w, r in _parts) / _wsum) if _wsum else 0.0  # identical to before when all windows exist
+        if RS_MODE == "swing":
+            combined, _swing = _rs_swing_combined(
+                close, {"1m": p1m, "3m": p3m, "6m": p6m, "12m": p12m}, {"1m": r1m, "3m": r3m, "6m": r6m, "12m": r12m})
+            result.update(_swing)
+        else:
+            _parts = [(w, r) for w, r, p in ((0.4, r3m, p3m), (0.2, r6m, p6m), (0.4, r12m, p12m)) if p is not None]
+            _wsum = sum(w for w, _ in _parts)
+            combined = (sum(w * r for w, r in _parts) / _wsum) if _wsum else 0.0  # identical to before when all windows exist
         rs = 50 + 50 * math.tanh(combined * 4)
         rs = round(max(1.0, min(99.0, rs)), 1)
         result["rs_score"] = rs
@@ -7727,6 +7848,9 @@ def compute_rs_score(ticker: str, df: pd.DataFrame) -> dict:
         p6_str  = f" | 6M: {result['perf_6m']:+.1f}%" if result["perf_6m"] is not None else ""
         p12_str = f" | 12M: {result['perf_12m']:+.1f}%" if result["perf_12m"] is not None else ""
         result["summary"] = f"{emoji} RS {rs:.0f} | {vs_str}{p6_str}{p12_str}"
+        _dec = result.get("rs_decay_1m_vs_3m")
+        if _dec is not None and _dec <= -RS_DECAY_DEADBAND * 100:
+            result["summary"] += f" | ⚠️ RS קצר דועך {_dec:+.1f}%"
 
     except Exception:
         result["summary"] = "RS N/A"
@@ -8000,6 +8124,22 @@ EXIT_DISTRIBUTION_VOL_MULT = float(os.getenv("EXIT_DISTRIBUTION_VOL_MULT", "1.5"
 EXIT_CLIMAX_VOL_MULT = float(os.getenv("EXIT_CLIMAX_VOL_MULT", "2.0"))
 EXIT_DOJI_BODY_MAX = float(os.getenv("EXIT_DOJI_BODY_MAX", "0.10"))
 
+# ── v9.7.5 swing-horizon exit (2 weeks - 1 month). SWING_EXIT_ENGINE=0 restores V9.2 behaviour exactly. ──
+# Starting values for the parameters below come from the swing-trading brief, NOT from a fitted backtest;
+# the exit-rule lab (bt3/exits.py) is the tool to tune them on saved forward paths.
+SWING_EXIT_ENGINE = os.getenv("SWING_EXIT_ENGINE", "1").lower() in ("1", "true", "yes")
+EXIT_ACTIVATE_ATR_MULT = float(os.getenv("EXIT_ACTIVATE_ATR_MULT", "1.5"))   # profit-protection trigger = 1.5 x ATR% at entry ...
+EXIT_ACTIVATE_MIN_PCT = float(os.getenv("EXIT_ACTIVATE_MIN_PCT", "2.5"))     # ... bounded below ...
+EXIT_ACTIVATE_MAX_PCT = float(os.getenv("EXIT_ACTIVATE_MAX_PCT", "5.0"))     # ... and above by the old fixed +5 %
+EXIT_TRAIL_EMA_SPAN = int(os.getenv("EXIT_TRAIL_EMA_SPAN", "10"))            # trailing EMA (9 or 10)
+EXIT_TRAIL_CLOSES = int(os.getenv("EXIT_TRAIL_CLOSES", "2"))                 # consecutive closes below it = EXIT; the first one = TIGHTEN
+EXIT_TRAIL_MIN_BARS = int(os.getenv("EXIT_TRAIL_MIN_BARS", "3"))             # no trailing-EMA exit during the first closed bars
+EXIT_EXPANSION_ATR = float(os.getenv("EXIT_EXPANSION_ATR", "3.0"))           # "strong momentum expansion": best close-bar high >= entry + 3 ATR ...
+EXIT_EXPANSION_MIN_ADX = float(os.getenv("EXIT_EXPANSION_MIN_ADX", "20"))    # ... with ADX14 >= 20 and the close above the trailing EMA
+EXIT_SWING_CHANDELIER_ATR_MULT = float(os.getenv("EXIT_SWING_CHANDELIER_ATR_MULT", "2.5"))  # Chandelier only after expansion
+EXIT_FAILED_BREAKOUT_BARS = int(os.getenv("EXIT_FAILED_BREAKOUT_BARS", "5"))
+EXIT_FAILED_BREAKOUT_VOL_MULT = float(os.getenv("EXIT_FAILED_BREAKOUT_VOL_MULT", "1.2"))
+
 
 def _load_positions() -> list[dict]:
     """טוען פוזיציות פתוחות מ-JSON."""
@@ -8071,6 +8211,21 @@ def _ensure_exit_plan(alert: dict) -> dict:
         "reversal_requires_multiple_categories": True,
         "daily_reversal_uses_closed_candles_only": True,
     }
+    if SWING_EXIT_ENGINE:
+        min_trigger = entry * (1.0 + EXIT_ACTIVATE_MIN_PCT / 100.0) if entry > 0 else None
+        plan.update({
+            "engine": "V9.7.5_SWING_EXIT",
+            "stop_policy": "STRUCTURAL_FIXED_INITIAL",
+            "profit_protection_policy": "ATR_DYNAMIC",
+            "profit_protection_trigger_pct": EXIT_ACTIVATE_MIN_PCT,
+            "profit_protection_trigger_pct_max": EXIT_ACTIVATE_MAX_PCT,
+            "profit_protection_trigger_price": round(min_trigger, 4) if min_trigger else None,
+            "trail_ema_span": EXIT_TRAIL_EMA_SPAN,
+            "trail_closes_for_exit": EXIT_TRAIL_CLOSES,
+            "chandelier_policy": "ONLY_AFTER_MOMENTUM_EXPANSION",
+            "chandelier_atr_mult": EXIT_SWING_CHANDELIER_ATR_MULT,
+            "tighten_on_reversal_candle_with_volume_climax": True,
+        })
     if isinstance(alert, dict):
         alert["exit_plan"] = plan
     return plan
@@ -8158,6 +8313,82 @@ def _aligned_rs_ratio(stock_df: pd.DataFrame, spy_df: pd.DataFrame | None) -> pd
         return None
 
 
+def _swing_activation_pct(entry: float, atr_entry: float) -> float:
+    """Profit-protection trigger in percent: EXIT_ACTIVATE_ATR_MULT x ATR%, bounded [MIN, MAX]. MAX is the old fixed +5 %."""
+    try:
+        atr_pct = float(atr_entry) / max(float(entry), 1e-9) * 100.0
+        return float(min(EXIT_ACTIVATE_MAX_PCT, max(EXIT_ACTIVATE_MIN_PCT, EXIT_ACTIVATE_ATR_MULT * atr_pct)))
+    except Exception:
+        return float(EXIT_PROFIT_ACTIVATE_PCT)
+
+
+def _atr_at_entry(work: pd.DataFrame, position: dict, fallback_atr: float) -> float:
+    """ATR14 on the position's open date (last bar on or before it); falls back to the latest ATR."""
+    try:
+        d = position.get("date_open")
+        if d:
+            v = work["atr14"].asof(pd.Timestamp(d))
+            if _is_finite_number(v) and float(v) > 0:
+                return float(v)
+    except Exception:
+        pass
+    return float(fallback_atr)
+
+
+def _bars_since_open(work: pd.DataFrame, position: dict) -> int:
+    """Closed daily bars strictly after the open date. Unknown date -> large number (treated as 'armed')."""
+    try:
+        d = position.get("date_open")
+        if not d:
+            return 999
+        idx = pd.DatetimeIndex(work.index)
+        if idx.tz is not None:
+            idx = idx.tz_localize(None)
+        return int((idx.normalize() > pd.Timestamp(d).normalize()).sum())
+    except Exception:
+        return 999
+
+
+def _distribution_series(work: pd.DataFrame) -> pd.Series:
+    """Vectorised twin of _distribution_bar() for every row (uses the row's own ATR14 and prior-20 volume average)."""
+    o = pd.to_numeric(work["open"], errors="coerce")
+    h = pd.to_numeric(work["high"], errors="coerce")
+    l = pd.to_numeric(work["low"], errors="coerce")
+    c = pd.to_numeric(work["close"], errors="coerce")
+    v = pd.to_numeric(work["volume"], errors="coerce")
+    rng = (h - l).clip(lower=1e-9)
+    close_loc = (c - l) / rng
+    body = (c - o).abs()
+    atr = pd.to_numeric(work["atr14"], errors="coerce").clip(lower=1e-9) if "atr14" in work.columns else pd.Series(np.nan, index=work.index)
+    avg = pd.to_numeric(work["avg_vol20"], errors="coerce")
+    return ((c < o) & (avg > 0) & (v >= EXIT_DISTRIBUTION_VOL_MULT * avg) & (close_loc <= 0.25) & (body >= 0.60 * atr)).fillna(False)
+
+
+def _swing_failed_breakout(work: pd.DataFrame, position: dict, entry: float, avg_vol20: float) -> list[str]:
+    """Advisory only (the structural initial stop is never moved): bull-trap warning in the first bars after entry."""
+    out: list[str] = []
+    try:
+        if _bars_since_open(work, position) > EXIT_FAILED_BREAKOUT_BARS or len(work) < 2:
+            return out
+        last, prev = work.iloc[-1], work.iloc[-2]
+        o, h, l, c, v = (float(last[k]) for k in ("open", "high", "low", "close", "volume"))
+        rng = max(h - l, 1e-9)
+        close_loc = (c - l) / rng
+        body = abs(c - o)
+        upper_wick = h - max(o, c)
+        vr = v / avg_vol20 if avg_vol20 > 0 else 0.0
+        if c < entry and vr >= EXIT_FAILED_BREAKOUT_VOL_MULT:
+            out.append(f"פריצת שווא אפשרית: סגירה מתחת לרמת הפריצה ({c:.2f} < {entry:.2f}) בנפח ×{vr:.1f}")
+        prev_o, prev_c = float(prev["open"]), float(prev["close"])
+        engulf = prev_c > prev_o and c < o and o >= prev_c and c <= prev_o
+        star = upper_wick >= max(2.0 * body, 0.45 * rng) and close_loc <= 0.45
+        if (engulf or star) and vr >= EXIT_CLIMAX_VOL_MULT:
+            out.append(f"נר היפוך עם נפח גבוה ×{vr:.1f} בתוך {EXIT_FAILED_BREAKOUT_BARS} ימים מהכניסה")
+    except Exception:
+        pass
+    return out
+
+
 def _evaluate_exit_intelligence(df: pd.DataFrame, position: dict, spy_df: pd.DataFrame | None = None) -> dict:
     """
     מנוע יציאה רב-סיגנלי. Doji לבדו לעולם אינו סוגר פוזיציה.
@@ -8197,7 +8428,12 @@ def _evaluate_exit_intelligence(df: pd.DataFrame, position: dict, spy_df: pd.Dat
         volume = pd.to_numeric(work["volume"], errors="coerce").fillna(0.0)
         work["ema10"] = close.ewm(span=10, adjust=False).mean()
         work["ema21"] = close.ewm(span=21, adjust=False).mean()
-        work["avg_vol20"] = volume.rolling(20, min_periods=10).mean()
+        if SWING_EXIT_ENGINE:
+            # Same causal baseline as the entry engine: the bar being judged is not part of its own average.
+            work["avg_vol20"] = volume.shift(1).rolling(20, min_periods=20).mean()
+            work["ema_trail"] = close.ewm(span=max(2, EXIT_TRAIL_EMA_SPAN), adjust=False).mean()
+        else:
+            work["avg_vol20"] = volume.rolling(20, min_periods=10).mean()
         work["cmf20"] = _compute_cmf20(work)
 
         last = work.iloc[-1]
@@ -8227,9 +8463,22 @@ def _evaluate_exit_intelligence(df: pd.DataFrame, position: dict, spy_df: pd.Dat
         position["highest_closed_price"] = highest
         max_profit_pct = (highest - entry) / max(entry, 1e-9) * 100.0
         result["max_profit_pct"] = round(max_profit_pct, 2)
+        stop_ref = position.get("stop_initial", position.get("stop_current", 0))
+        stop_ref = float(stop_ref) if _is_finite_number(stop_ref) else 0.0
+        if 0 < stop_ref < entry:
+            r_unit = entry - stop_ref
+            result["max_r"] = round((highest - entry) / r_unit, 2)
+            result["r_now"] = round((c - entry) / r_unit, 2)
 
+        if SWING_EXIT_ENGINE:
+            atr_entry = _atr_at_entry(work, position, atr)
+            activate_pct = _swing_activation_pct(entry, atr_entry)
+        else:
+            atr_entry = atr
+            activate_pct = EXIT_PROFIT_ACTIVATE_PCT
+        result["activation_pct"] = round(activate_pct, 2)
         active_before = bool(position.get("profit_protection_active", False))
-        active = active_before or max_profit_pct >= EXIT_PROFIT_ACTIVATE_PCT
+        active = active_before or max_profit_pct >= activate_pct
         result["profit_protection_active"] = active
         position["profit_protection_active"] = active
 
@@ -8239,11 +8488,29 @@ def _evaluate_exit_intelligence(df: pd.DataFrame, position: dict, spy_df: pd.Dat
 
         if not active:
             result["status"] = "BUILDING"
-            result["signals"] = [f"Profit Protection ממתין ל-+{EXIT_PROFIT_ACTIVATE_PCT:.1f}% (שיא כרגע {max_profit_pct:+.1f}%)"]
+            result["signals"] = [f"Profit Protection ממתין ל-+{activate_pct:.1f}% (שיא כרגע {max_profit_pct:+.1f}%)"]
+            if SWING_EXIT_ENGINE:
+                fb = _swing_failed_breakout(work, position, entry, avg_vol20)
+                if fb:
+                    result["status"] = "WATCH"
+                    result["signals"] = fb + result["signals"]
             return result
 
         # Profit floor נפרד מה-Stop המקורי. הוא רק עולה, ולעולם לא משנה stop_initial.
-        chandelier_raw = highest - EXIT_CHANDELIER_ATR_MULT * atr
+        if SWING_EXIT_ENGINE:
+            # Chandelier only after strong momentum expansion (sticky once reached); before that the floor is
+            # break-even plus the trailing-EMA / reversal-candle logic below.
+            adx_now = last.get("adx14", np.nan)
+            expanded = bool(position.get("momentum_expanded", False))
+            if (not expanded and (highest - entry) / max(atr_entry, 1e-9) >= EXIT_EXPANSION_ATR
+                    and c > float(last.get("ema_trail", ema10))
+                    and _is_finite_number(adx_now) and float(adx_now) >= EXIT_EXPANSION_MIN_ADX):
+                expanded = True
+            position["momentum_expanded"] = expanded
+            result["momentum_expanded"] = expanded
+            chandelier_raw = (highest - EXIT_SWING_CHANDELIER_ATR_MULT * atr) if expanded else float("-inf")
+        else:
+            chandelier_raw = highest - EXIT_CHANDELIER_ATR_MULT * atr
         old_floor = position.get("profit_exit_floor")
         old_floor = float(old_floor) if _is_finite_number(old_floor) else entry
         floor = max(entry, old_floor, chandelier_raw)
@@ -8297,16 +8564,7 @@ def _evaluate_exit_intelligence(df: pd.DataFrame, position: dict, spy_df: pd.Dat
             vr = v / max(avg_vol20, 1e-9)
             signals.append(f"High-volume distribution: נר אדום חזק, Volume ×{vr:.2f}")
 
-        dist_count = 0
-        tail5 = work.tail(5)
-        for _, row in tail5.iterrows():
-            try:
-                row_atr = float(row.get("atr14", atr) or atr)
-                row_avg = float(row.get("avg_vol20", avg_vol20) or avg_vol20)
-                if _distribution_bar(row, row_avg, row_atr):
-                    dist_count += 1
-            except Exception:
-                pass
+        dist_count = int(_distribution_series(work).tail(5).sum())
         if dist_count >= 2:
             score += 15
             categories.add("volume")
@@ -8387,12 +8645,45 @@ def _evaluate_exit_intelligence(df: pd.DataFrame, position: dict, spy_df: pd.Dat
             result["exit_reason"] = f"Profit Protection נשבר בסגירה ({c:.2f} ≤ {floor:.2f})"
             return result
 
+        # v9.7.5 swing layer — closed daily bars only, evaluated on the first closed bar that shows it.
+        swing_tighten: list[str] = []
+        if SWING_EXIT_ENGINE:
+            span = max(2, EXIT_TRAIL_EMA_SPAN)
+            ema_trail = float(last.get("ema_trail", ema10))
+            below = (close < work["ema_trail"])
+            n_below = int(below.iloc[::-1].astype(int).cumprod().sum())      # consecutive closes below the trailing EMA
+            armed = _bars_since_open(work, position) >= EXIT_TRAIL_MIN_BARS
+            result["trail_ema"] = round(ema_trail, 4)
+            result["closes_below_trail"] = n_below
+            if armed and n_below >= max(1, EXIT_TRAIL_CLOSES):
+                result["status"] = "EXIT"
+                result["exit_confirmed"] = True
+                result["exit_reason"] = f"Trailing EMA{span}: {n_below} סגירות רצופות מתחת ({c:.2f} < {ema_trail:.2f})"
+                return result
+            vr_prior = (v / avg_vol20) if avg_vol20 > 0 else 0.0
+            candle_reversal = bool(bearish_engulfing or shooting_star or distribution_today
+                                   or (_doji_flag(last) and h >= highest * 0.98))
+            if candle_reversal and vr_prior >= EXIT_CLIMAX_VOL_MULT:
+                swing_tighten.append(f"נר היפוך + Volume climax ×{vr_prior:.1f} — הדק סטופ מתחת ל-Low של הנר")
+            if armed and n_below >= 1:
+                swing_tighten.append(f"סגירה מתחת EMA{span} ({n_below}/{max(1, EXIT_TRAIL_CLOSES)}) — הדק סטופ")
+
         # Exit rule B: multi-signal confirmed reversal. A Doji alone can never satisfy this.
         if score >= EXIT_CONFIRM_SCORE and len(categories) >= 2 and price_confirmation:
             result["status"] = "EXIT"
             result["exit_confirmed"] = True
             top = "; ".join(signals[:4]) if signals else "multiple reversal signals"
             result["exit_reason"] = f"Confirmed reversal score {score:.0f}/100 — {top}"
+        elif swing_tighten:
+            # Ratchet only: the floor moves just under the signal bar's low and never goes down.
+            result["status"] = "TIGHTEN"
+            tight_floor = round(max(floor, l - 0.1 * atr), 4)
+            if tight_floor > floor:
+                floor = tight_floor
+                position["profit_exit_floor"] = floor
+                result["profit_exit_floor"] = floor
+            result["tighten_reasons"] = swing_tighten
+            result["signals"] = swing_tighten + [x for x in signals if x not in swing_tighten]
         elif score >= EXIT_WATCH_SCORE:
             result["status"] = "WATCH"
         elif result["target_reached"]:
@@ -8452,7 +8743,7 @@ def open_position(alert: dict) -> None:
         _save_positions(positions)
         trigger = plan.get("profit_protection_trigger_price")
         trigger_txt = f"${trigger:.2f}" if _is_finite_number(trigger) else "+5%"
-        log(f"📂 Position opened: {ticker} @ {entry:.2f} | initial_stop={stop:.2f} FIXED | target_ref={target:.2f} | profit protection starts {trigger_txt}")
+        log(f"📂 Position opened: {ticker} @ {entry:.2f} | initial_stop={stop:.2f} FIXED | target_ref={target:.2f} | profit protection from {trigger_txt}")
     except Exception as e:
         log(f"open_position error: {e}")
 
@@ -8658,10 +8949,12 @@ def send_positions_status_email() -> dict:
                 score = _mail_float(intel.get("score", 0) or 0)
                 signals = intel.get("signals", []) or []
                 floor = p.get("profit_exit_floor")
-                floor_txt = f"${_mail_float(floor):.2f}" if _is_finite_number(floor) else "ממתין ל-+5%"
+                floor_txt = f"${_mail_float(floor):.2f}" if _is_finite_number(floor) else "ממתין להפעלת Profit Protection"
                 target_reached = bool(p.get("target_reached", False))
 
-                if status == "WATCH":
+                if status == "TIGHTEN":
+                    status_emoji, status_text, status_color, status_bg = "🔒", "להדק סטופ — נר היפוך עם נפח / סגירה מתחת ל-EMA; ה-Profit Floor הועלה", "#9a3412", "#fff7ed"
+                elif status == "WATCH":
                     status_emoji, status_text, status_color, status_bg = "⚠️", "להישאר בזהירות — יש סימני שינוי כיוון שעדיין אינם מאושרים", "#92400e", "#fffbeb"
                 elif status == "RIDE_WINNER":
                     status_emoji, status_text, status_color, status_bg = "🏄", "Target 1 הושג — המגמה עדיין בריאה, ממשיכים לרכב", "#15803d", "#f0fdf4"
@@ -8670,7 +8963,7 @@ def send_positions_status_email() -> dict:
                 elif status == "DATA_LIMITED":
                     status_emoji, status_text, status_color, status_bg = "⚠️", "להישאר — אין מספיק נתונים לאישור שינוי כיוון", "#6b7280", "#f9fafb"
                 else:
-                    status_emoji, status_text, status_color, status_bg = "🟦", f"להישאר — Stop המקורי נשאר קבוע; Profit Protection יופעל ב-+{EXIT_PROFIT_ACTIVATE_PCT:.0f}%", "#1d4ed8", "#eff6ff"
+                    status_emoji, status_text, status_color, status_bg = "🟦", f"להישאר — Stop המקורי נשאר קבוע; Profit Protection יופעל ב-+{float(intel.get('activation_pct') or EXIT_PROFIT_ACTIVATE_PCT):.1f}%", "#1d4ed8", "#eff6ff"
 
                 sig_html = "".join(f"<li>{_mail_text(x)}</li>" for x in signals[:6]) or "<li>אין אותות Reversal משמעותיים</li>"
                 target_note = "✅ הושג — אינו גורם ליציאה אוטומטית" if target_reached else "טרם הושג"
@@ -8695,7 +8988,9 @@ def send_positions_status_email() -> dict:
         _save_positions(positions)
         if not cards:
             return _mail_status("skipped")
-        policy = ("Target הוא יעד ייחוס. Stop המקורי נשאר קבוע; אחרי +5% מופעל Profit Protection "
+        trig_txt = (f"{EXIT_ACTIVATE_MIN_PCT:.1f}%–{EXIT_ACTIVATE_MAX_PCT:.1f}% (לפי ATR)" if SWING_EXIT_ENGINE
+                    else f"{EXIT_PROFIT_ACTIVATE_PCT:.0f}%")
+        policy = (f"Target הוא יעד ייחוס. Stop המקורי נשאר קבוע; אחרי רווח של +{trig_txt} מופעל Profit Protection "
                   "והיציאה מתבססת על שינוי כיוון מאושר.")
         policy_html = f'<p style="margin:0 0 20px;color:#a9b6ca;font-size:12px;line-height:1.9;">{_mail_text(policy)}</p>'
         html_body = _mail_document("הפוזיציות במעקב", f"{len(open_pos)} פוזיציות פתוחות · {today_str}",
@@ -9006,40 +9301,89 @@ def get_catalyst_engine(ticker: str, company: dict) -> dict:
     }
 
 
-def get_weekly_timeframe(ticker: str) -> dict:
+WEEKLY_ALIGN_MODE = os.getenv("WEEKLY_ALIGN_MODE", "off").strip().lower()   # off | warn | block  (entry gate)
+WEEKLY_MA_WEEKS = int(os.getenv("WEEKLY_MA_WEEKS", "30"))
+WEEKLY_EMA_SPAN = int(os.getenv("WEEKLY_EMA_SPAN", "10"))
+
+
+def weekly_context_from_daily(df: pd.DataFrame | None) -> dict:
+    """Weekly context built by resampling the DAILY frame the scanner already holds (no second download).
+
+    The last weekly bar is the current (possibly partial) week, i.e. the latest daily close - the same convention the
+    backtest uses, so what is measured offline is what runs live. `aligned` = price above the 30-week MA AND above the
+    10-week EMA; it is None (unknown, never a blocker) when there are fewer than WEEKLY_MA_WEEKS weekly closes.
     """
-    מחזיר ניתוח שבועי: מגמה, MA30 שבועי, ביצועים 3 חודשים.
+    out = {"ok": False, "trend": "UNKNOWN", "above_ma30w": None, "above_ema10w": None, "ma30w_rising": None,
+           "aligned": None, "reason": "אין נתונים יומיים", "source": "daily_resample"}
+    try:
+        if df is None or len(df) == 0:
+            return out
+        col = "close" if "close" in df.columns else ("Close" if "Close" in df.columns else None)
+        if col is None:
+            return out
+        px = pd.to_numeric(df[col], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+        idx = pd.DatetimeIndex(px.index)
+        if idx.tz is not None:
+            idx = idx.tz_localize(None)
+        px.index = idx
+        px = px.sort_index()
+        px = px[~px.index.duplicated(keep="last")]
+        wk = px.resample("W-FRI").last().dropna()
+        if len(wk) < WEEKLY_MA_WEEKS:
+            out["reason"] = f"היסטוריה שבועית קצרה ({len(wk)} < {WEEKLY_MA_WEEKS} שבועות)"
+            return out
+        ma = wk.rolling(WEEKLY_MA_WEEKS).mean()
+        ema = wk.ewm(span=WEEKLY_EMA_SPAN, adjust=False).mean()
+        price, ma_now, ema_now = float(wk.iloc[-1]), float(ma.iloc[-1]), float(ema.iloc[-1])
+        above_ma, above_ema = price > ma_now, price > ema_now
+        ma_prev = float(ma.iloc[-5]) if len(ma.dropna()) >= 5 else float("nan")
+        rising = (ma_now > ma_prev) if np.isfinite(ma_prev) else None
+        price_3m = float(wk.iloc[-13]) if len(wk) >= 13 else float(wk.iloc[0])
+        perf_3m = round((price - price_3m) / max(price_3m, 1e-9) * 100, 1)
+        trend = "UP" if price > float(wk.iloc[-3]) else "DOWN"
+        aligned = bool(above_ma and above_ema)
+        if aligned:
+            reason = "מעל MA30 ו-EMA10 שבועיים"
+        else:
+            bits = []
+            if not above_ma:
+                bits.append(f"מתחת MA{WEEKLY_MA_WEEKS} שבועי")
+            if not above_ema:
+                bits.append(f"מתחת EMA{WEEKLY_EMA_SPAN} שבועי")
+            reason = " + ".join(bits)
+        out.update({
+            "ok": True, "trend": trend, "above_ma30w": above_ma, "above_ema10w": above_ema, "ma30w_rising": rising,
+            "aligned": aligned, "reason": reason, "ma30w": round(ma_now, 2), "ema10w": round(ema_now, 2),
+            "price_now": round(price, 2), "perf_3m": perf_3m, "weeks": int(len(wk)),
+            "dist_ma30w_pct": round((price / ma_now - 1) * 100, 2) if ma_now > 0 else None,
+        })
+        return out
+    except Exception as e:
+        out["reason"] = f"שגיאה בניתוח שבועי: {type(e).__name__}"
+        return out
+
+
+def get_weekly_timeframe(ticker: str, df: pd.DataFrame | None = None) -> dict:
+    """
+    ניתוח שבועי: מגמה, MA30 שבועי אמיתי (30 שבועות), EMA10 שבועי, ביצועי 3 חודשים.
+    מחושב מה-DataFrame היומי שכבר קיים (resample) — ללא הורדת yfinance שנייה.
     """
     result = {"trend": "UNKNOWN", "above_ma30w": None, "perf_3m": None, "summary": "N/A"}
     try:
-        df_w = yf.download(ticker, period="6mo", interval="1wk",
-                           progress=False, auto_adjust=True)
-        if df_w is None or len(df_w) < 12:
+        ctx = weekly_context_from_daily(df)
+        if not ctx.get("ok"):
+            result["summary"] = f"שבועי: {ctx.get('reason', 'N/A')}"
+            result.update({k: ctx.get(k) for k in ("aligned", "reason", "source")})
             return result
-        if isinstance(df_w.columns, pd.MultiIndex):
-            df_w.columns = [c[0].lower() for c in df_w.columns]
-        else:
-            df_w.columns = [c.lower() for c in df_w.columns]
-        close = df_w["close"] if "close" in df_w.columns else df_w.iloc[:, 0]
-        ma30w = float(close.rolling(13).mean().iloc[-1])  # 13 שבועות ≈ MA30 שבועי
-        price_now = float(close.iloc[-1])
-        price_3m  = float(close.iloc[-13]) if len(close) >= 13 else float(close.iloc[0])
-        perf_3m   = round((price_now - price_3m) / max(price_3m, 1e-9) * 100, 1)
-        above     = price_now > ma30w
-        # מגמה: 3 שבועות אחרונים עולים?
-        last3 = close.iloc[-3:].values
-        trend = "UP" if last3[-1] > last3[0] else "DOWN"
-        result = {
-            "trend":       trend,
-            "above_ma30w": above,
-            "ma30w":       round(ma30w, 2),
-            "price_now":   round(price_now, 2),
-            "perf_3m":     perf_3m,
-            "summary":     f"{'🟢' if above and trend=='UP' else '🔴' if not above else '🟡'} שבועי: {'מעל' if above else 'מתחת'} MA30 | {perf_3m:+.1f}% ב-3 חודשים | מגמה: {trend}",
-        }
+        above, trend = bool(ctx["above_ma30w"]), ctx["trend"]
+        aligned_txt = "מיושר עם הפריצה" if ctx["aligned"] else "לא מיושר"
+        ctx["summary"] = (f"{'🟢' if above and trend == 'UP' else '🔴' if not above else '🟡'} שבועי: "
+                          f"{'מעל' if above else 'מתחת'} MA{WEEKLY_MA_WEEKS} | {ctx['perf_3m']:+.1f}% ב-3 חודשים | "
+                          f"מגמה: {trend} | {aligned_txt}")
+        return ctx
     except Exception as e:
         result["summary"] = f"שגיאה בניתוח שבועי: {e}"
-    return result
+        return result
 
 
 def get_accumulation_score(df: pd.DataFrame) -> dict:
@@ -9059,15 +9403,9 @@ def get_accumulation_score(df: pd.DataFrame) -> dict:
             return result
 
         # On-Balance Volume
-        obv = [0.0]
-        for i in range(1, len(closes)):
-            if closes[i] > closes[i-1]:
-                obv.append(obv[-1] + volumes[i])
-            elif closes[i] < closes[i-1]:
-                obv.append(obv[-1] - volumes[i])
-            else:
-                obv.append(obv[-1])
-        obv = np.array(obv)
+        _c = np.asarray(closes, dtype=float)
+        _v = np.nan_to_num(np.asarray(volumes, dtype=float))
+        obv = np.cumsum(np.nan_to_num(np.sign(np.diff(_c, prepend=_c[0]))) * _v)   # vectorised; obv[0] = 0 as before
         # OBV trend: האם OBV עולה ב-10 ימים אחרונים?
         obv_10 = obv[-10:]
         obv_slope = float(np.polyfit(range(len(obv_10)), obv_10, 1)[0])
@@ -9897,7 +10235,7 @@ def get_deep_intelligence(ticker: str, df=None) -> dict:
     """
     מרכז את כל הניתוח המעמיק: Weekly + Accumulation + Insider + Short + Options + Narrow-range volume proxy + 13F + Sentiment + Congress.
     """
-    weekly      = get_weekly_timeframe(ticker)
+    weekly      = get_weekly_timeframe(ticker, df)
     accum       = get_accumulation_score(df) if df is not None else {"summary": "N/A"}
     insider     = get_insider_buying(ticker)
     short       = get_short_interest(ticker)
@@ -10242,7 +10580,7 @@ def _mail_position_card(values: dict) -> str:
     tone = "green" if v["pnl_pct"] >= 0 else "red"
     body = (f'<p style="margin:16px 0 0;color:#c5d0e0;font-size:13px;line-height:1.8;">'
             f'{_mail_text(v["status_text"])}</p>')
-    body += '<div style="margin-top:10px;">' + _mail_pill(v["status"], "amber" if v["status"] == "WATCH" else "blue") + '</div>'
+    body += '<div style="margin-top:10px;">' + _mail_pill(v["status"], "amber" if v["status"] in ("WATCH", "TIGHTEN") else "blue") + '</div>'
     body += _mail_metrics([
         ("כניסה", _mail_number(v["entry"], prefix="$"), "blue"),
         ("מחיר מעקב אחרון", _mail_number(v["price_now"], prefix="$"), "blue"),
@@ -10263,7 +10601,7 @@ def _mail_position_card(values: dict) -> str:
         body += _mail_section("📅 דוח קרוב", _mail_list([v["earnings_note"],
                               "פוזיציה פתוחה לפני דוח: התנודה ביום הדוח יכולה לעבור את הסטופ בפער פתיחה."]), "red")
     body += _mail_section("Exit Intelligence", _mail_list(v["signals"], "אין אותות Reversal משמעותיים", 6),
-                          "amber" if v["status"] == "WATCH" else "blue")
+                          "amber" if v["status"] in ("WATCH", "TIGHTEN") else "blue")
     return _mail_card(v["ticker"], body, "מעקב פוזיציה פתוחה",
                       _mail_pill(_mail_number(v["pnl_pct"], 1, suffix="%", signed=True), tone))
 
@@ -11542,7 +11880,7 @@ def main() -> None:
     log(f"🎯 MIN_ALERT_SCORE דינמי: {dynamic_score} (Regime={regime_name})")
     log(f"🚀 V9.3 Pattern-Aware Entry: min_quality={ENTRY_READY_MIN_SCORE:.1f}, breakout_volume×{ENTRY_MIN_VOLUME_RATIO:.2f}, pullback/retest_volume×{ENTRY_PULLBACK_MIN_VOLUME_RATIO:.2f}+, RS>={ENTRY_MIN_RS_SCORE:.0f}")
     log(f"🧩 V9 Pattern Expansion: enabled={V9_PATTERN_ENGINE_ENABLED}, all_detected_families_before_entry=True, email_limit={TOP_ALERTS_TO_SEND}, patterns=FlatBase/Darvas/VCP/EMA-Pullback/Retest")
-    log(f"🧠 V9.1 Professional Quality: enabled={PRO_ENGINE_ENABLED}, min={PRO_MIN_SCORE:.1f}, trend>={PRO_MIN_TREND_SCORE:.0f}, multi-RS>={PRO_MIN_RS_PROFILE_SCORE:.0f}, max_stop={PRO_MAX_STOP_RISK_PCT*100:.0f}%")
+    log(f"🧠 V9.1 Professional Quality: enabled={PRO_ENGINE_ENABLED}, min={PRO_MIN_SCORE:.1f}, trend>={PRO_MIN_TREND_SCORE:.0f}, multi-RS>={PRO_MIN_RS_PROFILE_SCORE:.0f}, max_stop={PRO_MAX_STOP_RISK_PCT*100:.0f}%, breakout_stop={BREAKOUT_MIN_STOP_RISK_PCT*100:.0f}-{BREAKOUT_MAX_STOP_RISK_PCT*100:.0f}%")
     log(f"🧭 V9.2 Exit Intelligence: fixed_initial_stop=True, profit_protection=+{EXIT_PROFIT_ACTIVATE_PCT:.1f}%, chandelier={EXIT_CHANDELIER_ATR_MULT:.1f}ATR, watch>={EXIT_WATCH_SCORE:.0f}, exit>={EXIT_CONFIRM_SCORE:.0f}, target=reference-only")
 
     # ── Market Reversal Detector ──────────────────────────────
@@ -11777,5 +12115,6 @@ def main() -> None:
     except Exception:
         pass
 
+if __name__ == "__main__":
 if __name__ == "__main__":
     main()
