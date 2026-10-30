@@ -27,6 +27,13 @@ v2 (2026-10-29): adds point-in-time distance columns (EMA10/21/28, MA50/150/200,
 ATR%, 20-day gain, 52-week high, stop risk, distance above the pivot) and disjoint
 universe shards (--offset). Speed: the V9 indicator frame is computed once per day
 instead of six times (identical signals, about 2x faster).
+v3 (2026-10-30): --paths-out writes the 25 sessions after every ENTRY_READY signal
+(open/high/low/close + EMA10/EMA21/ATR14 as of each bar) so exit rules (partial profit,
+breakeven stop, trailing stop, time stop) can be tested offline without new runs.
+v3.1 (2026-10-30): adds short-term relative-strength columns vs SPY (1M/3M excess return,
+RS line vs its EMA21, 10-day RS-line slope), point-in-time weekly context computed from the
+daily bars (true 30-week MA and weekly EMA10 including the current partial week, no look-ahead)
+and volume in the saved paths (for candle + volume-climax exit tests).
 
 Usage (in your own environment, where yfinance is installed):
   python scanner_backtest.py --scanner stock_scanner_unified.py \
@@ -138,6 +145,7 @@ def patch(m, pit, reuse_indicators=True):
         m.add_v9_indicators = add_v9_indicators_reused
         m._bt_indicator_reuse = True
     m._get_spy_returns = pit.spy_returns
+    m._get_spy_close = lambda: pit.cut["close"]       # point-in-time SPY closes for the RS-line check (v9.7.5+)
     m._rs_line_new_high = lambda df, lookback=63: pit.rs_line_new_high(df, lookback)
     m.get_market_regime = lambda: pit.regime(m.REGIME_MA_PERIOD)
     m._regime_cache = None
@@ -145,7 +153,23 @@ def patch(m, pit, reuse_indicators=True):
 
 
 # ---------------------------------------------------------------- point-in-time features
-def compute_features(df):
+def weekly_point_in_time(close):
+    """30-week MA / weekly EMA10 / 3-week trend as known on each DAY (current week = partial)."""
+    wk = close.resample("W-FRI").last()                      # completed-week closes, labelled by Friday
+    label = close.index.to_period("W-FRI").to_timestamp(how="end").normalize()
+    wk.index = wk.index.normalize()
+    sum29_prev = wk.rolling(29, min_periods=29).sum().shift(1)
+    alpha = 2.0 / (10 + 1)
+    ema10_prev = wk.ewm(span=10, adjust=False).mean().shift(1)
+    close_2w_ago = wk.shift(2)
+    m = lambda s: pd.Series(s.reindex(label).to_numpy(), index=close.index)
+    ma30w = (m(sum29_prev) + close) / 30.0
+    ema10w = alpha * close + (1 - alpha) * m(ema10_prev)
+    trend_up = close > m(close_2w_ago)
+    return ma30w, ema10w, trend_up
+
+
+def compute_features(df, spy=None):
     """Indicator series on the full history. Value at day i uses only bars <= i (no look-ahead)."""
     c = pd.to_numeric(df["close"], errors="coerce")
     h = pd.to_numeric(df["high"], errors="coerce")
@@ -160,7 +184,41 @@ def compute_features(df):
     f["hi252"] = h.rolling(252, min_periods=200).max()
     f["close_20ago"] = c.shift(20)
     f["close"] = c
+    v = pd.to_numeric(df["volume"], errors="coerce")
+    f["vol"] = v
+    f["vavg20"] = v.shift(1).rolling(20, min_periods=20).mean()      # prior 20 sessions (signal bar excluded)
+    f["ma30w"], f["ema10w"], f["wtrend_up"] = weekly_point_in_time(c)
+    if spy is not None and "close" in spy:
+        sc = pd.to_numeric(spy["close"], errors="coerce").reindex(df.index)
+        line = c / sc
+        # Same offsets as compute_rs_score(): close.iloc[-21] / [-63] / [-126] are 20 / 62 / 125 bars back.
+        f["exc_1m"] = ((c / c.shift(20) - 1) - (sc / sc.shift(20) - 1)) * 100.0
+        f["exc_3m"] = ((c / c.shift(62) - 1) - (sc / sc.shift(62) - 1)) * 100.0
+        f["exc_6m"] = ((c / c.shift(125) - 1) - (sc / sc.shift(125) - 1)) * 100.0
+        f["rs_decay"] = f["exc_1m"] - f["exc_3m"] / 3.0     # last month vs the monthly pace of the last quarter
+        f["rsl_vs_ema21"] = (line / line.ewm(span=21, adjust=False).mean() - 1) * 100.0
+        f["rsl_slope10"] = (line / line.shift(10) - 1) * 100.0
     return f
+
+
+PATH_BARS = 25
+
+
+def path_rows(df, feats, i, symbol, day, pattern):
+    """Forward bars i+1..i+PATH_BARS; indicator values at bar k use data up to bar k only."""
+    out = []
+    end = min(len(df), i + 1 + PATH_BARS)
+    for k in range(i + 1, end):
+        bar = df.iloc[k]
+        out.append({"ticker": symbol, "signal_date": day.date().isoformat(), "pattern": pattern, "k": k - i,
+                    "date": df.index[k].date().isoformat(),
+                    "o": round(float(bar["open"]), 4), "h": round(float(bar["high"]), 4),
+                    "l": round(float(bar["low"]), 4), "c": round(float(bar["close"]), 4),
+                    "ema10": round(float(feats["ema10"].iloc[k]), 4), "ema21": round(float(feats["ema21"].iloc[k]), 4),
+                    "v": float(feats["vol"].iloc[k]) if pd.notna(feats["vol"].iloc[k]) else None,
+                    "vavg20": round(float(feats["vavg20"].iloc[k]), 1) if pd.notna(feats["vavg20"].iloc[k]) else None,
+                    "atr14": round(float(feats["atr14"].iloc[k]), 4) if pd.notna(feats["atr14"].iloc[k]) else None})
+    return out
 
 
 def feature_row(f, day, alert):
@@ -185,15 +243,21 @@ def feature_row(f, day, alert):
         out["risk_pct"] = None
     pivot = (alert.get("meta") or {}).get("pattern_pivot")
     out["above_pivot_pct"] = pct(close, pivot) if pivot else None
+    out["dist_ma30w_pct"] = pct(close, r["ma30w"])
+    out["dist_ema10w_pct"] = pct(close, r["ema10w"])
+    out["weekly_trend_up"] = bool(r["wtrend_up"]) if pd.notna(r["ma30w"]) else None
+    out["signal_vol_ratio"] = round(float(r["vol"]) / float(r["vavg20"]), 3) if pd.notna(r["vavg20"]) and r["vavg20"] > 0 else None
+    for k in ("exc_1m", "exc_3m", "exc_6m", "rs_decay", "rsl_vs_ema21", "rsl_slope10"):
+        out[k] = round(float(r[k]), 3) if k in r.index and pd.notna(r[k]) else None
     return out
 
 
 # ---------------------------------------------------------------- core loop
-def scan_history(m, symbol, df, spy, pit, start, end, horizons=(5, 10, 20), min_bars=260, window_bars=320):
+def scan_history(m, symbol, df, spy, pit, start, end, horizons=(5, 10, 20), min_bars=260, window_bars=320, paths=None):
     cfg = m._make_v9_pattern_config()
     rows = []
     dates = df.index
-    feats = compute_features(df)
+    feats = compute_features(df, spy)
     for i in range(min_bars, len(df) - 1):
         day = dates[i]
         if day < pd.Timestamp(start) or day > pd.Timestamp(end):
@@ -207,6 +271,17 @@ def scan_history(m, symbol, df, spy, pit, start, end, horizons=(5, 10, 20), min_
         pit.set_date(day)
         regime = pit.regime(m.REGIME_MA_PERIOD)
         rs = m.compute_rs_score(symbol, hist).get("rs_score")
+        rs_legacy = rs_swing = rs_decay_pts = None
+        if hasattr(m, "RS_MODE"):                         # v9.7.5+: score the same bar both ways (gate keeps running mode)
+            keep_mode = m.RS_MODE
+            try:
+                m.RS_MODE = "legacy"
+                rs_legacy = m.compute_rs_score(symbol, hist).get("rs_score")
+                m.RS_MODE = "swing"
+                sw = m.compute_rs_score(symbol, hist)
+                rs_swing, rs_decay_pts = sw.get("rs_score"), sw.get("rs_decay_1m_vs_3m")
+            finally:
+                m.RS_MODE = keep_mode
         cands = m.find_v9_pattern_candidates(symbol, hist, rs_score=rs, market_regime=regime["regime"],
                                              config=cfg, include_rejected=False)
         if not cands:
@@ -240,8 +315,11 @@ def scan_history(m, symbol, df, spy, pit, start, end, horizons=(5, 10, 20), min_
                    "regime": regime["regime"], "rs_score": rs, "planned_entry": obs["planned_entry"],
                    "stop": obs["stop"], "target": obs["target"], "rr": alert.get("rr_ratio")}
             row.update(feature_row(feats, day, alert))
+            row.update({"rs_legacy": rs_legacy, "rs_swing": rs_swing, "rs_swing_decay_pts": rs_decay_pts})
             row.update({k: v for k, v in outcome.items() if not isinstance(v, (list, dict))})
             rows.append(row)
+            if paths is not None and row["entry_ready"]:
+                paths.extend(path_rows(df, feats, i, symbol, day, c.pattern_name))
     return rows
 
 
@@ -319,6 +397,7 @@ def main():
     ap.add_argument("--seed", type=int, default=1, help="same seed = same sample (reproducible)")
     ap.add_argument("--offset", type=int, default=0, help="skip this many tickers of the shuffled list (disjoint shards)")
     ap.add_argument("--window-bars", type=int, default=0, help="bars of history per signal day (0 = all, the default)")
+    ap.add_argument("--paths-out", default="", help="also write the forward price path of every ENTRY_READY signal to this CSV")
     args = ap.parse_args()
     run_t0 = time.time()
 
@@ -340,17 +419,21 @@ def main():
     patch(m, pit)
 
     rows = []
+    paths = [] if args.paths_out else None
     for k, sym in enumerate(dict.fromkeys(symbols), 1):
         t0 = time.time()
         df = download(sym, hist_start, hist_end, yf)
         if df is None or len(df) < 300:
             print(f"[{k}/{len(symbols)}] {sym}: not enough data")
             continue
-        got = scan_history(m, sym, df, spy, pit, args.start, args.end, window_bars=args.window_bars)
+        got = scan_history(m, sym, df, spy, pit, args.start, args.end, window_bars=args.window_bars, paths=paths)
         rows.extend(got)
         print(f"[{k}/{len(symbols)}] {sym}: {len(got)} candidate-days in {time.time() - t0:.0f}s")
     res = pd.DataFrame(rows)
     res.to_csv(args.out, index=False)
+    if paths is not None:
+        pd.DataFrame(paths).to_csv(args.paths_out, index=False)
+        print(f"Saved {len(paths)} forward-path rows -> {args.paths_out}")
     print(f"\nSaved {len(res)} rows -> {args.out} | scanner {getattr(m, 'CODE_VERSION', '?')} | total {time.time() - run_t0:.0f}s")
     summarize(res)
 
