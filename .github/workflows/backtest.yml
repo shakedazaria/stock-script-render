@@ -67,13 +67,14 @@ jobs:
           set -o pipefail
           OFFSET=$(( SHARD * SAMPLE ))
           echo "shard=$SHARD offset=$OFFSET sample=$SAMPLE seed=$SEED"
-          python scanner_backtest.py --scanner stock_scanner_unified.py --tickers "$TICKERS" --universe-cache scanner_state/universe_cache.json --sample "$SAMPLE" --seed "$SEED" --offset "$OFFSET" --start "$START" --end "$END" --out bt_results.csv 2>&1 | tee bt_summary.txt
+          python scanner_backtest.py --scanner stock_scanner_unified.py --tickers "$TICKERS" --universe-cache scanner_state/universe_cache.json --sample "$SAMPLE" --seed "$SEED" --offset "$OFFSET" --start "$START" --end "$END" --out bt_results.csv --paths-out bt_paths.csv 2>&1 | tee bt_summary.txt
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: backtest-results-shard${{ matrix.shard }}
           path: |
             bt_results.csv
+            bt_paths.csv
             bt_summary.txt
           retention-days: 7
           if-no-files-found: ignore
