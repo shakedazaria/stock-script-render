@@ -31,13 +31,19 @@ stock_scanner_unified.py
   תיקון דיוק R:R, עקביות טובה יותר ב-EMA28 Pre-filter ובדיקת Earnings עתידית בלבד.
   V9.6 בוחר Pullback אחרי שיא מקומי, משווה ווליום ל-20 נרות קודמים,
   ובודק את כל משפחות התבניות לפני בחירת הסטאפים לשליחה.
+  V9.7.5 מוסיף מנוע יציאה לסווינג, הקשר שבועי, RS לטווח קצר ובסיס נפח אחיד (20 ימים קודמים).
+  V9.7.6 מוסיף יציאה כפויה לפני דוח רווחים (EARNINGS_EXIT_LEAD_SESSIONS=1: התראה בנר הסגור של יום חמישי
+  לדוח של יום שני), RS_MODE=swing כקנס דירוג בלבד (לא חוסם), שכבות נזילות חציונית ו-Smart Money
+  כבויות כברירת מחדל, ועמודות gate_feature_frame לבקטסט הבא. פילטרי הדוחות בכניסה לא שונו.
+  V9.7.7 מוסיף טביעת רגל מוסדית (_compute_institutional_footprint: ימי print צרים בנפח גבוה + CMF מתרחב; בונוס דירוג בלבד,
+  כבוי עם USE_SMART_MONEY_ACCEL=False) ולמידת ספים שבועית (run_automated_threshold_learning; מוחל רק עם AUTO_APPLY_LEARNING=True).
 """
 
 # ============================================================
 # RESET VERIFIED FIX FILE — 2026-09-30 V9.3
 # This marker proves this is the rebuilt fixed file, not an old download copy.
 # ============================================================
-CODE_VERSION = "2026-10-30-v9.7.5-swing"
+CODE_VERSION = "2026-10-31-v9.7.7"
 RESET_VERIFIED_FIX_FILE = True
 
 
@@ -1066,6 +1072,15 @@ def run_market_reversal_detector() -> None:
 
 
 def get_dynamic_min_score() -> float:
+    """Regime threshold (55 / 45 / 55) raised - never lowered - by a validated learned floor (v9.7.7).
+    With AUTO_APPLY_LEARNING off (default) or LEARNED_MIN_SCORE_FLOOR == 0 the result is exactly the regime threshold."""
+    base = _dynamic_min_score_regime()
+    if AUTO_APPLY_LEARNING and _is_finite_number(LEARNED_MIN_SCORE_FLOOR) and float(LEARNED_MIN_SCORE_FLOOR) > base:
+        return float(LEARNED_MIN_SCORE_FLOOR)
+    return base
+
+
+def _dynamic_min_score_regime() -> float:
     """
     מחזיר ציון מינימלי דינמי לפי מצב השוק.
     FIX V7: אם נתוני SPY לא תקינים — לא מורידים סף, משתמשים בסף בטוח 55.
@@ -2969,6 +2984,7 @@ def _get_next_earnings_date(ticker: str, today=None) -> tuple[object, str]:
                         clean.append(dd)
             except Exception:
                 pass
+        _earnings_past_cache[t] = sorted(set(past_dates))  # v9.7.6: cadence input for the forced earnings exit
         last_past = max(past_dates) if past_dates else None
         if _recent_report_blocks(last_past, today):
             # Report after the signal candle (e.g. after-close yesterday): the price reaction is not in the data yet.
@@ -3000,6 +3016,795 @@ def earnings_filter_ok(ticker: str) -> tuple[bool, str]:
         return True, f"next earnings: {edate} ({days_until}d away)"
     except Exception as e:
         return True, f"earnings check error: {e} — allowing"
+
+# ============================================================
+#  v9.7.6 — SWING LAYERS (earnings forced exit · median liquidity · smart money · RS rank penalty)
+#
+#  Design rules
+#   * pandas / numpy / stdlib only. No network here: the scanner passes data in.
+#   * Everything is causal (point-in-time): a value at bar t uses bars <= t only.
+#   * Defaults (agreed 2026-10-31):
+#       EARNINGS_EXIT_ENABLED=1, EARNINGS_EXIT_LEAD_SESSIONS=1   (earnings ENTRY filters are untouched)
+#       USE_MEDIAN_LIQUIDITY=0, USE_SMART_MONEY_ACCEL=0          (measured and exported, not applied)
+#       RS_MODE=swing  -> ranking penalty only (see rs_rank_penalty); the RS gate itself stays on the legacy score
+#   * Layers 2 and 3 could not be validated on the v9.7.5 backtest (no pre-signal OHLCV in its outputs):
+#     gate_feature_frame() produces the missing columns for the next run (scanner_backtest.py v3.2).
+# ============================================================
+from datetime import date as _Date
+from typing import Callable, Iterable
+
+
+# ----------------------------------------------------------------------------------------------
+# environment switches
+# ----------------------------------------------------------------------------------------------
+def _v976_flag(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    return default if raw is None else raw.strip().lower() in ("1", "true", "yes", "on")
+
+
+def _v976_int(name: str, default: int) -> int:
+    try:
+        return int(float(os.getenv(name, str(default))))
+    except ValueError:
+        return default
+
+
+def _v976_float(name: str, default: float) -> float:
+    try:
+        return float(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+
+
+# 1) earnings forced exit (open positions only; the earnings ENTRY filter earnings_filter_ok is not touched)
+EARNINGS_EXIT_ENABLED = _v976_flag("EARNINGS_EXIT_ENABLED", True)
+# Number of FULL tradable sessions that may still remain between the last CLOSED bar and the first session exposed
+# to the release. 0 = trigger only on the last closed bar before the gap (Friday's bar for a Monday release).
+# 1 (production standard) = also one session earlier: Thursday's closed bar flags a Monday release, so Friday stays
+# an executable session for a human acting on the alert (it keeps firing on Friday's bar as well).
+EARNINGS_EXIT_LEAD_SESSIONS = _v976_int("EARNINGS_EXIT_LEAD_SESSIONS", 1)
+EARNINGS_EXIT_USE_PROBABLE = _v976_flag("EARNINGS_EXIT_USE_PROBABLE", True)
+EARNINGS_PROBABLE_TOL_SESSIONS = _v976_int("EARNINGS_PROBABLE_TOL_SESSIONS", 2)   # exit this many sessions early
+EARNINGS_PROBABLE_MAX_STD_DAYS = _v976_float("EARNINGS_PROBABLE_MAX_STD_DAYS", 7.0)
+EARNINGS_EXIT_EVENT_DAY = _v976_flag("EARNINGS_EXIT_EVENT_DAY", True)  # timing unknown: also exit ON the event day (after-close release)
+EARNINGS_EXTRA_HOLIDAYS = os.getenv("EARNINGS_EXTRA_HOLIDAYS", "")  # ISO dates, comma separated (unscheduled closures)
+_earnings_past_cache: dict[str, list] = {}   # ticker -> past report dates seen by _get_next_earnings_date (cadence input)
+
+# 2) liquidity
+USE_MEDIAN_LIQUIDITY = _v976_flag("USE_MEDIAN_LIQUIDITY", False)
+LIQ_MEDIAN_MIN_DOLLAR_VOL = _v976_float("LIQ_MEDIAN_MIN_DOLLAR_VOL", 15_000_000.0)
+LIQ_LOOKBACK = _v976_int("LIQ_LOOKBACK", 20)
+LIQ_MIN_PRICE = _v976_float("LIQ_MIN_PRICE", 5.0)
+LIQ_MAX_TOP_DAY_SHARE = _v976_float("LIQ_MAX_TOP_DAY_SHARE", 0.0)   # 0 = off; e.g. 0.35: one day may not be >35% of the window
+
+# 3) smart money
+USE_SMART_MONEY_ACCEL = _v976_flag("USE_SMART_MONEY_ACCEL", False)
+SM_APPLY_MODE = os.getenv("SM_APPLY_MODE", "rank").strip().lower()   # rank | score
+SM_LOOKBACK = _v976_int("SM_LOOKBACK", 10)
+SM_SPIKE_MULT = _v976_float("SM_SPIKE_MULT", 1.5)
+SM_POS_UP = _v976_float("SM_POS_UP", 0.55)          # close position in the day's range for an accumulation day
+SM_POS_DOWN = _v976_float("SM_POS_DOWN", 0.35)      # ... for a distribution day
+SM_CMF_WINDOW = _v976_int("SM_CMF_WINDOW", 20)
+SM_CMF_EXPANSION = _v976_float("SM_CMF_EXPANSION", 0.15)
+SM_DIV_FLAT_PCT = _v976_float("SM_DIV_FLAT_PCT", 2.0)
+SM_DIV_BEAR_CMF_DROP = _v976_float("SM_DIV_BEAR_CMF_DROP", 0.10)
+SM_BUMP_CAP_UP = _v976_float("SM_BUMP_CAP_UP", 8.0)
+SM_BUMP_CAP_DOWN = _v976_float("SM_BUMP_CAP_DOWN", 6.0)
+
+# Shadow metrics: median dollar volume and smart-money columns are written into the entry-quality metrics even while the
+# gates are OFF (live log / audit). The backtest harness turns this off and exports gate_feature_frame() instead (faster).
+GATE_SHADOW_METRICS = _v976_flag("GATE_SHADOW_METRICS", True)
+GATE_SHADOW_TAIL_BARS = _v976_int("GATE_SHADOW_TAIL_BARS", 120)   # last-bar values only need ~60 bars; 120 keeps a margin
+
+# 4) RS rank penalty (RS_MODE=swing). Magnitudes are an equal-weight HYPOTHESIS on the 0-100 score scale, not fitted:
+#    the two conditions overlap in only ~5% of backtest episodes and showed similar R gaps. They only reorder alerts
+#    (rank_key); they never block an entry and never change alert["score"] (which feeds PRO_MIN_SCORE).
+RS_RANK_PENALTY_DECAY = _v976_float("RS_RANK_PENALTY_DECAY", 4.0)       # full penalty when 1M excess lags the 3M monthly pace by >= RS_RANK_DECAY_FULL_PTS
+RS_RANK_DECAY_FULL_PTS = _v976_float("RS_RANK_DECAY_FULL_PTS", 5.0)      # percentage points; ramps linearly from the RS_DECAY_DEADBAND
+RS_RANK_PENALTY_LINE = _v976_float("RS_RANK_PENALTY_LINE", 4.0)         # RS line (stock / SPY) closed below its EMA(RS_LINE_EMA_SPAN)
+
+
+# ==============================================================================================
+# 0) NYSE calendar (no external dependency)
+# ==============================================================================================
+def _easter(year: int) -> _Date:
+    a, b, c = year % 19, year // 100, year % 100
+    d, e = b // 4, b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = c // 4, c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    month = (h + l - 7 * m + 114) // 31
+    day = ((h + l - 7 * m + 114) % 31) + 1
+    return _Date(year, month, day)
+
+
+def _nth_weekday(year: int, month: int, weekday: int, n: int) -> _Date:
+    d = _Date(year, month, 1)
+    d += timedelta(days=(weekday - d.weekday()) % 7)
+    return d + timedelta(weeks=n - 1)
+
+
+def _last_weekday(year: int, month: int, weekday: int) -> _Date:
+    d = _Date(year + (month == 12), month % 12 + 1, 1) - timedelta(days=1)
+    return d - timedelta(days=(d.weekday() - weekday) % 7)
+
+
+def _observed(d: _Date) -> _Date:
+    if d.weekday() == 5:
+        return d - timedelta(days=1)
+    if d.weekday() == 6:
+        return d + timedelta(days=1)
+    return d
+
+
+@functools.lru_cache(maxsize=64)
+def nyse_holidays(year: int) -> tuple[_Date, ...]:
+    """Regular NYSE full-day closures for `year` (+ known unscheduled closures).
+
+    New Year's Day on a Saturday is NOT observed on the previous Friday (NYSE rule); every other fixed-date
+    holiday is observed on Friday/Monday. Juneteenth from 2022. Add other unscheduled closures through
+    EARNINGS_EXTRA_HOLIDAYS (ISO dates)."""
+    hs: list[_Date] = []
+    ny = _Date(year, 1, 1)
+    if ny.weekday() == 6:
+        hs.append(_Date(year, 1, 2))
+    elif ny.weekday() != 5:
+        hs.append(ny)
+    hs.append(_nth_weekday(year, 1, 0, 3))                 # Martin Luther King Jr. Day
+    hs.append(_nth_weekday(year, 2, 0, 3))                 # Washington's Birthday
+    hs.append(_easter(year) - timedelta(days=2))           # Good Friday
+    hs.append(_last_weekday(year, 5, 0))                   # Memorial Day
+    if year >= 2022:
+        hs.append(_observed(_Date(year, 6, 19)))            # Juneteenth
+    hs.append(_observed(_Date(year, 7, 4)))                 # Independence Day
+    hs.append(_nth_weekday(year, 9, 0, 1))                 # Labor Day
+    hs.append(_nth_weekday(year, 11, 3, 4))                # Thanksgiving
+    hs.append(_observed(_Date(year, 12, 25)))               # Christmas
+    if year == 2025:
+        hs.append(_Date(2025, 1, 9))                        # National Day of Mourning (J. Carter)
+    for tok in EARNINGS_EXTRA_HOLIDAYS.split(","):
+        tok = tok.strip()
+        if tok:
+            try:
+                d = _Date.fromisoformat(tok)
+                if d.year == year:
+                    hs.append(d)
+            except ValueError:
+                pass
+    return tuple(sorted(set(hs)))
+
+
+@functools.lru_cache(maxsize=16)
+def _holiday_array(y0: int, y1: int) -> np.ndarray:
+    out: list[_Date] = []
+    for y in range(y0 - 1, y1 + 2):
+        out.extend(nyse_holidays(y))
+    return np.array(sorted(out), dtype="datetime64[D]")
+
+
+def _to_date(x: Any) -> _Date | None:
+    if x is None:
+        return None
+    try:
+        ts = pd.Timestamp(x)
+    except Exception:
+        return None
+    if pd.isna(ts):
+        return None
+    return ts.date()
+
+
+# ==============================================================================================
+# 1) EARNINGS FORCED EXIT
+# ==============================================================================================
+_D = np.timedelta64(1, "D")
+_DUMMY = np.datetime64("2000-01-03")   # a Monday, only used to keep numpy happy for invalid rows
+
+
+def _hypothesis(a_sess, e_sess, *, amc: bool, tol: int, hol):
+    """Exposure hypothesis. Returns (first_exposed_session, safe_sessions_left, passed).
+
+    first_exposed_session : first session whose OPEN can already contain the earnings reaction, moved `tol` sessions
+        EARLIER for an estimated date.  pre-market release (or unknown timing) on session E -> E ; after-close -> E+1.
+    safe_sessions_left    : tradable sessions strictly after the closed bar and strictly before the (adjusted) exposed one;
+        0 while the bar is already inside the tolerance window of an estimate (the event may be next).
+    passed                : the UNADJUSTED exposed session has been reached - only then is there nothing left to protect from.
+        (A position opened inside the tolerance window of an estimated date therefore still gets its exit signal.)
+    """
+    s0 = np.busday_offset(e_sess, 1, holidays=hol) if amc else e_sess
+    s = np.where(tol > 0, np.busday_offset(s0, -np.maximum(tol, 0), roll="forward", holidays=hol), s0) if np.any(tol > 0) else s0
+    left = np.maximum(np.busday_count(a_sess + _D, s, holidays=hol), 0)
+    return s, left, s0 <= a_sess
+
+
+def earnings_exit_flags(asof, event, *, lead_sessions: int | None = None, timing: str | Iterable[str] = "unknown",
+                        tol_sessions: int | Iterable[int] = 0, event_day: bool | None = None) -> dict[str, np.ndarray]:
+    """Vectorised earnings-exit test. All inputs broadcast; dates are array-likes (NaT allowed in `event`).
+
+    asof          date of the LAST CLOSED daily bar (a weekend/holiday value is rolled back to the last session).
+    event         earnings calendar date (a weekend/holiday date is rolled forward to the next session).
+    lead_sessions L: trigger when at most L tradable sessions remain before the first exposed session.
+    timing        'bmo' | 'amc' | 'unknown' (unknown = worst case: pre-market, and also event-day for after-close).
+    tol_sessions  extra sessions of safety (used for estimated dates).
+
+    Returns dict of numpy arrays: trigger, safe_left, first_exposed, last_safe, event_session, asof_session, passed.
+    Calendar arithmetic is done in SESSION space (numpy business-day counts with the NYSE holiday list), so
+    weekends and holidays cannot hide an event: Fri->Mon is one step, a Monday holiday is skipped.
+    """
+    lead = EARNINGS_EXIT_LEAD_SESSIONS if lead_sessions is None else int(lead_sessions)
+    ev_day = EARNINGS_EXIT_EVENT_DAY if event_day is None else bool(event_day)
+    a = np.atleast_1d(np.asarray(pd.to_datetime(np.atleast_1d(asof)).values, dtype="datetime64[D]"))
+    e = np.atleast_1d(np.asarray(pd.to_datetime(np.atleast_1d(event)).values, dtype="datetime64[D]"))
+    a, e = np.broadcast_arrays(a, e)
+    tm = np.broadcast_to(np.asarray(timing, dtype=object), a.shape)
+    tol = np.broadcast_to(np.asarray(tol_sessions, dtype=int), a.shape)
+    valid = ~np.isnat(a) & ~np.isnat(e)
+    a0 = np.where(valid, a, _DUMMY)
+    e0 = np.where(valid, e, _DUMMY)
+    y0 = int(min(a0.min(), e0.min()).astype("datetime64[Y]").astype(int) + 1970)
+    y1 = int(max(a0.max(), e0.max()).astype("datetime64[Y]").astype(int) + 1970)
+    hol = _holiday_array(y0, y1)
+
+    a_sess = np.busday_offset(a0, 0, roll="backward", holidays=hol)   # last session <= asof
+    e_sess = np.busday_offset(e0, 0, roll="forward", holidays=hol)    # first session >= event date
+
+    s_b, left_b, pass_b = _hypothesis(a_sess, e_sess, amc=False, tol=tol, hol=hol)
+    s_a, left_a, pass_a = _hypothesis(a_sess, e_sess, amc=True, tol=tol, hol=hol)
+    is_bmo, is_amc, is_unk = (tm == "bmo"), (tm == "amc"), ~((tm == "bmo") | (tm == "amc"))
+
+    trig_b = ~pass_b & (left_b <= lead)
+    trig_a = ~pass_a & (left_a <= lead)
+    # unknown timing: pre-market hypothesis, OR (only on the event day itself) the after-close hypothesis
+    trig_unk = trig_b | (ev_day & trig_a & (e_sess == a_sess))
+    trigger = valid & np.where(is_bmo, trig_b, np.where(is_amc, trig_a, trig_unk))
+    use_a = is_amc | (is_unk & ev_day & (e_sess == a_sess) & ~trig_b)
+    first_exposed = np.where(use_a, s_a, s_b)
+    left = np.where(use_a, left_a, left_b)
+    passed = np.where(use_a, pass_a, pass_b)
+    last_safe = np.busday_offset(first_exposed, -1, roll="forward", holidays=hol)
+    left = np.where(passed, -1, left)
+    nat = np.datetime64("NaT", "D")
+    return {
+        "trigger": trigger,
+        "safe_left": np.where(valid, left, -1),
+        "first_exposed": np.where(valid, first_exposed, nat),
+        "last_safe": np.where(valid, last_safe, nat),
+        "event_session": np.where(valid, e_sess, nat),
+        "asof_session": np.where(valid, a_sess, nat),
+        "passed": np.where(valid, passed, False),
+    }
+
+
+def earnings_exit_decision(asof, event_date, *, timing: str = "unknown", tol_sessions: int = 0,
+                           lead_sessions: int | None = None) -> dict[str, Any]:
+    """Scalar convenience wrapper around `earnings_exit_flags` (JSON-friendly output)."""
+    d_asof, d_ev = _to_date(asof), _to_date(event_date)
+    if d_asof is None or d_ev is None:
+        return {"triggered": False, "reason": "no_date", "safe_sessions_left": None}
+    r = earnings_exit_flags([d_asof], [d_ev], lead_sessions=lead_sessions, timing=timing, tol_sessions=tol_sessions)
+
+    def _iso(x):
+        return None if np.isnat(x) else str(x)
+
+    return {
+        "triggered": bool(r["trigger"][0]),
+        "safe_sessions_left": int(r["safe_left"][0]),
+        "event_session": _iso(r["event_session"][0]),
+        "first_exposed_session": _iso(r["first_exposed"][0]),
+        "last_safe_session": _iso(r["last_safe"][0]),
+        "asof_session": _iso(r["asof_session"][0]),
+        "passed": bool(r["passed"][0]),
+        "timing": timing,
+        "lead_sessions": EARNINGS_EXIT_LEAD_SESSIONS if lead_sessions is None else int(lead_sessions),
+    }
+
+
+def _cadence_estimate(past_dates: Iterable[Any], asof: _Date, max_std_days: float) -> tuple[_Date, float] | None:
+    ds = sorted({d for d in (_to_date(x) for x in (past_dates or [])) if d is not None and d <= asof})
+    kept: list[_Date] = []
+    for d in ds:                                   # collapse duplicate / estimate artefacts closer than 40 days
+        if not kept or (d - kept[-1]).days >= 40:
+            kept.append(d)
+    kept = kept[-8:]
+    if len(kept) < 3:
+        return None
+    iv = np.diff([k.toordinal() for k in kept]).astype(float)
+    iv = iv[(iv >= 60) & (iv <= 125)]              # quarterly cadence only
+    if len(iv) < 2:
+        return None
+    std = float(np.std(iv))
+    if std > max_std_days:
+        return None
+    est = kept[-1] + timedelta(days=int(round(float(np.median(iv)))))
+    if est <= asof:                                # overdue / already happened: do not guess
+        return None
+    return est, std
+
+
+def estimate_earnings_event(next_date: Any, status: str, past_dates: Iterable[Any] | None, asof: Any, *,
+                            use_probable: bool | None = None, max_std_days: float | None = None,
+                            tol_sessions: int | None = None, timing: str = "unknown") -> dict[str, Any]:
+    """Classify the next earnings date: verified | probable | none.
+
+    verified : the scanner's status 'verified_future' (Yahoo date in the future). Yahoo does not separate a
+               confirmed date from an estimate, so 'verified' means "present and in the future", not "confirmed".
+    probable : no usable date, but >=3 past report dates show a stable quarterly cadence (std <= max_std_days);
+               next = last + median interval; exited `tol_sessions` early because it is an estimate.
+    none     : anything else (recent_past, stale, unknown, error) -> the layer stays silent (fail-open, like today).
+    """
+    a = _to_date(asof)
+    use_prob = EARNINGS_EXIT_USE_PROBABLE if use_probable is None else use_probable
+    std_cap = EARNINGS_PROBABLE_MAX_STD_DAYS if max_std_days is None else max_std_days
+    tol = EARNINGS_PROBABLE_TOL_SESSIONS if tol_sessions is None else tol_sessions
+    none = {"kind": "none", "date": None, "tol_sessions": 0, "timing": timing, "note": f"status={status}"}
+    if a is None:
+        return none
+    d = _to_date(next_date)
+    if status == "verified_future" and d is not None and d >= a:
+        return {"kind": "verified", "date": d, "tol_sessions": 0, "timing": timing, "note": "future date from calendar"}
+    if status == "recent_past":
+        return {**none, "note": "reported recently - nothing ahead"}
+    if use_prob and past_dates:
+        est = _cadence_estimate(past_dates, a, std_cap)
+        if est is not None:
+            return {"kind": "probable", "date": est[0], "tol_sessions": int(tol), "timing": timing,
+                    "note": f"quarterly cadence, std {est[1]:.1f}d"}
+    return none
+
+
+def earnings_event_for_ticker(ticker: str, asof: Any, *, next_fn: Callable[[str], tuple[Any, str]],
+                              past_fn: Callable[[str], Iterable[Any]] | None = None, **kw) -> dict[str, Any]:
+    """Glue to the scanner: `next_fn` = _get_next_earnings_date, `past_fn` = optional list of past report dates."""
+    try:
+        nd, status = next_fn(ticker)
+    except Exception as exc:   # never let a data hiccup close a position
+        return {"kind": "none", "date": None, "tol_sessions": 0, "timing": "unknown", "note": f"error:{type(exc).__name__}"}
+    past = None
+    if past_fn is not None:
+        try:
+            past = list(past_fn(ticker) or [])
+        except Exception:
+            past = None
+    return estimate_earnings_event(nd, status, past, asof, **kw)
+
+
+def apply_earnings_exit(result: dict, *, closed_bar_date: Any, event: dict | None, enabled: bool | None = None,
+                        lead_sessions: int | None = None) -> dict:
+    """Override an `_evaluate_exit_intelligence` result with a forced EXIT when earnings are imminent.
+
+    * switch OFF -> `result` returned untouched (same object).
+    * never mutates the input; never downgrades an existing EXIT (its reason stays, earnings info is appended).
+    * sets status='EXIT', exit_confirmed=True, exit_reason, and result['earnings_exit'] (always, for display).
+    """
+    on = EARNINGS_EXIT_ENABLED if enabled is None else enabled
+    if not on:
+        return result
+    out = dict(result)
+    out["signals"] = list(out.get("signals") or [])
+    ev = event or {"kind": "none"}
+    asof = _to_date(closed_bar_date) or _to_date(out.get("closed_bar_date"))
+    if asof is None or ev.get("kind", "none") == "none" or ev.get("date") is None:
+        out["earnings_exit"] = {"triggered": False, "kind": ev.get("kind", "none"), "note": ev.get("note", "no event")}
+        return out
+    dec = earnings_exit_decision(asof, ev["date"], timing=ev.get("timing", "unknown"),
+                                 tol_sessions=int(ev.get("tol_sessions", 0)), lead_sessions=lead_sessions)
+    info = {**dec, "kind": ev["kind"], "event_date": str(ev["date"]), "note": ev.get("note", "")}
+    out["earnings_exit"] = info
+    if not dec["triggered"]:
+        return out
+    kind_he = "מאומת" if ev["kind"] == "verified" else "צפוי (הערכה)"
+    reason = (f"דוח רווחים {kind_he} ב-{ev['date']} — בסשן הבא כבר חשוף לפער "
+              f"(סשנים בטוחים שנותרו: {dec['safe_sessions_left']}, אחרון בטוח: {dec['last_safe_session']})")
+    out["signals"].append(f"Earnings forced exit: {reason}")
+    if out.get("status") == "EXIT" and out.get("exit_confirmed"):
+        info["also_triggered"] = True            # a price-based exit already fired; keep its (more specific) reason
+        return out
+    out["status"] = "EXIT"
+    out["exit_confirmed"] = True
+    out["exit_reason"] = reason
+    out["exit_kind_hint"] = "EARNINGS_EXIT"
+    return out
+
+
+# ==============================================================================================
+# 2) TRUE MEDIAN LIQUIDITY
+# ==============================================================================================
+def _ohlcv(df: pd.DataFrame) -> pd.DataFrame:
+    cols = {c: str(c).lower() for c in df.columns}
+    out = df.rename(columns=cols)
+    return out
+
+
+def dollar_volume_series(df: pd.DataFrame) -> pd.Series:
+    """Per-day traded value = close * volume (each day at its own price, NOT today's price)."""
+    d = _ohlcv(df)
+    return (pd.to_numeric(d["close"], errors="coerce") * pd.to_numeric(d["volume"], errors="coerce"))
+
+
+def rolling_median_dollar_volume(df: pd.DataFrame, window: int | None = None, include_current: bool = False) -> pd.Series:
+    """Rolling MEDIAN of daily dollar volume. Default excludes the current (setup) bar, so a volume spike on the
+    breakout candle cannot make an illiquid name look liquid. NaN inside the window -> NaN (fail-closed)."""
+    w = LIQ_LOOKBACK if window is None else int(window)
+    dv = dollar_volume_series(df)
+    if not include_current:
+        dv = dv.shift(1)
+    return dv.rolling(w, min_periods=w).median()
+
+
+def median_dollar_volume_batch(close: pd.DataFrame, volume: pd.DataFrame, window: int | None = None,
+                               include_current: bool = False) -> pd.DataFrame:
+    """Same measure for a wide table (dates x tickers) in one pass - use it to pre-filter the universe
+    BEFORE per-ticker scanning (saves network calls)."""
+    w = LIQ_LOOKBACK if window is None else int(window)
+    dv = close * volume
+    if not include_current:
+        dv = dv.shift(1)
+    return dv.rolling(w, min_periods=w).median()
+
+
+def liquidity_gate(df: pd.DataFrame, *, enabled: bool | None = None, min_dollar_vol: float | None = None,
+                   window: int | None = None, min_price: float | None = None,
+                   max_top_day_share: float | None = None) -> dict[str, Any]:
+    """Institutional liquidity gate on the LAST bar of `df` (setup bar excluded from the statistic).
+
+    Always returns the measured numbers (also when disabled, for shadow logging); `ok` is True when disabled.
+    Enabled and not enough clean history -> ok=False (liquidity must be proven)."""
+    on = USE_MEDIAN_LIQUIDITY if enabled is None else enabled
+    thr = LIQ_MEDIAN_MIN_DOLLAR_VOL if min_dollar_vol is None else float(min_dollar_vol)
+    w = LIQ_LOOKBACK if window is None else int(window)
+    pmin = LIQ_MIN_PRICE if min_price is None else float(min_price)
+    top_cap = LIQ_MAX_TOP_DAY_SHARE if max_top_day_share is None else float(max_top_day_share)
+    out: dict[str, Any] = {"enabled": bool(on), "ok": True, "median_dv": None, "mean_dv": None,
+                           "top_day_share": None, "threshold": thr, "reason": "disabled" if not on else "ok"}
+    try:
+        d = _ohlcv(df.iloc[-(w + 2):])          # shift(1) + w-bar window: older bars cannot change the result
+        dv = dollar_volume_series(d)
+        win = dv.shift(1).iloc[-w:] if len(dv) > w else pd.Series(dtype=float)
+        if len(win) < w or win.isna().any():
+            out.update(ok=not on, reason="insufficient_or_missing_history")
+            return out
+        med, mean = float(win.median()), float(win.mean())
+        total = float(win.sum())
+        out.update(median_dv=med, mean_dv=mean, top_day_share=(float(win.max()) / total) if total > 0 else None)
+        px = float(pd.to_numeric(d["close"], errors="coerce").iloc[-1])
+        out["price"] = px
+        if not on:
+            return out
+        if not np.isfinite(px) or px < pmin:
+            out.update(ok=False, reason=f"price {px:.2f} < {pmin:.2f}")
+        elif med < thr:
+            out.update(ok=False, reason=f"median $vol {med/1e6:.1f}M < {thr/1e6:.0f}M")
+        elif top_cap > 0 and out["top_day_share"] is not None and out["top_day_share"] > top_cap:
+            out.update(ok=False, reason=f"one day = {out['top_day_share']*100:.0f}% of window turnover")
+        return out
+    except Exception as exc:
+        out.update(ok=not on, reason=f"error:{type(exc).__name__}")
+        return out
+
+
+# ==============================================================================================
+# 3) SMART-MONEY OVERLAY (sequential volume expansion + CMF expansion / divergence)
+# ==============================================================================================
+def chaikin_money_flow(df: pd.DataFrame, window: int | None = None) -> pd.Series:
+    """CMF = sum(MFV, n) / sum(volume, n), MFV = ((C-L)-(H-C))/(H-L) * V. Causal."""
+    n = SM_CMF_WINDOW if window is None else int(window)
+    d = _ohlcv(df)
+    h, l, c, v = (pd.to_numeric(d[k], errors="coerce") for k in ("high", "low", "close", "volume"))
+    rng = (h - l).replace(0, np.nan)
+    mfm = (((c - l) - (h - c)) / rng).fillna(0.0)
+    return (mfm * v).rolling(n, min_periods=n).sum() / v.rolling(n, min_periods=n).sum().replace(0, np.nan)
+
+
+def smart_money_overlay(df: pd.DataFrame, lookback: int | None = None) -> pd.DataFrame:
+    """Per-bar accumulation / distribution evidence over the last `lookback` sessions (causal, vectorised).
+
+    acc_day   : close > prior close, volume >= SM_SPIKE_MULT x prior-20 mean, close in the top (1-SM_POS_UP) of range
+    dist_day  : close < prior close, same volume spike, close in the bottom SM_POS_DOWN of range
+    seq       : consecutive up-closes with rising volume above the prior-20 mean ("sequential expansion")
+    cmf_exp   : CMF > 0 and CMF rose >= SM_CMF_EXPANSION over `lookback` bars
+    bull_div  : price flat/down (<= +SM_DIV_FLAT_PCT%) while CMF rose >= SM_CMF_EXPANSION  (hidden accumulation)
+    bear_div  : price up (>= +SM_DIV_FLAT_PCT%) while CMF fell >= SM_DIV_BEAR_CMF_DROP     (price without flow)
+    bump      : points added to the entry-readiness score (cap +SM_BUMP_CAP_UP / -SM_BUMP_CAP_DOWN)
+    """
+    L = SM_LOOKBACK if lookback is None else int(lookback)
+    d = _ohlcv(df)
+    o, h, l, c, v = (pd.to_numeric(d[k], errors="coerce") for k in ("open", "high", "low", "close", "volume"))
+    prev_c = c.shift(1)
+    avg_prior = v.shift(1).rolling(20, min_periods=20).mean()
+    pos = ((c - l) / (h - l).replace(0, np.nan))
+    spike = (v >= SM_SPIKE_MULT * avg_prior) & (avg_prior > 0)
+    up = c > prev_c
+    acc = (up & spike & (pos >= SM_POS_UP)).astype(float)
+    dist = ((c < prev_c) & spike & (pos <= SM_POS_DOWN)).astype(float)
+    seq = (up & up.shift(1, fill_value=False) & (v > v.shift(1)) & (v >= avg_prior)).astype(float)
+    cmf = chaikin_money_flow(d)
+    cmf_delta = cmf - cmf.shift(L)
+    px_chg = (c / c.shift(L) - 1.0) * 100.0
+    cmf_exp = (cmf > 0) & (cmf_delta >= SM_CMF_EXPANSION)
+    bull_div = (px_chg <= SM_DIV_FLAT_PCT) & (cmf_delta >= SM_CMF_EXPANSION)
+    bear_div = (px_chg >= SM_DIV_FLAT_PCT) & (cmf_delta <= -SM_DIV_BEAR_CMF_DROP)
+    ready = avg_prior.notna().astype(float).rolling(L, min_periods=L).min().eq(1.0)   # full volume baseline for all L bars
+    out = pd.DataFrame(index=d.index)
+    out["sm_acc_days"] = acc.rolling(L, min_periods=L).sum().where(ready)
+    out["sm_dist_days"] = dist.rolling(L, min_periods=L).sum().where(ready)
+    out["sm_seq"] = seq.rolling(L, min_periods=L).sum().where(ready)
+    out["sm_cmf"] = cmf
+    out["sm_cmf_delta"] = cmf_delta
+    out["sm_cmf_exp"] = cmf_exp.astype(float).where(cmf_delta.notna())
+    out["sm_bull_div"] = bull_div.astype(float).where(cmf_delta.notna())
+    out["sm_bear_div"] = bear_div.astype(float).where(cmf_delta.notna())
+    a, dd, s = out["sm_acc_days"], out["sm_dist_days"], out["sm_seq"]
+    bump = (np.select([a >= 3, a == 2], [5.0, 3.0], 0.0) + np.where(s >= 2, 2.0, 0.0)
+            + 3.0 * out["sm_cmf_exp"].fillna(0) + 2.0 * out["sm_bull_div"].fillna(0)
+            - np.where(dd >= 2, 4.0, 0.0) - 4.0 * out["sm_bear_div"].fillna(0))
+    out["sm_bump"] = pd.Series(bump, index=out.index).clip(-SM_BUMP_CAP_DOWN, SM_BUMP_CAP_UP).where(a.notna())
+    return out
+
+
+def smart_money_last(df: pd.DataFrame, lookback: int | None = None, tail: int | None = None) -> dict[str, Any]:
+    """Overlay values at the last bar of `df` (NaN-safe dict; bump=0.0 when history is insufficient).
+
+    Every statistic is a finite rolling window (<= ~60 bars deep), so the last-bar values computed on the last `tail`
+    bars equal those on the full frame (tested); this keeps the per-candidate cost bounded."""
+    n_tail = GATE_SHADOW_TAIL_BARS if tail is None else int(tail)
+    ov = smart_money_overlay(df.iloc[-n_tail:] if n_tail > 0 else df, lookback)
+    if ov.empty:
+        return {"sm_bump": 0.0}
+    row = ov.iloc[-1]
+    res = {k: (None if pd.isna(v) else float(v)) for k, v in row.items()}
+    if res.get("sm_bump") is None:
+        res["sm_bump"] = 0.0
+    return res
+
+
+def apply_smart_money(score: float, overlay: dict[str, Any] | float | None, *, enabled: bool | None = None,
+                      mode: str | None = None) -> tuple[float, float]:
+    """Combine the legacy score with the overlay. Returns (score_for_gate, rank_key).
+
+    OFF            -> (score, score): legacy behaviour, bit-for-bit.
+    mode='rank'    -> gate score untouched; only the ordering key gets the bump (cannot create or kill a signal).
+    mode='score'   -> bump is added to the gate score (CAN lift a candidate across ENTRY_READY_MIN_SCORE)."""
+    on = USE_SMART_MONEY_ACCEL if enabled is None else enabled
+    if not on or overlay is None:
+        return float(score), float(score)
+    bump = float(overlay.get("sm_bump", 0.0) if isinstance(overlay, dict) else overlay)
+    if not np.isfinite(bump):
+        bump = 0.0
+    m = (SM_APPLY_MODE if mode is None else mode).lower()
+    # v9.7.7: the institutional-footprint bonus is RANK-ONLY in every mode (it can order candidates, never create or
+    # remove one) and shares the SM_BUMP_CAP_UP ceiling with sm_bump, so overlapping CMF evidence is not counted twice.
+    fp_bonus = 0.0
+    if isinstance(overlay, dict) and _is_finite_number(overlay.get("fp_bonus")) and float(overlay["fp_bonus"]) > 0:
+        fp_bonus = min(float(overlay["fp_bonus"]), max(0.0, SM_BUMP_CAP_UP - max(bump, 0.0)))
+    if m == "score":
+        return float(score) + bump, float(score) + bump + fp_bonus
+    return float(score), float(score) + bump + fp_bonus
+
+
+# ==============================================================================================
+# v9.7.7 — PHASE 2: INSTITUTIONAL FOOTPRINT ("Smart Money Prints": narrow range + high volume + up-close)
+#
+# Why: a breakout-day volume spike is one noisy number (news, index rebalances, option expiry, a single gap all spike
+# it). Institutions that need to build size over 1-3 weeks cannot buy it all on one breakout bar without displacing
+# price, so the repeatable signature is the opposite: several sessions where volume is clearly above its own recent
+# norm while the day's high-low range stays tight and the bar closes at/above its open (size absorbed, price not
+# pushed). We count those prints over a short window and require money-flow (CMF) to be expanding as confirmation.
+#
+# Contract (all point-in-time, bar i uses bars <= i only):
+#   print_i      = volume_i >= SM_SPIKE_MULT * VOL_PRIOR20_i          (VOL_PRIOR20 = mean of the 20 bars BEFORE bar i)
+#                  AND 0 < (high_i - low_i) / close_i <= DARKPOOL_PRICE_MAX / 100   (DARKPOOL_PRICE_MAX is in PERCENT)
+#                  AND close_i >= open_i
+#   fp_prints_i  = rolling sum of print over the last `window` bars (NaN until a full window with a full baseline)
+#   cmf_exp_i    = CMF20_i > 0 AND CMF20_i - CMF20_{i-window} >= SM_CMF_EXPANSION   (same definition as the v9.7.6 overlay)
+#   fp_accel_i   = fp_prints_i >= FP_MIN_PRINTS AND cmf_exp_i                       -> "Smart Money Acceleration"
+#   fp_bonus_i   = FP_BONUS_POINTS * fp_accel_i   (RANK KEY ONLY; never the gate score; capped together with sm_bump)
+#   fp_score_i   = 100 * (0.5 * min(prints / FP_PRINT_SATURATION, 1) + 0.5 * clip(cmf_delta / FP_CMF_SATURATION, 0, 1))
+#                  an equal-weight blend used as an ML feature (a hypothesis, not a calibrated quantity)
+# The bonus is applied only when USE_SMART_MONEY_ACCEL is ON; the numbers are always measured (shadow) into `metrics`.
+# ==============================================================================================
+FP_WINDOW = _v976_int("FP_WINDOW", 10)
+FP_MIN_PRINTS = _v976_int("FP_MIN_PRINTS", 2)
+FP_PRINT_SATURATION = max(1, _v976_int("FP_PRINT_SATURATION", 3))
+FP_CMF_SATURATION = max(1e-6, _v976_float("FP_CMF_SATURATION", 0.30))
+FP_BONUS_POINTS = _v976_float("FP_BONUS_POINTS", 4.0)            # rank points; hypothesis, not calibrated
+FP_WIDE_PRICE_MAX_PCT = _v976_float("FP_WIDE_PRICE_MAX_PCT", 1.5)  # backtest-only sensitivity column (fp_prints_wide)
+FP_COLUMNS = ("fp_print", "fp_prints", "fp_cmf", "fp_cmf_delta", "fp_cmf_exp", "fp_accel", "fp_score", "fp_bonus")
+
+
+def _fp_price_max_fraction(price_max_pct: float | None = None) -> float:
+    """DARKPOOL_PRICE_MAX is expressed in PERCENT (0.5 == 0.5%); the footprint compares a FRACTION of the close."""
+    raw = price_max_pct if price_max_pct is not None else globals().get("DARKPOOL_PRICE_MAX", 0.5)
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        value = 0.5
+    if not _is_finite_number(value) or value <= 0:
+        value = 0.5
+    return value / 100.0
+
+
+def _fp_num(value, fallback: float, *, positive: bool = False) -> float:
+    """Config / argument sanity: a non-finite (or, with positive=True, non-positive) number falls back to `fallback`."""
+    if not _is_finite_number(value):
+        return float(fallback)
+    v = float(value)
+    return float(fallback) if (positive and v <= 0) else v
+
+
+def _compute_institutional_footprint(df: pd.DataFrame, window: int | None = None, *, vol_mult: float | None = None,
+                                     price_max_pct: float | None = None, cmf_expansion: float | None = None,
+                                     min_prints: int | None = None) -> pd.DataFrame:
+    """Vectorised, causal institutional-footprint columns for EVERY bar of `df` (see the block header for definitions).
+
+    Missing / non-finite / non-positive inputs never create a print (the bar is simply not counted); a window is
+    only scored when all `window` bars have a complete 20-bar volume baseline, otherwise the value is NaN. The result
+    has the same index as `df` and the columns in FP_COLUMNS."""
+    w = max(2, int(_fp_num(FP_WINDOW if window is None else window, 10, positive=True)))
+    mult = _fp_num(SM_SPIKE_MULT if vol_mult is None else vol_mult, 1.5, positive=True)
+    price_max = _fp_price_max_fraction(price_max_pct)
+    expansion = _fp_num(SM_CMF_EXPANSION if cmf_expansion is None else cmf_expansion, 0.15)
+    need = max(1, int(_fp_num(FP_MIN_PRINTS if min_prints is None else min_prints, 2, positive=True)))
+    sat_prints = _fp_num(FP_PRINT_SATURATION, 3.0, positive=True)
+    sat_flow = _fp_num(FP_CMF_SATURATION, 0.30, positive=True)
+    bonus = _fp_num(FP_BONUS_POINTS, 4.0)
+    empty = pd.DataFrame(index=getattr(df, "index", pd.RangeIndex(0)), columns=list(FP_COLUMNS), dtype=float)
+    if df is None or len(df) == 0:
+        return empty
+    d = _ohlcv(df)
+    if any(k not in d.columns for k in ("open", "high", "low", "close", "volume")):
+        return empty
+    o, h, l, c, v = (pd.to_numeric(d[k], errors="coerce").replace([np.inf, -np.inf], np.nan)
+                     for k in ("open", "high", "low", "close", "volume"))
+    base = v.shift(1).rolling(VOLUME_AVG_LOOKBACK, min_periods=VOLUME_AVG_LOOKBACK).mean()   # VOL_PRIOR20: bar excluded
+    base_ok = base.notna() & (base > 0)
+    bar_ok = o.notna() & h.notna() & l.notna() & c.notna() & v.notna() & (c > 0) & (v >= 0) & (h > l)
+    rng_frac = (h - l) / c.where(c > 0)
+    is_print = (bar_ok & base_ok & (v >= mult * base) & (rng_frac <= price_max) & (c >= o))
+    full_baseline = base_ok.astype(float).rolling(w, min_periods=w).min().eq(1.0)
+    prints = is_print.astype(float).rolling(w, min_periods=w).sum().where(full_baseline)
+    cmf = chaikin_money_flow(d).replace([np.inf, -np.inf], np.nan)
+    cmf_delta = (cmf - cmf.shift(w)).replace([np.inf, -np.inf], np.nan)
+    flow_known = cmf.notna() & cmf_delta.notna()
+    cmf_exp = ((cmf > 0) & (cmf_delta >= expansion)).astype(float).where(flow_known)
+    accel = ((prints >= need) & (cmf_exp == 1.0)).astype(float).where(prints.notna() & flow_known)
+    count_part = (prints / sat_prints).clip(0.0, 1.0)
+    flow_part = (cmf_delta / sat_flow).clip(0.0, 1.0)
+    score = (100.0 * (0.5 * count_part + 0.5 * flow_part)).where(prints.notna() & flow_known)
+    out = pd.DataFrame(index=d.index)
+    out["fp_print"] = is_print.astype(float).where(bar_ok & base_ok)
+    out["fp_prints"] = prints
+    out["fp_cmf"] = cmf
+    out["fp_cmf_delta"] = cmf_delta
+    out["fp_cmf_exp"] = cmf_exp
+    out["fp_accel"] = accel
+    out["fp_score"] = score
+    out["fp_bonus"] = (bonus * accel).where(accel.notna())
+    return out.replace([np.inf, -np.inf], np.nan)
+
+
+def footprint_last(df: pd.DataFrame, window: int | None = None, tail: int | None = None) -> dict[str, Any]:
+    """Footprint values at the last bar of `df` as a finite-checked dict (None where unknown; fp_accel/fp_bonus default 0).
+
+    Every statistic is a finite rolling window (<= ~60 bars deep), so computing on the last `tail` bars gives the same
+    last-bar values as the full frame (tested) while keeping the per-candidate cost bounded."""
+    neutral = {"fp_prints": None, "fp_cmf": None, "fp_cmf_delta": None, "fp_cmf_exp": None,
+               "fp_accel": 0.0, "fp_score": None, "fp_bonus": 0.0}
+    try:
+        n_tail = GATE_SHADOW_TAIL_BARS if tail is None else int(tail)
+        fp = _compute_institutional_footprint(df.iloc[-n_tail:] if n_tail > 0 else df, window)
+        if fp.empty:
+            return neutral
+        row = fp.iloc[-1]
+        res = {k: (float(row[k]) if _is_finite_number(row[k]) else None) for k in FP_COLUMNS if k != "fp_print"}
+        res["fp_accel"] = 1.0 if res.get("fp_accel") == 1.0 else 0.0
+        res["fp_bonus"] = res["fp_bonus"] if res.get("fp_bonus") is not None else 0.0
+        return res
+    except Exception:
+        return neutral
+
+def gate_shadow_metrics(df: pd.DataFrame) -> dict[str, Any]:
+    """Liquidity + smart-money numbers at the last bar for the entry-quality metrics (computed whether the gates are ON or
+    OFF, so the live log carries the evidence the next backtest needs). Never raises; missing data -> None values."""
+    out: dict[str, Any] = {}
+    try:
+        liq = liquidity_gate(df)
+        out.update(median_dv20=liq.get("median_dv"), mean_dv20=liq.get("mean_dv"), top_day_share20=liq.get("top_day_share"),
+                   liq_gate_ok=bool(liq.get("ok", True)), liq_gate_reason=liq.get("reason"))
+    except Exception as exc:
+        out.update(median_dv20=None, liq_gate_ok=True, liq_gate_reason=f"error:{type(exc).__name__}")
+    try:
+        out["smart_money"] = smart_money_last(df)
+    except Exception:
+        out["smart_money"] = {"sm_bump": 0.0}
+    # v9.7.7: institutional footprint (shadow numbers always; the rank bonus is applied only when USE_SMART_MONEY_ACCEL is ON)
+    try:
+        fp = footprint_last(df)
+        out["smart_money"].update(fp)            # apply_smart_money reads fp_bonus from this dict
+        out.update(fp_prints=fp.get("fp_prints"), fp_cmf_delta=fp.get("fp_cmf_delta"), fp_accel=fp.get("fp_accel"),
+                   fp_score=fp.get("fp_score"), fp_bonus=fp.get("fp_bonus"))
+    except Exception:
+        out.update(fp_prints=None, fp_cmf_delta=None, fp_accel=0.0, fp_score=None, fp_bonus=0.0)
+    return out
+
+
+# ==============================================================================================
+# 3b) RS RANK PENALTY (RS_MODE=swing): fading short-term RS / RS line below its EMA -> lower rank, never a block
+# ==============================================================================================
+def rs_rank_penalty_arrays(decay_pts, line_vs_ema_pct, *, decay_penalty: float | None = None, decay_full_pts: float | None = None,
+                           line_penalty: float | None = None, deadband_pts: float | None = None):
+    """Vectorised penalty in score points (>= 0). NaN / missing input -> 0 (a missing measurement never demotes a setup).
+
+    decay_pts        : (1M excess return) - (3M excess return / 3), in percentage points (negative = fading).
+    line_vs_ema_pct  : RS line (stock / SPY) vs its EMA(RS_LINE_EMA_SPAN), in percent (negative = line closed below).
+    decay penalty    : 0 inside the dead-band (RS_DECAY_DEADBAND, default 2 pts), ramping linearly to the full
+                       penalty at RS_RANK_DECAY_FULL_PTS (default 5 pts) and flat beyond - no cliff at the threshold.
+    line penalty     : fixed amount whenever the RS line closed below its EMA."""
+    dp = RS_RANK_PENALTY_DECAY if decay_penalty is None else float(decay_penalty)
+    full = RS_RANK_DECAY_FULL_PTS if decay_full_pts is None else float(decay_full_pts)
+    lp = RS_RANK_PENALTY_LINE if line_penalty is None else float(line_penalty)
+    db = RS_DECAY_DEADBAND * 100.0 if deadband_pts is None else float(deadband_pts)
+    d = np.asarray(decay_pts, dtype=float)
+    l = np.asarray(line_vs_ema_pct, dtype=float)
+    span = max(full - db, 1e-9)
+    frac = np.clip((-d - db) / span, 0.0, 1.0)
+    pen = dp * np.where(np.isfinite(frac), frac, 0.0) + lp * np.where(np.isfinite(l) & (l < 0), 1.0, 0.0)
+    return pen
+
+
+def rs_rank_penalty(decay_pts, line_vs_ema_pct, *, enabled: bool | None = None) -> tuple[float, list[str]]:
+    """Scalar form used by evaluate_entry_quality -> (penalty_points, Hebrew risk flags). Active only when RS_MODE == 'swing'
+    (in 'swing_gate' the swing score already replaces the gate score; in 'legacy' there is no swing measurement)."""
+    on = (RS_MODE == "swing") if enabled is None else bool(enabled)
+    if not on:
+        return 0.0, []
+    flags: list[str] = []
+    try:
+        d = float(decay_pts) if decay_pts is not None else float("nan")
+        l = float(line_vs_ema_pct) if line_vs_ema_pct is not None else float("nan")
+        pen = float(rs_rank_penalty_arrays(d, l))
+        if np.isfinite(d) and pen > 0 and -d > RS_DECAY_DEADBAND * 100.0:
+            part = float(rs_rank_penalty_arrays(d, float("nan")))
+            if part > 0:
+                flags.append(f"RS קצר דועך ({d:+.1f} נק' מול קצב 3M) — קנס דירוג −{part:.1f}")
+        if np.isfinite(l) and l < 0:
+            flags.append(f"קו RS סגר מתחת ל-EMA{RS_LINE_EMA_SPAN} ({l:+.1f}%) — קנס דירוג −{RS_RANK_PENALTY_LINE:.1f}")
+        return (pen if np.isfinite(pen) else 0.0), flags
+    except Exception:
+        return 0.0, []
+
+
+# ==============================================================================================
+# 4) BACKTEST FEATURES (so layers 2 and 3 can be validated in the next backtest run)
+# ==============================================================================================
+def gate_feature_frame(df: pd.DataFrame) -> pd.DataFrame:
+    """One call per ticker -> point-in-time feature columns for EVERY date (join on signal_date).
+
+    median_dv20 / mean_dv20 / top_day_share20 use the LIQ_LOOKBACK (20) sessions BEFORE the bar (same convention as
+    `liquidity_gate`); liq_gate_ok mirrors that gate (median >= LIQ_MEDIAN_MIN_DOLLAR_VOL, price >= LIQ_MIN_PRICE and the
+    optional concentration cap) and is NaN where history is insufficient. The smart-money columns come from
+    `smart_money_overlay`. Join on date, then compare outcomes by median_dv20 buckets and sm_bump."""
+    d = _ohlcv(df)
+    w = LIQ_LOOKBACK
+    dv = dollar_volume_series(d).shift(1)
+    out = pd.DataFrame(index=d.index)
+    out["median_dv20"] = dv.rolling(w, min_periods=w).median()
+    out["mean_dv20"] = dv.rolling(w, min_periods=w).mean()
+    total = dv.rolling(w, min_periods=w).sum().replace(0, np.nan)
+    out["top_day_share20"] = dv.rolling(w, min_periods=w).max() / total
+    px = pd.to_numeric(d["close"], errors="coerce")
+    ok = (out["median_dv20"] >= LIQ_MEDIAN_MIN_DOLLAR_VOL) & (px >= LIQ_MIN_PRICE)
+    if LIQ_MAX_TOP_DAY_SHARE > 0:
+        ok = ok & ~(out["top_day_share20"] > LIQ_MAX_TOP_DAY_SHARE)
+    out["liq_ok"] = (out["median_dv20"] >= LIQ_MEDIAN_MIN_DOLLAR_VOL).astype(float).where(out["median_dv20"].notna())  # median only
+    out["liq_gate_ok"] = ok.astype(float).where(out["median_dv20"].notna())                                           # full gate
+    out = out.join(smart_money_overlay(d)).join(_compute_institutional_footprint(d))
+    # v9.7.7: sensitivity column - prints counted with a looser range cap (FP_WIDE_PRICE_MAX_PCT, default 1.5%)
+    out["fp_prints_wide"] = _compute_institutional_footprint(d, price_max_pct=FP_WIDE_PRICE_MAX_PCT)["fp_prints"]
+    return out
+
 
 # ============================================================
 #  TECHNICAL INDICATORS
@@ -4120,6 +4925,12 @@ def _entry_quality_metrics(df: pd.DataFrame, ticker: str, breakout_level: float,
         else:
             metrics["volume_ratio"] = None
         metrics["avg_dollar_volume20"] = (avg_vol20 * close) if avg_vol20 and close else None
+        # v9.7.6: true-median liquidity and smart-money evidence are measured here (shadow, for the log / audit) and
+        # applied only when USE_MEDIAN_LIQUIDITY / USE_SMART_MONEY_ACCEL are ON. Both use bars before the signal bar only.
+        if GATE_SHADOW_METRICS or USE_MEDIAN_LIQUIDITY or USE_SMART_MONEY_ACCEL:
+            metrics.update(gate_shadow_metrics(df))
+            if USE_MEDIAN_LIQUIDITY and metrics.get("median_dv20") is not None:
+                metrics["avg_dollar_volume20"] = metrics["median_dv20"]
 
         try:
             h = pd.to_numeric(df["high"], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
@@ -4155,10 +4966,15 @@ def _entry_quality_metrics(df: pd.DataFrame, ticker: str, breakout_level: float,
             metrics["rs_score"] = rs_data.get("rs_score") if isinstance(rs_data, dict) else None
             metrics["rs_summary"] = rs_data.get("summary", "RS N/A") if isinstance(rs_data, dict) else "RS N/A"
             metrics["vs_spy_3m"] = rs_data.get("vs_spy_3m") if isinstance(rs_data, dict) else None
+            # v9.7.6: swing diagnostics (ranking penalty only; the gate keeps using rs_score)
+            metrics["rs_swing_score"] = rs_data.get("rs_swing_score") if isinstance(rs_data, dict) else None
+            metrics["rs_decay_pts"] = rs_data.get("rs_decay_1m_vs_3m") if isinstance(rs_data, dict) else None
+            metrics["rs_line_vs_ema_pct"] = rs_data.get("rs_line_vs_ema_pct") if isinstance(rs_data, dict) else None
         except Exception:
             metrics["rs_score"] = None
             metrics["rs_summary"] = "RS N/A"
             metrics["vs_spy_3m"] = None
+            metrics["rs_swing_score"] = metrics["rs_decay_pts"] = metrics["rs_line_vs_ema_pct"] = None
         metrics["rs_line_new_high"] = _rs_line_new_high(df)
 
         reg = regime if isinstance(regime, dict) else get_market_regime()
@@ -4429,6 +5245,8 @@ def evaluate_entry_quality(df: pd.DataFrame, ticker: str, breakout_level: float,
         blocking_fails.append("רחוק מדי משיא 52 שבועות")
     if (adv is None) or (adv < ENTRY_MIN_DOLLAR_VOLUME):
         blocking_fails.append("נזילות דולרית נמוכה")
+    if USE_MEDIAN_LIQUIDITY and m.get("liq_gate_ok") is False:
+        blocking_fails.append(f"נזילות חציונית נמוכה ({m.get('liq_gate_reason')})")
     if not _rr_at_least(rr_val, ENTRY_MIN_RR):
         blocking_fails.append("R:R נמוך מדי")
     if ENTRY_REQUIRE_REGIME_DATA_OK and not m.get("regime_data_ok"):
@@ -4436,7 +5254,15 @@ def evaluate_entry_quality(df: pd.DataFrame, ticker: str, breakout_level: float,
     if ENTRY_BLOCK_BEAR_REGIME and regime_name == "BEAR":
         blocking_fails.append("שוק BEAR")
 
-    quality_score = round(max(0.0, min(100.0, points)), 1)
+    # v9.7.6: Smart-Money overlay (OFF: identical score) and RS rank penalty (RS_MODE=swing). Neither blocks an entry:
+    # the penalty and the SM_APPLY_MODE=rank bonus only move rank_key; SM_APPLY_MODE=score lifts the gate score on purpose.
+    gate_points, rank_points = apply_smart_money(points, m.get("smart_money"))
+    rank_bonus = float(rank_points - gate_points)
+    _sm = m.get("smart_money") if isinstance(m.get("smart_money"), dict) else {}
+    if USE_SMART_MONEY_ACCEL and _sm.get("fp_accel") == 1.0 and _is_finite_number(_sm.get("fp_prints")):
+        reasons.append(f"טביעת רגל מוסדית: {int(_sm['fp_prints'])} ימי print ב-{FP_WINDOW} ימים + CMF מתרחב (בונוס דירוג בלבד)")
+    rank_penalty, risk_flags = rs_rank_penalty(m.get("rs_decay_pts"), m.get("rs_line_vs_ema_pct"))
+    quality_score = round(max(0.0, min(100.0, gate_points)), 1)
     if quality_score < ENTRY_READY_MIN_SCORE:
         blocking_fails.append(f"ציון Entry Quality נמוך ({quality_score:.1f} < {ENTRY_READY_MIN_SCORE:.1f})")
 
@@ -4450,6 +5276,9 @@ def evaluate_entry_quality(df: pd.DataFrame, ticker: str, breakout_level: float,
         "reasons": reasons,
         "fail_reasons": list(dict.fromkeys(fails + blocking_fails)),
         "blocking_fails": list(dict.fromkeys(blocking_fails)),
+        "rank_bonus": round(rank_bonus, 2),
+        "rank_penalty": round(float(rank_penalty), 2),
+        "risk_flags": risk_flags,
         "metrics": m,
     }
 
@@ -4677,7 +5506,8 @@ def add_v9_indicators(df: pd.DataFrame) -> pd.DataFrame:
     out["MA50"] = close.rolling(50, min_periods=20).mean()
     out["MA150"] = close.rolling(150, min_periods=80).mean()
     out["MA200"] = close.rolling(200, min_periods=100).mean()
-    out["VOL20"] = volume.rolling(20, min_periods=10).mean()
+    out["VOL20"] = volume.rolling(20, min_periods=10).mean()   # includes the current bar - NOT used for ratios (v9.7.6)
+    out["VOL_PRIOR20"] = volume.shift(1).rolling(VOLUME_AVG_LOOKBACK, min_periods=VOLUME_AVG_LOOKBACK).mean()  # the one baseline: prior N bars
     out["DOLLAR_VOL20"] = (close * volume).rolling(20, min_periods=10).mean()
     out["HIGH_52W"] = high.rolling(252, min_periods=120).max()
 
@@ -4697,8 +5527,7 @@ def add_v9_indicators(df: pd.DataFrame) -> pd.DataFrame:
     out["CLOSE_POSITION"] = ((close - low) / daily_range).clip(0, 1)
     # Match the final Entry engine: the signal's volume cannot be part of its
     # own comparison baseline. Retest history uses the same causal convention.
-    prior_volume20 = volume.shift(1).rolling(20, min_periods=20).mean()
-    out["VOLUME_RATIO20"] = volume / prior_volume20.replace(0, np.nan)
+    out["VOLUME_RATIO20"] = volume / out["VOL_PRIOR20"].replace(0, np.nan)
     out["DIST_52W_HIGH_PCT"] = (close / out["HIGH_52W"].replace(0, np.nan) - 1.0) * 100.0
     return out
 
@@ -5364,7 +6193,7 @@ def detect_vcp(
     )
 
     vol5 = safe_float(data["Volume"].iloc[-6:-1].mean())
-    vol20 = latest_value(data.iloc[:-1], "VOL20")
+    vol20 = latest_value(data, "VOL_PRIOR20")   # v9.7.6: same value as VOL20 one bar earlier, one definition
     volume_dryup = vol5 is not None and vol20 is not None and vol20 > 0 and vol5 <= vol20 * config.vcp_volume_dryup_ratio
 
     if contractions < 1 and not (atr_contracting and range_contracting and volume_dryup):
@@ -5564,7 +6393,7 @@ def detect_ema_pullback_bounce(
     bounce_confirmed = close > prev_high and is_green and ma_reclaimed
 
     vol_pullback = safe_float(pullback["Volume"].mean())
-    vol20 = latest_value(data.iloc[:-1], "VOL20")
+    vol20 = latest_value(data, "VOL_PRIOR20")   # v9.7.6: same value as VOL20 one bar earlier, one definition
     pullback_volume_quiet = vol_pullback is not None and vol20 is not None and vol20 > 0 and vol_pullback <= vol20
 
     base_score = 0.0
@@ -7641,6 +8470,11 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
         bl    = alert.get("breakout_level", 0)
         if alert_already_sent(symbol, pname, bl, alert_history):
             log(f"{symbol} {pname} already sent. Skip."); continue
+        alert["rank_key"] = _alert_rank_value(alert)   # v9.7.6: ordering only; never compared with a threshold
+        _rq = alert.get("entry_quality", {}) if isinstance(alert.get("entry_quality", {}), dict) else {}
+        if _rq.get("rank_penalty") or _rq.get("rank_bonus"):
+            log(f"{symbol}: ↕ rank adjust {float(_rq.get('rank_bonus', 0) or 0) - float(_rq.get('rank_penalty', 0) or 0):+.1f} "
+                f"(score {float(alert.get('score', 0) or 0):.1f} → rank {alert['rank_key']:.1f}) {'; '.join(_rq.get('risk_flags') or [])}")
         if DEBUG_SCAN_REASONS:
             q = alert.get("entry_quality", {}) if isinstance(alert.get("entry_quality", {}), dict) else {}
             pro = alert.get("professional_quality", {}) if isinstance(alert.get("professional_quality", {}), dict) else {}
@@ -7669,10 +8503,17 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
 
 _rs_spy_cache: dict = {}
 
-# v9.7.5: RS_MODE=legacy keeps the original 3M/6M/12M formula bit-for-bit. RS_MODE=swing re-weights towards the
-# 1M/3M windows and penalises decaying short-term relative strength. The defaults are hypotheses to be validated
-# with the backtest columns exc_1m / exc_3m / rs_decay / rsl_vs_ema21 before switching it on for the gate.
-RS_MODE = os.getenv("RS_MODE", "legacy").strip().lower()
+# RS_MODE (v9.7.6 default: swing)
+#   legacy     : original 3M/6M/12M formula, no swing measurements.
+#   swing      : the gate-facing rs_score stays the LEGACY score (the RS entry gate is unchanged); the swing score, the
+#                1M-vs-3M decay and the RS line vs its EMA are measured and used as a RANKING PENALTY only
+#                (rs_rank_penalty -> rank_key). Never a hard block.
+#   swing_gate : v9.7.5 behaviour: the swing score replaces rs_score everywhere, i.e. it also drives the gates.
+# Backtest v9.7.5 (31,975 episodes): decay <= -5 pts -> win 38.9% vs 44.4% (no decay); RS line below EMA21 -> win 36.6% vs
+# 45.6%. Both are hypotheses for the penalty size - validate with exc_1m / exc_3m / rs_decay / rsl_vs_ema21 / rank_penalty.
+RS_MODE = os.getenv("RS_MODE", "swing").strip().lower()
+if RS_MODE not in ("legacy", "swing", "swing_gate"):
+    RS_MODE = "swing"
 RS_SWING_W_1M = float(os.getenv("RS_SWING_W_1M", "0.30"))
 RS_SWING_W_3M = float(os.getenv("RS_SWING_W_3M", "0.40"))
 RS_SWING_W_6M = float(os.getenv("RS_SWING_W_6M", "0.20"))
@@ -7824,16 +8665,19 @@ def compute_rs_score(ticker: str, df: pd.DataFrame) -> dict:
 
         # ציון IBD משוקלל → tanh → 0-100
         import math
-        if RS_MODE == "swing":
-            combined, _swing = _rs_swing_combined(
-                close, {"1m": p1m, "3m": p3m, "6m": p6m, "12m": p12m}, {"1m": r1m, "3m": r3m, "6m": r6m, "12m": r12m})
-            result.update(_swing)
-        else:
-            _parts = [(w, r) for w, r, p in ((0.4, r3m, p3m), (0.2, r6m, p6m), (0.4, r12m, p12m)) if p is not None]
-            _wsum = sum(w for w, _ in _parts)
-            combined = (sum(w * r for w, r in _parts) / _wsum) if _wsum else 0.0  # identical to before when all windows exist
+        _parts = [(w, r) for w, r, p in ((0.4, r3m, p3m), (0.2, r6m, p6m), (0.4, r12m, p12m)) if p is not None]
+        _wsum = sum(w for w, _ in _parts)
+        combined = (sum(w * r for w, r in _parts) / _wsum) if _wsum else 0.0  # identical to before when all windows exist
         rs = 50 + 50 * math.tanh(combined * 4)
         rs = round(max(1.0, min(99.0, rs)), 1)
+        if RS_MODE in ("swing", "swing_gate"):
+            sw_combined, _swing = _rs_swing_combined(
+                close, {"1m": p1m, "3m": p3m, "6m": p6m, "12m": p12m}, {"1m": r1m, "3m": r3m, "6m": r6m, "12m": r12m})
+            result.update(_swing)
+            rs_swing = round(max(1.0, min(99.0, 50 + 50 * math.tanh(sw_combined * 4))), 1)
+            result["rs_swing_score"] = rs_swing
+            if RS_MODE == "swing_gate":
+                rs = rs_swing          # v9.7.5 behaviour: the swing score also drives the gates
         result["rs_score"] = rs
 
         if rs >= 80:
@@ -8390,6 +9234,32 @@ def _swing_failed_breakout(work: pd.DataFrame, position: dict, entry: float, avg
 
 
 def _evaluate_exit_intelligence(df: pd.DataFrame, position: dict, spy_df: pd.DataFrame | None = None) -> dict:
+    """v9.7.6: price-based exit engine (core) + forced exit ahead of an earnings release.
+
+    The override wraps the core instead of living inside it, because the core returns early (BUILDING before Profit
+    Protection, DATA_LIMITED, ...) and the earnings risk exists in every one of those states. Everything is evaluated on
+    the last CLOSED daily bar: with EARNINGS_EXIT_LEAD_SESSIONS=1 a Monday release is flagged on Thursday's closed bar
+    (and keeps firing on Friday's), so Friday stays an executable session. The earnings ENTRY filter is not touched."""
+    result = _evaluate_exit_intelligence_core(df, position, spy_df=spy_df)
+    if not EARNINGS_EXIT_ENABLED:
+        return result
+    try:
+        asof = result.get("closed_bar_date")
+        if not asof:
+            closed = _closed_daily_frame(df)
+            asof = str(pd.Timestamp(closed.index[-1]).date()) if closed is not None and len(closed) else None
+        if not asof:
+            return result
+        ticker = str(position.get("ticker", "") or "").strip().upper()
+        event = earnings_event_for_ticker(ticker, asof, next_fn=_get_next_earnings_date,
+                                          past_fn=lambda t: _earnings_past_cache.get(t, []))
+        return apply_earnings_exit(result, closed_bar_date=asof, event=event, lead_sessions=EARNINGS_EXIT_LEAD_SESSIONS)
+    except Exception as exc:                      # a data hiccup must never close (or break) a position
+        result.setdefault("signals", []).append(f"earnings exit check error: {type(exc).__name__}")
+        return result
+
+
+def _evaluate_exit_intelligence_core(df: pd.DataFrame, position: dict, spy_df: pd.DataFrame | None = None) -> dict:
     """
     מנוע יציאה רב-סיגנלי. Doji לבדו לעולם אינו סוגר פוזיציה.
     EXIT מתקבל רק משבירת Profit Floor או מקונפלואנס של כמה קטגוריות
@@ -8428,12 +9298,11 @@ def _evaluate_exit_intelligence(df: pd.DataFrame, position: dict, spy_df: pd.Dat
         volume = pd.to_numeric(work["volume"], errors="coerce").fillna(0.0)
         work["ema10"] = close.ewm(span=10, adjust=False).mean()
         work["ema21"] = close.ewm(span=21, adjust=False).mean()
+        # One causal baseline for both engines and for the entry engine: the bar being judged is not part of its own
+        # average (v9.7.6 - the legacy engine used to include the current bar).
+        work["avg_vol20"] = volume.shift(1).rolling(VOLUME_AVG_LOOKBACK, min_periods=VOLUME_AVG_LOOKBACK).mean()
         if SWING_EXIT_ENGINE:
-            # Same causal baseline as the entry engine: the bar being judged is not part of its own average.
-            work["avg_vol20"] = volume.shift(1).rolling(20, min_periods=20).mean()
             work["ema_trail"] = close.ewm(span=max(2, EXIT_TRAIL_EMA_SPAN), adjust=False).mean()
-        else:
-            work["avg_vol20"] = volume.rolling(20, min_periods=10).mean()
         work["cmf20"] = _compute_cmf20(work)
 
         last = work.iloc[-1]
@@ -8822,6 +9691,10 @@ def run_position_tracker(send_exit_email_fn=None) -> list[dict]:
                 close_reason = f"🛑 פגע ב-Stop Loss המקורי ({price_now:.2f} ≤ {stop_initial:.2f})"
                 close_emoji = "🛑"
                 exit_kind = "INITIAL_STOP"
+            elif intel.get("exit_confirmed") and intel.get("exit_kind_hint") == "EARNINGS_EXIT":
+                close_reason = f"📅 יציאה לפני דוח — {intel.get('exit_reason', 'Earnings')}"
+                close_emoji = "📅"
+                exit_kind = "EARNINGS_EXIT"
             elif intel.get("exit_confirmed"):
                 close_reason = f"🔄 שינוי כיוון מאושר — {intel.get('exit_reason', 'Exit Intelligence')}"
                 close_emoji = "🔄"
@@ -9056,12 +9929,560 @@ def _apply_learned_params() -> None:
             EMA28_MAX_DIST_PCT = float(params["EMA28_MAX_DIST_PCT"])
             if abs(old - EMA28_MAX_DIST_PCT) > 0.001:
                 changed.append(f"EMA28_MAX_DIST_PCT: {old*100:.1f}%→{EMA28_MAX_DIST_PCT*100:.1f}%")
+        changed.extend(_apply_threshold_learning(params))   # v9.7.7: validated, fresh, tighten-only gate proposals
         if changed:
             log(f"🧠 Learned params applied: {', '.join(changed)}")
         else:
             log(f"🧠 Learned params loaded (no changes from defaults)")
     except Exception as e:
         log(f"_apply_learned_params error: {e}")
+
+# ==============================================================================================
+# v9.7.7 — PHASE 3: SELF-CALIBRATING THRESHOLD LEARNING
+#
+# setup_evaluations_v2.csv (one row per evaluated candidate, outcomes filled in by the 5/10/20-session tracker) is the
+# training set. `run_automated_threshold_learning()` fits a depth-3 decision tree on point-in-time features and turns
+# the best leaf into candidate gate thresholds. It is deliberately conservative:
+#   * target y = 1 if bracket_net_r_20d >= LEARN_TARGET_R (2.5) else 0   (a rare event: base rate ~5%)
+#   * only rows of the current code_version, completed outcomes, one row per episode (same ticker+pattern within 14 days)
+#   * chronological split (oldest 70% fit / newest 30% validate) with a 30-day embargo for the 20-session outcome overlap
+#   * the DEPLOYED rule (only tighten-only, bounded, mapped gates - not the raw leaf) is judged on the validation rows
+#     that already pass today's gates, against: lift, Wilson lower bound, win rate and mean clipped R (do-no-harm)
+#   * proposals are written to scanner_learned_params.json under "threshold_learning"; they change behaviour ONLY when
+#     AUTO_APPLY_LEARNING is ON, the section is VALIDATED, matches the current code_version and is <= LEARN_MAX_AGE_DAYS old.
+# ==============================================================================================
+THRESHOLD_LEARNING_ENABLED = _v976_flag("THRESHOLD_LEARNING_ENABLED", True)   # weekly run; writes proposals only
+LEARN_TARGET_R = _v976_float("LEARN_TARGET_R", 2.5)
+LEARN_TREE_DEPTH = 3
+LEARN_MIN_EPISODES = _v976_int("LEARN_MIN_EPISODES", 400)
+LEARN_MIN_POSITIVES = _v976_int("LEARN_MIN_POSITIVES", 40)
+LEARN_MIN_LEAF_ABS = _v976_int("LEARN_MIN_LEAF_ABS", 40)
+LEARN_MIN_LEAF_FRAC = _v976_float("LEARN_MIN_LEAF_FRAC", 0.05)
+LEARN_CCP_ALPHA = _v976_float("LEARN_CCP_ALPHA", 0.0005)
+LEARN_VALID_FRAC = _v976_float("LEARN_VALID_FRAC", 0.30)
+LEARN_EMBARGO_DAYS = _v976_int("LEARN_EMBARGO_DAYS", 30)
+LEARN_EPISODE_GAP_DAYS = _v976_int("LEARN_EPISODE_GAP_DAYS", 14)
+LEARN_MIN_FEATURE_COVERAGE = _v976_float("LEARN_MIN_FEATURE_COVERAGE", 0.80)
+LEARN_MIN_LIFT_IS = _v976_float("LEARN_MIN_LIFT_IS", 1.30)       # best-leaf smoothed precision / base rate (train)
+LEARN_MIN_LIFT_OOS = _v976_float("LEARN_MIN_LIFT_OOS", 1.20)     # deployed rule precision / baseline-pass precision (validation)
+LEARN_MIN_BASE_OOS = _v976_int("LEARN_MIN_BASE_OOS", 60)         # validation rows that already pass today's gates
+LEARN_MIN_PASS_OOS = _v976_int("LEARN_MIN_PASS_OOS", 30)         # ... and still pass the learned rule
+LEARN_MIN_PASS_SHARE = _v976_float("LEARN_MIN_PASS_SHARE", 0.20)  # the rule may not discard more than 80% of them
+LEARN_WILSON_Z = _v976_float("LEARN_WILSON_Z", 1.645)
+LEARN_MAX_AGE_DAYS = _v976_int("LEARN_MAX_AGE_DAYS", 35)
+LEARN_VERSION_SCOPE = os.getenv("LEARN_VERSION_SCOPE", "current").strip().lower()   # current | minor (pool v9.7.x)
+LEARN_FEATURES = ("rs_score", "rs_swing_score", "breakout_pct", "median_dv20", "close_position", "fp_score")
+LEARN_SCORE_FLOOR_BOUNDS = (0.0, 80.0)
+LEARNED_MIN_SCORE_FLOOR = 0.0     # read by get_dynamic_min_score(); stays 0.0 unless a validated floor is applied
+LEARNING_SECTION = "threshold_learning"
+
+# A learned threshold may only TIGHTEN a gate (never loosen it), must fall inside `accept` (so a leaf like
+# "breakout_pct <= -3%" cannot be mistranslated into an extension cap) and is clipped to the hard `bounds`.
+# side="min": candidate passes when feature >= value (value only goes up); side="max": passes when feature <= value.
+_LEARN_GATE_SPECS = (
+    {"param": "ENTRY_MIN_RS_SCORE", "feature": "rs_score", "side": "min", "accept": (0.0, 100.0), "bounds": (None, 80.0), "quantum": 0.5},
+    {"param": "ENTRY_MIN_CLOSE_POS", "feature": "close_position", "side": "min", "accept": (0.0, 1.0), "bounds": (None, 0.80), "quantum": 0.01},
+    {"param": "LIQ_MEDIAN_MIN_DOLLAR_VOL", "feature": "median_dv20", "side": "min", "accept": (0.0, 1e11), "bounds": (None, 40e6), "quantum": 1e6,
+     "effective_if": "USE_MEDIAN_LIQUIDITY"},
+    {"param": "ENTRY_MIN_BREAKOUT_PCT", "feature": "breakout_pct", "side": "min", "accept": (0.0, 0.05), "bounds": (None, 0.010), "quantum": 0.0005},
+    {"param": "ENTRY_MAX_EXTENSION_PCT", "feature": "breakout_pct", "side": "max", "accept": (0.0, 0.20), "bounds": (0.015, None), "quantum": 0.0005},
+)
+_LEARN_SPEC_BY_PARAM = {s["param"]: s for s in _LEARN_GATE_SPECS}
+_LEARN_ADVISORY_FEATURES = ("rs_swing_score", "fp_score")      # rank-only signals: reported, never applied as gates
+# Code/env defaults captured at import, BEFORE any learned value is applied: tighten-only is always relative to these.
+_LEARN_BASELINES = {s["param"]: float(globals()[s["param"]]) for s in _LEARN_GATE_SPECS}
+
+
+def _learn_jsonable(value):
+    """Recursively convert numpy / pandas scalars to plain JSON types; non-finite floats become None."""
+    if isinstance(value, dict):
+        return {str(k): _learn_jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_learn_jsonable(v) for v in value]
+    if isinstance(value, (np.bool_, bool)):
+        return bool(value)
+    if isinstance(value, (np.integer, int)):
+        return int(value)
+    if isinstance(value, (np.floating, float)):
+        return float(value) if _is_finite_number(value) else None
+    if isinstance(value, (pd.Timestamp, datetime)):
+        return value.isoformat()
+    return value
+
+
+def _learn_wilson_lower(positives: float, n: float, z: float | None = None) -> float:
+    """One-sided Wilson lower confidence bound of a proportion (0.0 when n <= 0)."""
+    zz = LEARN_WILSON_Z if z is None else float(z)
+    if not (_is_finite_number(positives) and _is_finite_number(n)) or n <= 0:
+        return 0.0
+    p = min(max(float(positives) / float(n), 0.0), 1.0)
+    denom = 1.0 + zz * zz / n
+    centre = p + zz * zz / (2.0 * n)
+    margin = zz * math.sqrt(max(p * (1.0 - p) / n + zz * zz / (4.0 * n * n), 0.0))
+    return max(0.0, (centre - margin) / denom)
+
+
+def _learn_resolve_gate(spec: dict, threshold) -> tuple[float | None, str]:
+    """Map a learned cutting plane onto a gate value -> (value | None, reason). Used by the learner AND at apply time, so a
+    hand-edited JSON can never push a gate outside its bounds or loosen it."""
+    if not _is_finite_number(threshold):
+        return None, "threshold not finite"
+    t = float(threshold)
+    lo_a, hi_a = spec["accept"]
+    if not (lo_a <= t <= hi_a):
+        return None, f"threshold {t:g} outside the accepted range [{lo_a:g}, {hi_a:g}]"
+    base = _LEARN_BASELINES[spec["param"]]
+    lo_b, hi_b = spec["bounds"]
+    q = float(spec["quantum"])
+    if spec["side"] == "min":
+        if t <= base:
+            return None, f"not stricter than the default ({base:g})"
+        value = math.ceil(min(t, hi_b) / q - 1e-9) * q          # round toward stricter, never above the hard bound
+        value = min(value, hi_b)
+        if value <= base + 1e-12:
+            return None, f"not stricter than the default ({base:g}) after bounds"
+    else:
+        if t >= base:
+            return None, f"not stricter than the default ({base:g})"
+        value = math.floor(max(t, lo_b) / q + 1e-9) * q
+        value = max(value, lo_b)
+        if value >= base - 1e-12:
+            return None, f"not stricter than the default ({base:g}) after bounds"
+    return (float(value) if _is_finite_number(value) else None), "ok"
+
+
+def _learn_features_from_metadata(raw) -> dict[str, float]:
+    """Point-in-time feature snapshot stored with the candidate (metadata_json -> entry_diagnostics_v3 -> metrics)."""
+    out = {name: float("nan") for name in LEARN_FEATURES}
+    try:
+        meta = json.loads(raw) if isinstance(raw, str) and raw.strip() else {}
+        metrics = (((meta or {}).get("entry_diagnostics_v3") or {}).get("metrics")) or {}
+        smart = metrics.get("smart_money") if isinstance(metrics.get("smart_money"), dict) else {}
+        for name in LEARN_FEATURES:
+            value = metrics.get(name)
+            if value is None and name.startswith("fp_"):
+                value = smart.get(name)
+            if _is_finite_number(value) and not isinstance(value, (bool, np.bool_)):
+                out[name] = float(value)
+    except Exception:
+        pass
+    return out
+
+
+def _learn_minor(version: str) -> str | None:
+    m = re.search(r"v(\d+\.\d+)", str(version or ""))
+    return m.group(1) if m else None
+
+
+def _learn_load_frame(csv_path: str | None = None, code_version: str | None = None, scope: str | None = None) -> tuple[pd.DataFrame, dict]:
+    """Safe-parse the evaluations CSV -> (episode-level training frame, info). Never raises; `info["status"]` says why a
+    frame is empty. Columns of the frame: signal_date, ticker, pattern, stage, entry_quality, R, y, win, Rc + LEARN_FEATURES."""
+    path = SETUP_EVALUATIONS_CSV if csv_path is None else csv_path
+    cv = CODE_VERSION if code_version is None else code_version
+    sc = (LEARN_VERSION_SCOPE if scope is None else scope).lower()
+    info: dict[str, Any] = {"status": "OK", "csv": os.path.basename(str(path)), "rows_csv": 0, "rows_version": 0,
+                            "rows_complete": 0, "episodes": 0}
+    cols = ["signal_date", "ticker", "pattern", "stage", "entry_quality", "R", "y", "win", "Rc", *LEARN_FEATURES]
+    empty = pd.DataFrame(columns=cols)
+    try:
+        if not path or not os.path.exists(path):
+            info["status"] = "NO_FILE"
+            return empty, info
+        try:
+            raw = pd.read_csv(path, dtype={"evaluation_id": str}, low_memory=False, on_bad_lines="skip")
+        except (pd.errors.EmptyDataError, pd.errors.ParserError, UnicodeDecodeError, OSError, ValueError) as exc:
+            info["status"] = f"UNREADABLE:{type(exc).__name__}"
+            return empty, info
+        info["rows_csv"] = int(len(raw))
+        needed = {"code_version", "signal_date", "ticker", "pattern", "metadata_json", "evaluation_status",
+                  "bracket_net_r_20d", "bracket_result_20d"}
+        missing = sorted(needed - set(raw.columns))
+        if raw.empty or missing:
+            info["status"] = "MISSING_COLUMNS:" + ",".join(missing) if missing else "EMPTY"
+            return empty, info
+        if "schema_version" in raw.columns:
+            raw = raw[pd.to_numeric(raw["schema_version"], errors="coerce") == 2]
+        if sc == "minor" and _learn_minor(cv):
+            keep = raw["code_version"].astype(str).map(_learn_minor) == _learn_minor(cv)
+        else:
+            keep = raw["code_version"].astype(str) == str(cv)
+        raw = raw[keep]
+        info["rows_version"] = int(len(raw))
+        r = pd.to_numeric(raw["bracket_net_r_20d"], errors="coerce").replace([np.inf, -np.inf], np.nan)
+        ok = ((raw["evaluation_status"].astype(str) == "COMPLETE") & r.notna()
+              & (raw["bracket_result_20d"].astype(str) != "AMBIGUOUS_BOTH"))
+        raw = raw[ok].copy()
+        raw["R"] = r[ok]
+        raw["signal_date"] = pd.to_datetime(raw["signal_date"], errors="coerce")
+        raw = raw[raw["signal_date"].notna()]
+        info["rows_complete"] = int(len(raw))
+        if raw.empty:
+            info["status"] = "NO_COMPLETE_ROWS"
+            return empty, info
+        # one row per episode: the first row of a (ticker, pattern) run whose consecutive rows are <= GAP days apart
+        raw = raw.sort_values(["ticker", "pattern", "signal_date"], kind="mergesort")
+        gap = raw.groupby(["ticker", "pattern"], sort=False)["signal_date"].diff().dt.days
+        raw = raw[gap.isna() | (gap > LEARN_EPISODE_GAP_DAYS)].copy()
+        feats = pd.DataFrame([_learn_features_from_metadata(m) for m in raw["metadata_json"].to_numpy()],
+                             index=raw.index, columns=list(LEARN_FEATURES))
+        frame = pd.DataFrame({
+            "signal_date": raw["signal_date"],
+            "ticker": raw["ticker"].astype(str),
+            "pattern": raw["pattern"].astype(str),
+            "stage": raw["stage"].astype(str) if "stage" in raw.columns else "",
+            "entry_quality": pd.to_numeric(raw["entry_quality"], errors="coerce") if "entry_quality" in raw.columns else np.nan,
+            "R": raw["R"],
+        }, index=raw.index).join(feats)
+        frame["y"] = (frame["R"] >= LEARN_TARGET_R).astype(int)
+        frame["win"] = (frame["R"] > 0).astype(int)
+        frame["Rc"] = frame["R"].clip(-3.0, 5.0)
+        frame = frame.sort_values("signal_date", kind="mergesort").reset_index(drop=True)
+        info["episodes"] = int(len(frame))
+        return frame[cols], info
+    except Exception as exc:                                    # parsing must never take the weekly maintenance down
+        info["status"] = f"ERROR:{type(exc).__name__}"
+        return empty, info
+
+
+def _learn_split(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
+    """Chronological split: newest LEARN_VALID_FRAC validates; the fit set ends LEARN_EMBARGO_DAYS before the first
+    validation date, because a 20-session outcome of a late fit row overlaps the validation period."""
+    d = frame.sort_values("signal_date", kind="mergesort").reset_index(drop=True)
+    if len(d) < 4:
+        return d.iloc[0:0], d.iloc[0:0], {"cut_date": None}
+    cut_pos = min(max(int(math.floor(len(d) * (1.0 - LEARN_VALID_FRAC))), 1), len(d) - 1)
+    cut_date = d["signal_date"].iloc[cut_pos]
+    valid = d[d["signal_date"] >= cut_date]
+    train = d[d["signal_date"] < cut_date - pd.Timedelta(days=LEARN_EMBARGO_DAYS)]
+    return train, valid, {"cut_date": cut_date.date().isoformat(), "embargo_days": LEARN_EMBARGO_DAYS}
+
+
+def _learn_pass_mask(frame: pd.DataFrame, gates: dict[str, float]) -> pd.Series:
+    """Rows that pass every gate in `gates` (param -> value). A missing / NaN feature fails (the live gates fail closed)."""
+    mask = pd.Series(True, index=frame.index)
+    for param, value in gates.items():
+        spec = _LEARN_SPEC_BY_PARAM[param]
+        col = pd.to_numeric(frame[spec["feature"]], errors="coerce")
+        mask &= (col >= value) if spec["side"] == "min" else (col <= value)
+        mask &= col.notna()
+    return mask
+
+
+def _learn_baseline_mask(frame: pd.DataFrame, features_available: Iterable[str]) -> pd.Series:
+    """Rows the live system would already accept on the gates we can evaluate (default values captured at import)."""
+    avail = set(features_available)
+    gates = {}
+    for spec in _LEARN_GATE_SPECS:
+        if spec["feature"] not in avail:
+            continue
+        if spec.get("effective_if") and not globals().get(spec["effective_if"], False):
+            continue
+        gates[spec["param"]] = _LEARN_BASELINES[spec["param"]]
+    return _learn_pass_mask(frame, gates)
+
+
+def _learn_rule_metrics(frame: pd.DataFrame, mask: pd.Series) -> dict:
+    n = int(len(frame))
+    k = int(mask.sum())
+    sub = frame[mask]
+    p_all = float(frame["y"].mean()) if n else float("nan")
+    p_rule = float(sub["y"].mean()) if k else float("nan")
+    return {
+        "n": n, "n_pass": k, "pass_share": (k / n) if n else float("nan"),
+        "positives_pass": int(sub["y"].sum()) if k else 0,
+        "p_all": p_all, "p_pass": p_rule, "lift": (p_rule / p_all) if (k and _is_finite_number(p_all) and p_all > 0) else float("nan"),
+        "wilson_lower": _learn_wilson_lower(float(sub["y"].sum()) if k else 0.0, float(k)),
+        "win_all": float(frame["win"].mean()) if n else float("nan"), "win_pass": float(sub["win"].mean()) if k else float("nan"),
+        "mean_rc_all": float(frame["Rc"].mean()) if n else float("nan"), "mean_rc_pass": float(sub["Rc"].mean()) if k else float("nan"),
+    }
+
+
+def _learn_judge(train_m: dict, valid_m: dict) -> list[str]:
+    """Return the list of failed acceptance criteria (empty == the deployed rule is accepted)."""
+    fails = []
+    if valid_m["n"] < LEARN_MIN_BASE_OOS:
+        fails.append(f"validation rows passing today's gates {valid_m['n']} < {LEARN_MIN_BASE_OOS}")
+        return fails
+    if valid_m["n_pass"] < LEARN_MIN_PASS_OOS:
+        fails.append(f"validation rows passing the rule {valid_m['n_pass']} < {LEARN_MIN_PASS_OOS}")
+    if not (valid_m["pass_share"] >= LEARN_MIN_PASS_SHARE):
+        fails.append(f"rule keeps {valid_m['pass_share']:.0%} of validation rows (< {LEARN_MIN_PASS_SHARE:.0%})")
+    if not (_is_finite_number(train_m.get("lift")) and train_m["lift"] >= 1.0):
+        fails.append("rule shows no lift on the fit rows")
+    if not (_is_finite_number(valid_m.get("lift")) and valid_m["lift"] >= LEARN_MIN_LIFT_OOS):
+        fails.append(f"validation lift {valid_m.get('lift')} < {LEARN_MIN_LIFT_OOS}")
+    if not (valid_m["wilson_lower"] > valid_m["p_all"]):
+        fails.append("validation precision is not above the baseline rate with confidence (Wilson lower bound)")
+    if not (_is_finite_number(valid_m.get("win_pass")) and valid_m["win_pass"] >= valid_m["win_all"]):
+        fails.append("do-no-harm: validation win rate (R>0) is lower than the baseline-pass rows")
+    if not (_is_finite_number(valid_m.get("mean_rc_pass")) and valid_m["mean_rc_pass"] >= valid_m["mean_rc_all"]):
+        fails.append("do-no-harm: validation mean clipped R is lower than the baseline-pass rows")
+    return fails
+
+
+def _learn_fit_tree(DecisionTreeClassifier, X: pd.DataFrame, y: pd.Series, *, depth: int):
+    leaf = max(LEARN_MIN_LEAF_ABS, int(math.ceil(LEARN_MIN_LEAF_FRAC * len(X))))
+    model = DecisionTreeClassifier(max_depth=depth, min_samples_leaf=leaf, ccp_alpha=LEARN_CCP_ALPHA, random_state=0)
+    model.fit(X.to_numpy(dtype=float), y.to_numpy(dtype=int))
+    return model, leaf
+
+
+def _learn_leaf_paths(model, names: list[str]) -> dict[int, list[tuple[str, str, float]]]:
+    t = model.tree_
+    paths: dict[int, list] = {}
+    stack = [(0, [])]
+    while stack:
+        node, cons = stack.pop()
+        left, right = int(t.children_left[node]), int(t.children_right[node])
+        if left == right:                                        # leaf
+            paths[node] = cons
+            continue
+        name, thr = names[int(t.feature[node])], float(t.threshold[node])
+        stack.append((left, cons + [(name, "<=", thr)]))
+        stack.append((right, cons + [(name, ">", thr)]))
+    return paths
+
+
+def _learn_best_leaf(model, names: list[str], X: pd.DataFrame, y: pd.Series, leaf_min: int) -> dict | None:
+    """Leaf with the highest base-rate-smoothed precision on the fit rows (smoothing weight = the minimum leaf size)."""
+    base = float(y.mean())
+    if not (_is_finite_number(base) and base > 0):
+        return None
+    leaves = model.apply(X.to_numpy(dtype=float))
+    stats = pd.DataFrame({"leaf": leaves, "y": y.to_numpy()}).groupby("leaf")["y"].agg(["sum", "size"])
+    smoothed = (stats["sum"] + leaf_min * base) / (stats["size"] + leaf_min)
+    best = int(smoothed.idxmax())
+    paths = _learn_leaf_paths(model, names)
+    return {"leaf": best, "n": int(stats.loc[best, "size"]), "positives": int(stats.loc[best, "sum"]),
+            "precision": float(stats.loc[best, "sum"] / stats.loc[best, "size"]), "smoothed": float(smoothed.loc[best]),
+            "lift": float(smoothed.loc[best] / base), "constraints": paths.get(best, [])}
+
+
+def _learn_translate(constraints: list[tuple[str, str, float]]) -> tuple[dict[str, float], dict, list[dict]]:
+    """Leaf constraints -> (gates, advisory, ignored). Several constraints on one feature collapse to the tightest."""
+    lower: dict[str, float] = {}
+    upper: dict[str, float] = {}
+    for name, op, thr in constraints:
+        if op == ">":
+            lower[name] = max(lower.get(name, -math.inf), thr)
+        else:
+            upper[name] = min(upper.get(name, math.inf), thr)
+    gates: dict[str, float] = {}
+    advisory: dict[str, dict] = {}
+    ignored: list[dict] = []
+    used: set[tuple[str, str]] = set()
+    for spec in _LEARN_GATE_SPECS:
+        bound = lower.get(spec["feature"]) if spec["side"] == "min" else upper.get(spec["feature"])
+        if bound is None:
+            continue
+        value, why = _learn_resolve_gate(spec, bound)
+        used.add((spec["feature"], ">" if spec["side"] == "min" else "<="))
+        if value is None:
+            ignored.append({"feature": spec["feature"], "op": ">" if spec["side"] == "min" else "<=", "threshold": bound, "param": spec["param"], "reason": why})
+        else:
+            gates[spec["param"]] = value
+    for name, thr in lower.items():
+        if (name, ">") in used:
+            continue
+        if name in _LEARN_ADVISORY_FEATURES:
+            advisory[name] = {"min": thr}
+        else:
+            ignored.append({"feature": name, "op": ">", "threshold": thr, "reason": "no gate for this feature/direction"})
+    for name, thr in upper.items():
+        if (name, "<=") in used:
+            continue
+        if name in _LEARN_ADVISORY_FEATURES:
+            advisory.setdefault(name, {})["max"] = thr
+        ignored.append({"feature": name, "op": "<=", "threshold": thr, "reason": "upper bound would loosen/invert a minimum-quality gate; never applied"})
+    return gates, advisory, ignored
+
+
+def _learn_score_floor(DecisionTreeClassifier, train: pd.DataFrame, valid: pd.DataFrame, avail: list[str]) -> dict:
+    """Depth-1 stump on entry_quality, restricted to rows that already clear today's gates and ENTRY_READY_MIN_SCORE
+    (a floor below the existing minimum cannot change anything). Same acceptance tests as the gates."""
+    res: dict[str, Any] = {"floor": None, "status": "NOT_FITTED"}
+    tr = train[_learn_baseline_mask(train, avail) & (train["entry_quality"] >= ENTRY_READY_MIN_SCORE)]
+    va = valid[_learn_baseline_mask(valid, avail) & (valid["entry_quality"] >= ENTRY_READY_MIN_SCORE)]
+    res.update(n_train=int(len(tr)), n_valid=int(len(va)))
+    if len(tr) < LEARN_MIN_EPISODES // 4 or int(tr["y"].sum()) < max(10, LEARN_MIN_POSITIVES // 4):
+        res["status"] = "INSUFFICIENT_DATA"
+        return res
+    model, leaf_min = _learn_fit_tree(DecisionTreeClassifier, tr[["entry_quality"]], tr["y"], depth=1)
+    if model.tree_.node_count < 3:
+        res["status"] = "NO_SPLIT"
+        return res
+    thr = float(model.tree_.threshold[0])
+    right_hi = float(tr.loc[tr["entry_quality"] > thr, "y"].mean()) > float(tr.loc[tr["entry_quality"] <= thr, "y"].mean())
+    lo, hi = LEARN_SCORE_FLOOR_BOUNDS
+    floor = math.ceil(min(max(thr, lo), hi))
+    if not right_hi or floor <= ENTRY_READY_MIN_SCORE:
+        res["status"] = "NO_TIGHTER_FLOOR"
+        res["threshold"] = thr
+        return res
+    rule_tr = tr["entry_quality"] >= floor
+    rule_va = va["entry_quality"] >= floor
+    train_m, valid_m = _learn_rule_metrics(tr, rule_tr), _learn_rule_metrics(va, rule_va)
+    fails = _learn_judge(train_m, valid_m)
+    res.update(threshold=thr, candidate=float(floor), train=train_m, valid=valid_m, rejection_reasons=fails,
+               status="VALIDATED" if not fails else "NOT_VALIDATED", floor=float(floor) if not fails else None)
+    return res
+
+
+def run_automated_threshold_learning(csv_path: str | None = None, params_path: str | None = None, *,
+                                     code_version: str | None = None, write: bool = True) -> dict:
+    """Weekly learner: evaluations CSV -> depth-3 tree -> bounded, validated gate proposals -> scanner_learned_params.json.
+
+    Returns the report dict (also stored under params["threshold_learning"]). Never raises. Behaviour of the scanner
+    changes only if AUTO_APPLY_LEARNING is ON and the report is VALIDATED (see _apply_threshold_learning)."""
+    cv = CODE_VERSION if code_version is None else code_version
+    report: dict[str, Any] = {
+        "schema_version": 1, "code_version": cv, "version_scope": LEARN_VERSION_SCOPE,
+        "generated_at": datetime.now(timezone.utc).isoformat(), "status": "INSUFFICIENT_DATA",
+        "target": {"definition": f"bracket_net_r_20d >= {LEARN_TARGET_R:g}", "threshold_r": LEARN_TARGET_R, "horizon_sessions": 20},
+        "population": "all evaluated candidates for the fit; validation judged on rows that already pass the default gates",
+        "gates": {}, "min_score_floor": None, "advisory": {}, "ignored_constraints": [], "rejection_reasons": [],
+        "auto_apply_active": bool(AUTO_APPLY_LEARNING),
+    }
+    try:
+        frame, info = _learn_load_frame(csv_path, cv)
+        report["data"] = dict(info)
+        if frame.empty:
+            report["status"] = "INSUFFICIENT_DATA"
+            report["rejection_reasons"].append(f"no usable rows ({info.get('status')})")
+            return _learn_finish(report, params_path, write)
+        coverage = {f: float(frame[f].notna().mean()) for f in LEARN_FEATURES}
+        avail = [f for f in LEARN_FEATURES if coverage[f] >= LEARN_MIN_FEATURE_COVERAGE]
+        report["data"].update(feature_coverage=coverage, features_used=avail,
+                              features_dropped={f: coverage[f] for f in LEARN_FEATURES if f not in avail},
+                              base_rate=float(frame["y"].mean()), positives=int(frame["y"].sum()),
+                              date_min=frame["signal_date"].min().date().isoformat(), date_max=frame["signal_date"].max().date().isoformat())
+        if len(avail) < 2:
+            report["status"] = "INSUFFICIENT_FEATURES"
+            report["rejection_reasons"].append(f"only {len(avail)} feature(s) have >= {LEARN_MIN_FEATURE_COVERAGE:.0%} coverage")
+            return _learn_finish(report, params_path, write)
+        complete = frame.dropna(subset=avail).reset_index(drop=True)
+        train, valid, split = _learn_split(complete)
+        report["data"].update(rows_with_all_features=int(len(complete)), train_n=int(len(train)), valid_n=int(len(valid)),
+                              train_positives=int(train["y"].sum()) if len(train) else 0,
+                              valid_positives=int(valid["y"].sum()) if len(valid) else 0, **split)
+        if len(complete) < LEARN_MIN_EPISODES or len(train) == 0 or int(complete["y"].sum()) < LEARN_MIN_POSITIVES \
+                or int(train["y"].sum()) < max(10, LEARN_MIN_POSITIVES // 2):
+            report["rejection_reasons"].append(
+                f"need >= {LEARN_MIN_EPISODES} episodes and >= {LEARN_MIN_POSITIVES} positives (have {len(complete)} / {int(complete['y'].sum())})")
+            return _learn_finish(report, params_path, write)
+        DecisionTreeClassifier = None
+        try:
+            from sklearn.tree import DecisionTreeClassifier, export_text   # lazy: the scanner runs without scikit-learn
+        except Exception:
+            report["status"] = "NO_SKLEARN"
+            report["rejection_reasons"].append("scikit-learn is not installed; add it to requirements.txt to enable learning")
+            return _learn_finish(report, params_path, write)
+        model, leaf_min = _learn_fit_tree(DecisionTreeClassifier, train[avail], train["y"], depth=LEARN_TREE_DEPTH)
+        report["model"] = {"type": "DecisionTreeClassifier", "max_depth": LEARN_TREE_DEPTH, "min_samples_leaf": leaf_min,
+                           "ccp_alpha": LEARN_CCP_ALPHA, "random_state": 0, "features": avail,
+                           "feature_importances": {f: float(w) for f, w in zip(avail, model.feature_importances_)},
+                           "tree_text": export_text(model, feature_names=avail)}
+        best = _learn_best_leaf(model, avail, train[avail], train["y"], leaf_min)
+        if best is None or best["lift"] < LEARN_MIN_LIFT_IS or not best["constraints"]:
+            report["status"] = "NOT_VALIDATED"
+            report["rejection_reasons"].append("no leaf with a smoothed lift >= " + f"{LEARN_MIN_LIFT_IS:g} over the base rate on the fit rows")
+            report["best_leaf"] = _learn_jsonable(best)
+            return _learn_finish(report, params_path, write)
+        gates, advisory, ignored = _learn_translate(best["constraints"])
+        report["best_leaf"] = _learn_jsonable({**best, "constraints": [{"feature": f, "op": o, "threshold": t} for f, o, t in best["constraints"]]})
+        report["advisory"], report["ignored_constraints"] = advisory, _learn_jsonable(ignored)
+        base_tr = train[_learn_baseline_mask(train, avail)]
+        base_va = valid[_learn_baseline_mask(valid, avail)]
+        floor_info = _learn_score_floor(DecisionTreeClassifier, train, valid, avail)
+        report["score_floor"] = _learn_jsonable(floor_info)
+        reasons: list[str] = []
+        if gates:
+            train_m = _learn_rule_metrics(base_tr, _learn_pass_mask(base_tr, gates))
+            valid_m = _learn_rule_metrics(base_va, _learn_pass_mask(base_va, gates))
+            reasons = _learn_judge(train_m, valid_m)
+            report["validation"] = _learn_jsonable({"rule": gates, "train_baseline_pass": train_m, "valid_baseline_pass": valid_m})
+            if not reasons:
+                report["gates"] = gates
+        else:
+            reasons.append("the best leaf contains no constraint that maps onto a tighten-only gate")
+        if floor_info.get("status") == "VALIDATED":
+            report["min_score_floor"] = floor_info["floor"]
+        report["rejection_reasons"] = reasons
+        report["status"] = "VALIDATED" if (report["gates"] or report["min_score_floor"] is not None) else "NOT_VALIDATED"
+        return _learn_finish(report, params_path, write)
+    except Exception as exc:
+        report["status"] = "ERROR"
+        report["error_type"] = type(exc).__name__
+        log(f"Threshold learning error: {type(exc).__name__}: {exc}")
+        return _learn_finish(report, params_path, write)
+
+
+def _learn_finish(report: dict, params_path: str | None, write: bool) -> dict:
+    """Persist the report under params[LEARNING_SECTION] (other keys of the file are preserved) and log one summary line."""
+    report = _learn_jsonable(report)
+    path = LEARNING_CONFIG_FILE if params_path is None else params_path
+    if write:
+        try:
+            existing = {}
+            if os.path.exists(path):
+                with open(path, encoding="utf-8") as handle:
+                    loaded = json.load(handle)
+                existing = loaded if isinstance(loaded, dict) else {}
+            existing[LEARNING_SECTION] = report
+            existing["last_updated"] = datetime.now().isoformat()
+            _atomic_write_json(path, existing)
+        except Exception as exc:
+            log(f"Threshold learning save error: {type(exc).__name__}: {exc}")
+    data = report.get("data") or {}
+    log(f"🧪 Threshold learning: status={report.get('status')} episodes={data.get('episodes')} positives={data.get('positives')} "
+        f"gates={report.get('gates')} score_floor={report.get('min_score_floor')} (auto_apply={AUTO_APPLY_LEARNING})")
+    return report
+
+
+def _apply_threshold_learning(params: dict, *, now: datetime | None = None) -> list[str]:
+    """Apply a VALIDATED, fresh, same-version `threshold_learning` section to the module globals (tighten-only, bounded).
+    Called by _apply_learned_params only when AUTO_APPLY_LEARNING is ON. Returns human-readable change notes."""
+    global LEARNED_MIN_SCORE_FLOOR
+    changed: list[str] = []
+    try:
+        section = params.get(LEARNING_SECTION) if isinstance(params, dict) else None
+        if not isinstance(section, dict) or section.get("status") != "VALIDATED":
+            return changed
+        cv = str(section.get("code_version", ""))
+        same = (cv == CODE_VERSION) if LEARN_VERSION_SCOPE != "minor" else (_learn_minor(cv) is not None and _learn_minor(cv) == _learn_minor(CODE_VERSION))
+        if not same:
+            log(f"🧪 Learned thresholds ignored: generated for {cv}, running {CODE_VERSION}")
+            return changed
+        stamp = pd.Timestamp(section.get("generated_at"))
+        if stamp.tzinfo is None:
+            stamp = stamp.tz_localize("UTC")
+        ref = pd.Timestamp(now) if now is not None else pd.Timestamp.now(tz="UTC")
+        if ref.tzinfo is None:
+            ref = ref.tz_localize("UTC")
+        age_days = (ref - stamp).total_seconds() / 86400.0
+        if not _is_finite_number(age_days) or age_days > LEARN_MAX_AGE_DAYS or age_days < -1.0:
+            log(f"🧪 Learned thresholds ignored: age {age_days:.1f} days (limit {LEARN_MAX_AGE_DAYS})")
+            return changed
+        for param, raw in (section.get("gates") or {}).items():
+            spec = _LEARN_SPEC_BY_PARAM.get(param)
+            if spec is None:
+                continue
+            value, _why = _learn_resolve_gate(spec, raw)
+            if value is None:
+                continue
+            old = float(globals()[param])
+            globals()[param] = value
+            changed.append(f"{param}: {old:g}→{value:g}")
+        floor = section.get("min_score_floor")
+        if _is_finite_number(floor):
+            lo, hi = LEARN_SCORE_FLOOR_BOUNDS
+            value = min(max(float(floor), lo), hi)
+            if value > LEARNED_MIN_SCORE_FLOOR:
+                LEARNED_MIN_SCORE_FLOOR = value
+                changed.append(f"min_score_floor: →{value:g}")
+    except Exception as exc:
+        log(f"_apply_threshold_learning error: {type(exc).__name__}: {exc}")
+    return changed
 
 def run_self_learning() -> dict:
     """Weekly descriptive research, with no automatic threshold search or changes.
@@ -9301,6 +10722,8 @@ def get_catalyst_engine(ticker: str, company: dict) -> dict:
     }
 
 
+# STAGED OFF: the v9.7.5 backtest showed "aligned" (above the 30-week MA and weekly EMA10) at -0.055 R [-0.101, -0.005]
+# versus the rest, i.e. the opposite of the expected sign. Use "warn" only to collect evidence; do not use "block".
 WEEKLY_ALIGN_MODE = os.getenv("WEEKLY_ALIGN_MODE", "off").strip().lower()   # off | warn | block  (entry gate)
 WEEKLY_MA_WEEKS = int(os.getenv("WEEKLY_MA_WEEKS", "30"))
 WEEKLY_EMA_SPAN = int(os.getenv("WEEKLY_EMA_SPAN", "10"))
@@ -10493,7 +11916,9 @@ def _build_html_card(alert: dict, company: dict, send_date: str, sector: dict | 
     ]) + '<p style="font-size:11px;color:#a9b6ca;line-height:1.7;margin:10px 0 0;">כניסה מתוכננת היא מחיר ייחוס של האיתות; אינה אישור לביצוע עסקה.</p>')
     body += _mail_section("Entry Ready · אימות הכניסה",
         _mail_rows([("סטטוס", quality.get("status", "ENTRY_READY")),
-                    ("ציון Entry", _mail_number(quality.get("quality_score"), 0, suffix="/100"))])
+                    ("ציון Entry", _mail_number(quality.get("quality_score"), 0, suffix="/100"))]
+                   + ([("קנס דירוג · RS", f"−{float(quality.get('rank_penalty')):.1f}", "; ".join(quality.get("risk_flags") or []))]
+                      if quality.get("rank_penalty") else []))
         + _mail_list(quality.get("reasons"), "עבר שכבת Entry Ready")
         + _mail_list(quality.get("blocking_fails"), limit=6), "green")
     if pro:
@@ -10771,7 +12196,14 @@ def _entry_research_thresholds() -> dict:
             "max_extension_pct": ENTRY_MAX_EXTENSION_PCT,
             "earnings_exclusion_calendar_days": EARNINGS_FILTER_DAYS,
             "require_verified_earnings": REQUIRE_VERIFIED_EARNINGS,
-            "rs_score_method": "WEIGHTED_EXCESS_VS_SPY_TANH_NOT_PERCENTILE"}
+            "rs_score_method": "WEIGHTED_EXCESS_VS_SPY_TANH_NOT_PERCENTILE",
+            "rs_mode": RS_MODE, "rs_rank_penalty_decay": RS_RANK_PENALTY_DECAY, "rs_rank_penalty_line": RS_RANK_PENALTY_LINE,
+            "earnings_exit_enabled": EARNINGS_EXIT_ENABLED, "earnings_exit_lead_sessions": EARNINGS_EXIT_LEAD_SESSIONS,
+            "use_median_liquidity": USE_MEDIAN_LIQUIDITY, "liq_median_min_dollar_vol": LIQ_MEDIAN_MIN_DOLLAR_VOL,
+            "use_smart_money_accel": USE_SMART_MONEY_ACCEL, "sm_apply_mode": SM_APPLY_MODE,
+            "weekly_align_mode": WEEKLY_ALIGN_MODE,
+            "fp_window": FP_WINDOW, "fp_min_prints": FP_MIN_PRINTS, "fp_bonus_points": FP_BONUS_POINTS,
+            "auto_apply_learning": AUTO_APPLY_LEARNING, "learned_min_score_floor": LEARNED_MIN_SCORE_FLOOR}
 
 
 def _capture_entry_research_diagnostics(alert: dict, stage: str, df=None) -> None:
@@ -11116,9 +12548,25 @@ def _update_setup_evaluations() -> None:
         log(f"Research performance updated: {len(observations)} observations")
 
 
+def _alert_rank_value(alert: dict) -> float:
+    """Ordering key = displayed score + Smart-Money rank bonus - RS rank penalty (both 0 unless the layers are active)."""
+    try:
+        q = alert.get("entry_quality") if isinstance(alert.get("entry_quality"), dict) else {}
+        return (float(alert.get("score", 0) or 0) + float(q.get("rank_bonus", 0) or 0) - float(q.get("rank_penalty", 0) or 0))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _alert_rank_key(alert: dict) -> float:
+    value = alert.get("rank_key") if isinstance(alert, dict) else None
+    if value is None:
+        value = _alert_rank_value(alert) if isinstance(alert, dict) else 0.0
+    return float(value) if _is_finite_number(value) else 0.0
+
+
 def _select_final_alerts(alerts: list[dict], limit=None) -> list[dict]:
     best = {}
-    for alert in sorted(alerts, key=lambda a: float(a.get("score", 0) or 0), reverse=True):
+    for alert in sorted(alerts, key=_alert_rank_key, reverse=True):
         ticker = str(alert.get("ticker", "")).strip().upper()
         if ticker and ticker not in best:
             best[ticker] = alert
@@ -11269,7 +12717,7 @@ def send_email_alerts(alerts: list[dict]) -> dict:
             log("Email configuration missing — email disabled.")
             return {"success": False, "accepted": 0, "refused": len(TO_EMAILS), "status": "disabled"}
 
-        alerts = sorted(alerts, key=lambda a: _infra_float(a.get("score",0), 0.0), reverse=True)
+        alerts = sorted(alerts, key=_alert_rank_key, reverse=True)   # v9.7.6: rank_key = score +/- rank adjustments
         now_str   = datetime.now().strftime("%d/%m/%Y")
         subj_str  = datetime.now().strftime("%Y-%m-%d %H:%M")
 
@@ -11754,6 +13202,11 @@ def _run_saturday_maintenance_if_due() -> bool:
     log("🧠 Saturday maintenance — running weekly self-learning before Market Day Guard...")
     update_performance_log()
     result = run_self_learning()
+    if THRESHOLD_LEARNING_ENABLED:
+        try:
+            run_automated_threshold_learning()   # v9.7.7: writes proposals only; applied solely with AUTO_APPLY_LEARNING
+        except Exception as e:
+            log(f"🧪 Threshold learning failed (maintenance continues): {type(e).__name__}: {e}")
     try:
         os.makedirs(os.path.dirname(SATURDAY_MAINTENANCE_STATE_FILE) or ".", exist_ok=True)
         _atomic_write_text(SATURDAY_MAINTENANCE_STATE_FILE, today + "\n")
@@ -11770,6 +13223,11 @@ def main() -> None:
     log("=" * 60)
     log("Stock Scanner Unified — START")
     log(f"Code version: {CODE_VERSION}")
+    log(f"v9.7.6 switches: RS_MODE={RS_MODE} | EARNINGS_EXIT={EARNINGS_EXIT_ENABLED} (lead={EARNINGS_EXIT_LEAD_SESSIONS}, "
+        f"probable={EARNINGS_EXIT_USE_PROBABLE}) | MEDIAN_LIQUIDITY={USE_MEDIAN_LIQUIDITY} | SMART_MONEY={USE_SMART_MONEY_ACCEL} "
+        f"({SM_APPLY_MODE}) | WEEKLY_ALIGN={WEEKLY_ALIGN_MODE} | SWING_EXIT_ENGINE={SWING_EXIT_ENGINE}")
+    log(f"v9.7.7 switches: SMART_MONEY_ACCEL={USE_SMART_MONEY_ACCEL} (footprint window={FP_WINDOW}, min_prints={FP_MIN_PRINTS}, bonus={FP_BONUS_POINTS:g}) | "
+        f"AUTO_APPLY_LEARNING={AUTO_APPLY_LEARNING} | THRESHOLD_LEARNING={THRESHOLD_LEARNING_ENABLED} (scope={LEARN_VERSION_SCOPE})")
     log(f"Market cap threshold: ${MIN_MARKET_CAP_USD/1e9:.1f}B | Pipeline: screener cache → precheck unknowns → fail-open only if unresolved")
     log(f"Entry Ready threshold: quality>={ENTRY_READY_MIN_SCORE:.1f} | candidate_score>={ENTRY_CANDIDATE_MIN_SCORE:.1f}")
     log("RESET VERIFIED FIX FILE")
@@ -12117,3 +13575,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+# END OF FILE - stock_scanner_unified.py v9.7.7 (2026-10-31)
