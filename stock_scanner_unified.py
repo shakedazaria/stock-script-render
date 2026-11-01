@@ -37,13 +37,15 @@ stock_scanner_unified.py
   כבויות כברירת מחדל, ועמודות gate_feature_frame לבקטסט הבא. פילטרי הדוחות בכניסה לא שונו.
   V9.7.7 מוסיף טביעת רגל מוסדית (_compute_institutional_footprint: ימי print צרים בנפח גבוה + CMF מתרחב; בונוס דירוג בלבד,
   כבוי עם USE_SMART_MONEY_ACCEL=False) ולמידת ספים שבועית (run_automated_threshold_learning; מוחל רק עם AUTO_APPLY_LEARNING=True).
+  V9.7.8 מוסיף Alpha Boost Engine: בונוס דירוג בלבד (rank_key) על רצף CMF עולה ועל דחיסת טווח יחסית ל-ATR לפני הפריצה;
+  כבוי עם USE_ALPHA_BOOST=False, לא חוסם, לא משנה ציוני כניסה, ועמודות ab_* נכנסות ל-gate_feature_frame לבקטסט הבא.
 """
 
 # ============================================================
 # RESET VERIFIED FIX FILE — 2026-09-30 V9.3
 # This marker proves this is the rebuilt fixed file, not an old download copy.
 # ============================================================
-CODE_VERSION = "2026-10-31-v9.7.7"
+CODE_VERSION = "2026-11-01-v9.7.8-swing"
 RESET_VERIFIED_FIX_FILE = True
 
 
@@ -3705,6 +3707,167 @@ def footprint_last(df: pd.DataFrame, window: int | None = None, tail: int | None
     except Exception:
         return neutral
 
+# ==============================================================================================
+# v9.7.8 — ALPHA BOOST ENGINE (RANK-ONLY, default OFF: USE_ALPHA_BOOST=False)
+#
+# Purpose: order the candidates that ALREADY passed every gate, so the top TOP_ALERTS_TO_SEND emails are the ones with the
+# most persistent money flow and the tightest pre-breakout coil. It adds NO gate and NO block, and never touches
+# alert["score"] / quality_score / gate_points: the bonus goes only into `rank_bonus` (-> alert["rank_key"]).
+# With USE_ALPHA_BOOST=False the bonus is exactly 0.0 (ordering identical to v9.7.7); the numbers are still measured
+# (shadow) and flow into gate_feature_frame as ab_* columns, so the next backtest can validate them before any switch-on.
+#
+# Contract (all point-in-time: bar i uses bars <= i; the compression window uses only bars BEFORE the signal bar):
+#   cmf_i        = chaikin_money_flow(SM_CMF_WINDOW, default 20)
+#   streak_i     = number of consecutive sessions ending at i with cmf_t > cmf_(t-1)    (NaN if cmf_i / cmf_(i-1) unknown)
+#   cmf_ok_i     = streak_i >= AB_CMF_STREAK (default 5)
+#   ratio_i      = (high_i - low_i) / ATR_i,  ATR_i = mean true range of the AB_COMPRESS_ATR_LEN (14) bars BEFORE bar i.
+#                  Dimensionless. Equals the spec formula (high-low)/(atr14*close) when atr14 is read as a FRACTION of the
+#                  close; with atr14 in PRICE units that formula has units of 1/price and would favour low-priced stocks.
+#   ref_i        = AB_COMPRESS_REF_MEDIAN when > 0 (a fixed cross-section median), otherwise the median of `ratio` over the
+#                  previous AB_COMPRESS_REF_WINDOW (60) bars of the same ticker (no cross-sectional input is available per symbol)
+#   tight_j      = ratio_j < ref_j
+#   n_tight_i    = number of tight bars among the 5 bars immediately BEFORE bar i
+#   comp_bonus_i = AB_COMPRESS_MAX_POINTS * AB_COMPRESS_TIERS[n_tight_i]     tiers by count 0..5: 0, 0, 0, .5, .75, 1.0
+#   ab_bonus_i   = clip(AB_CMF_BONUS_POINTS * cmf_ok_i + comp_bonus_i, 0, AB_BONUS_CAP)
+# Missing / non-finite / non-positive inputs never create a bonus (the value is NaN and counts as 0).
+# ==============================================================================================
+USE_ALPHA_BOOST = _v976_flag("USE_ALPHA_BOOST", False)
+AB_CMF_STREAK = max(2, _v976_int("AB_CMF_STREAK", 5))                 # consecutive sessions of rising CMF
+AB_CMF_BONUS_POINTS = _v976_float("AB_CMF_BONUS_POINTS", 6.0)         # rank points (Alpha Momentum Bonus)
+AB_COMPRESS_MAX_POINTS = _v976_float("AB_COMPRESS_MAX_POINTS", 4.0)   # rank points at the top compression tier
+AB_COMPRESS_ATR_LEN = max(2, _v976_int("AB_COMPRESS_ATR_LEN", 14))
+AB_COMPRESS_REF_WINDOW = max(20, _v976_int("AB_COMPRESS_REF_WINDOW", 60))
+AB_COMPRESS_REF_MEDIAN = _v976_float("AB_COMPRESS_REF_MEDIAN", 0.0)   # 0 = use the ticker's own trailing median
+AB_COMPRESS_TIERS = (0.0, 0.0, 0.0, 0.5, 0.75, 1.0)                   # share of AB_COMPRESS_MAX_POINTS by tight-bar count (len-1 = bars checked)
+AB_BONUS_CAP = _v976_float("AB_BONUS_CAP", 10.0)                      # ceiling for the sum of both bonuses
+AB_COLUMNS = ("ab_cmf_streak", "ab_cmf_ok", "ab_compress_ratio", "ab_compress_ref", "ab_compress_tight_n",
+              "ab_compress_bonus", "ab_bonus")
+
+
+def _ab_tiers() -> np.ndarray:
+    """Sanitised tier table: finite, clipped to [0, 1], at least two entries (else the default table)."""
+    default = np.array([0.0, 0.0, 0.0, 0.5, 0.75, 1.0])
+    try:
+        raw = np.asarray(AB_COMPRESS_TIERS, dtype=float).ravel()
+    except (TypeError, ValueError):
+        return default
+    if raw.size < 2:
+        return default
+    return np.clip(np.nan_to_num(raw, nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
+
+
+def cmf_rise_streak(cmf: pd.Series) -> pd.Series:
+    """Length of the run of consecutive sessions with cmf_t > cmf_(t-1), ending at each bar (0 after a non-rise).
+    NaN where cmf or its previous value is unknown. Vectorised (cumsum trick), causal."""
+    c = pd.to_numeric(cmf, errors="coerce").replace([np.inf, -np.inf], np.nan)
+    prev = c.shift(1)
+    valid = c.notna() & prev.notna()
+    up = (c > prev) & valid
+    run = up.astype(float).cumsum()
+    base = run.where(~up).ffill().fillna(0.0)
+    return (run - base).where(valid)
+
+
+def compression_ratio_series(df: pd.DataFrame, atr_len: int | None = None) -> pd.Series:
+    """Bar range relative to the true volatility measured BEFORE the bar: (high - low) / mean(TR of the previous atr_len bars).
+    Dimensionless and causal. NaN for bars with missing / non-finite OHLC, close <= 0, high <= low, or no full ATR window."""
+    n = max(2, int(_fp_num(AB_COMPRESS_ATR_LEN if atr_len is None else atr_len, 14, positive=True)))
+    index = getattr(df, "index", pd.RangeIndex(0))
+    if df is None or len(df) == 0:
+        return pd.Series(np.nan, index=index, dtype=float)
+    d = _ohlcv(df)
+    if any(k not in d.columns for k in ("high", "low", "close")):
+        return pd.Series(np.nan, index=d.index, dtype=float)
+    h, l, c = (pd.to_numeric(d[k], errors="coerce").replace([np.inf, -np.inf], np.nan) for k in ("high", "low", "close"))
+    prev_c = c.shift(1)
+    tr = pd.concat([(h - l), (h - prev_c).abs(), (l - prev_c).abs()], axis=1).max(axis=1, skipna=False)
+    atr_prior = tr.shift(1).rolling(n, min_periods=n).mean()
+    bar_ok = h.notna() & l.notna() & c.notna() & (c > 0) & (h > l)
+    ratio = ((h - l) / atr_prior.where(atr_prior > 0)).where(bar_ok)
+    return ratio.replace([np.inf, -np.inf], np.nan)
+
+
+def alpha_boost_frame(df: pd.DataFrame, *, ref_median: float | None = None) -> pd.DataFrame:
+    """Alpha-boost columns (AB_COLUMNS) for EVERY bar of `df`. Vectorised, causal, never raises (error -> all-NaN frame)."""
+    empty = pd.DataFrame(np.nan, index=getattr(df, "index", pd.RangeIndex(0)), columns=list(AB_COLUMNS), dtype=float)
+    try:
+        if df is None or len(df) == 0:
+            return empty
+        d = _ohlcv(df)
+        if any(k not in d.columns for k in ("open", "high", "low", "close", "volume")):
+            return empty
+        need_streak = max(2, int(_fp_num(AB_CMF_STREAK, 5, positive=True)))
+        cmf_pts = max(0.0, _fp_num(AB_CMF_BONUS_POINTS, 6.0))
+        comp_pts = max(0.0, _fp_num(AB_COMPRESS_MAX_POINTS, 4.0))
+        cap = max(0.0, _fp_num(AB_BONUS_CAP, 10.0))
+        ref_w = max(20, int(_fp_num(AB_COMPRESS_REF_WINDOW, 60, positive=True)))
+        fixed_ref = _fp_num(AB_COMPRESS_REF_MEDIAN if ref_median is None else ref_median, 0.0)
+        tiers = _ab_tiers()
+        k = tiers.size - 1                                     # number of bars before the signal bar that are checked
+        cmf = chaikin_money_flow(d).replace([np.inf, -np.inf], np.nan)
+        streak = cmf_rise_streak(cmf)
+        cmf_ok = (streak >= need_streak).astype(float).where(streak.notna())
+        ratio = compression_ratio_series(d)
+        if fixed_ref > 0:
+            ref = pd.Series(fixed_ref, index=d.index, dtype=float)
+        else:
+            ref = ratio.shift(1).rolling(ref_w, min_periods=max(10, ref_w // 2)).median()
+        known = ratio.notna() & ref.notna()
+        tight = (ratio < ref).astype(float).where(known)
+        n_tight = tight.shift(1).rolling(k, min_periods=k).sum()      # only bars BEFORE the signal bar
+        tier_idx = np.clip(np.nan_to_num(n_tight.to_numpy(dtype=float), nan=0.0), 0, k).astype(int)
+        comp_bonus = pd.Series(comp_pts * tiers[tier_idx], index=d.index).where(n_tight.notna())
+        total = (cmf_ok.fillna(0.0) * cmf_pts + comp_bonus.fillna(0.0)).clip(0.0, cap).where(cmf_ok.notna() | comp_bonus.notna())
+        out = pd.DataFrame(index=d.index)
+        out["ab_cmf_streak"] = streak
+        out["ab_cmf_ok"] = cmf_ok
+        out["ab_compress_ratio"] = ratio
+        out["ab_compress_ref"] = ref
+        out["ab_compress_tight_n"] = n_tight
+        out["ab_compress_bonus"] = comp_bonus
+        out["ab_bonus"] = total
+        return out[list(AB_COLUMNS)].replace([np.inf, -np.inf], np.nan)
+    except Exception:
+        return empty
+
+
+def alpha_boost_last(df: pd.DataFrame, tail: int | None = None) -> dict[str, Any]:
+    """Alpha-boost values at the last bar as a finite-checked dict (None where unknown, ab_bonus defaults to 0.0).
+
+    Every statistic has a finite look-back (CMF window + streak, ATR + reference window + tight-bar window), so the last
+    `tail` bars (never fewer than that look-back) give the same last-bar values as the full frame (tested)."""
+    neutral: dict[str, Any] = {key: None for key in AB_COLUMNS}
+    neutral["ab_bonus"] = 0.0
+    try:
+        depth = (max(20, int(_fp_num(AB_COMPRESS_REF_WINDOW, 60, positive=True)))
+                 + max(2, int(_fp_num(AB_COMPRESS_ATR_LEN, 14, positive=True))) + _ab_tiers().size + 12)
+        n_tail = GATE_SHADOW_TAIL_BARS if tail is None else int(tail)
+        n_tail = max(n_tail, depth) if n_tail > 0 else 0
+        fr = alpha_boost_frame(df.iloc[-n_tail:] if n_tail > 0 else df)
+        if fr.empty:
+            return neutral
+        arr = fr.iloc[-1].to_numpy(dtype=float)
+        res = dict(zip(AB_COLUMNS, np.where(np.isfinite(arr), arr, None).tolist()))
+        if res.get("ab_bonus") is None:
+            res["ab_bonus"] = 0.0
+        return res
+    except Exception:
+        return neutral
+
+
+def alpha_boost_points(info: dict[str, Any] | None, *, enabled: bool | None = None) -> float:
+    """Rank points for one candidate. Exactly 0.0 when USE_ALPHA_BOOST is OFF, when `info` is missing, or when the value is not
+    a finite number. Never negative, never above AB_BONUS_CAP. Used only for ordering (rank_key), never for a gate."""
+    on = USE_ALPHA_BOOST if enabled is None else bool(enabled)
+    if not on or not isinstance(info, dict):
+        return 0.0
+    value = info.get("ab_bonus")
+    if not _is_finite_number(value):
+        return 0.0
+    cap = max(0.0, _fp_num(AB_BONUS_CAP, 10.0))
+    return float(min(max(float(value), 0.0), cap))
+
+
 def gate_shadow_metrics(df: pd.DataFrame) -> dict[str, Any]:
     """Liquidity + smart-money numbers at the last bar for the entry-quality metrics (computed whether the gates are ON or
     OFF, so the live log carries the evidence the next backtest needs). Never raises; missing data -> None values."""
@@ -3727,6 +3890,14 @@ def gate_shadow_metrics(df: pd.DataFrame) -> dict[str, Any]:
                    fp_score=fp.get("fp_score"), fp_bonus=fp.get("fp_bonus"))
     except Exception:
         out.update(fp_prints=None, fp_cmf_delta=None, fp_accel=0.0, fp_score=None, fp_bonus=0.0)
+    # v9.7.8: alpha-boost numbers (shadow always; the rank bonus is applied only when USE_ALPHA_BOOST is ON)
+    try:
+        ab = alpha_boost_last(df)
+        out["alpha_boost"] = ab
+        out.update(ab_cmf_streak=ab.get("ab_cmf_streak"), ab_compress_tight_n=ab.get("ab_compress_tight_n"), ab_bonus=ab.get("ab_bonus"))
+    except Exception:
+        out["alpha_boost"] = {"ab_bonus": 0.0}
+        out.update(ab_cmf_streak=None, ab_compress_tight_n=None, ab_bonus=0.0)
     return out
 
 
@@ -3800,7 +3971,7 @@ def gate_feature_frame(df: pd.DataFrame) -> pd.DataFrame:
         ok = ok & ~(out["top_day_share20"] > LIQ_MAX_TOP_DAY_SHARE)
     out["liq_ok"] = (out["median_dv20"] >= LIQ_MEDIAN_MIN_DOLLAR_VOL).astype(float).where(out["median_dv20"].notna())  # median only
     out["liq_gate_ok"] = ok.astype(float).where(out["median_dv20"].notna())                                           # full gate
-    out = out.join(smart_money_overlay(d)).join(_compute_institutional_footprint(d))
+    out = out.join(smart_money_overlay(d)).join(_compute_institutional_footprint(d)).join(alpha_boost_frame(d))   # v9.7.8: + ab_* columns
     # v9.7.7: sensitivity column - prints counted with a looser range cap (FP_WIDE_PRICE_MAX_PCT, default 1.5%)
     out["fp_prints_wide"] = _compute_institutional_footprint(d, price_max_pct=FP_WIDE_PRICE_MAX_PCT)["fp_prints"]
     return out
@@ -4927,7 +5098,7 @@ def _entry_quality_metrics(df: pd.DataFrame, ticker: str, breakout_level: float,
         metrics["avg_dollar_volume20"] = (avg_vol20 * close) if avg_vol20 and close else None
         # v9.7.6: true-median liquidity and smart-money evidence are measured here (shadow, for the log / audit) and
         # applied only when USE_MEDIAN_LIQUIDITY / USE_SMART_MONEY_ACCEL are ON. Both use bars before the signal bar only.
-        if GATE_SHADOW_METRICS or USE_MEDIAN_LIQUIDITY or USE_SMART_MONEY_ACCEL:
+        if GATE_SHADOW_METRICS or USE_MEDIAN_LIQUIDITY or USE_SMART_MONEY_ACCEL or USE_ALPHA_BOOST:
             metrics.update(gate_shadow_metrics(df))
             if USE_MEDIAN_LIQUIDITY and metrics.get("median_dv20") is not None:
                 metrics["avg_dollar_volume20"] = metrics["median_dv20"]
@@ -5258,6 +5429,18 @@ def evaluate_entry_quality(df: pd.DataFrame, ticker: str, breakout_level: float,
     # the penalty and the SM_APPLY_MODE=rank bonus only move rank_key; SM_APPLY_MODE=score lifts the gate score on purpose.
     gate_points, rank_points = apply_smart_money(points, m.get("smart_money"))
     rank_bonus = float(rank_points - gate_points)
+    # v9.7.8: Alpha Boost Engine - RANK ONLY. Added to rank_bonus (-> rank_key); never to gate_points / quality_score / alert["score"].
+    # alpha_boost_points() is exactly 0.0 while USE_ALPHA_BOOST is False, so the ordering is then identical to v9.7.7.
+    ab_points = alpha_boost_points(m.get("alpha_boost"))
+    rank_bonus += ab_points
+    if ab_points > 0:
+        _ab = m.get("alpha_boost") if isinstance(m.get("alpha_boost"), dict) else {}
+        _parts = []
+        if _is_finite_number(_ab.get("ab_cmf_ok")) and float(_ab["ab_cmf_ok"]) == 1.0 and _is_finite_number(_ab.get("ab_cmf_streak")):
+            _parts.append(f"CMF עולה {int(_ab['ab_cmf_streak'])} ימים ברצף")
+        if _is_finite_number(_ab.get("ab_compress_bonus")) and float(_ab["ab_compress_bonus"]) > 0 and _is_finite_number(_ab.get("ab_compress_tight_n")):
+            _parts.append(f"{int(_ab['ab_compress_tight_n'])} נרות דחוסים לפני הפריצה")
+        reasons.append(f"Alpha Boost: +{ab_points:.1f} לדירוג בלבד ({'; '.join(_parts) or 'ללא פירוט'})")
     _sm = m.get("smart_money") if isinstance(m.get("smart_money"), dict) else {}
     if USE_SMART_MONEY_ACCEL and _sm.get("fp_accel") == 1.0 and _is_finite_number(_sm.get("fp_prints")):
         reasons.append(f"טביעת רגל מוסדית: {int(_sm['fp_prints'])} ימי print ב-{FP_WINDOW} ימים + CMF מתרחב (בונוס דירוג בלבד)")
@@ -5277,6 +5460,7 @@ def evaluate_entry_quality(df: pd.DataFrame, ticker: str, breakout_level: float,
         "fail_reasons": list(dict.fromkeys(fails + blocking_fails)),
         "blocking_fails": list(dict.fromkeys(blocking_fails)),
         "rank_bonus": round(rank_bonus, 2),
+        "alpha_boost_points": round(float(ab_points), 2),
         "rank_penalty": round(float(rank_penalty), 2),
         "risk_flags": risk_flags,
         "metrics": m,
@@ -12203,6 +12387,8 @@ def _entry_research_thresholds() -> dict:
             "use_smart_money_accel": USE_SMART_MONEY_ACCEL, "sm_apply_mode": SM_APPLY_MODE,
             "weekly_align_mode": WEEKLY_ALIGN_MODE,
             "fp_window": FP_WINDOW, "fp_min_prints": FP_MIN_PRINTS, "fp_bonus_points": FP_BONUS_POINTS,
+            "use_alpha_boost": USE_ALPHA_BOOST, "ab_cmf_streak": AB_CMF_STREAK, "ab_cmf_bonus_points": AB_CMF_BONUS_POINTS,
+            "ab_compress_max_points": AB_COMPRESS_MAX_POINTS, "ab_bonus_cap": AB_BONUS_CAP,
             "auto_apply_learning": AUTO_APPLY_LEARNING, "learned_min_score_floor": LEARNED_MIN_SCORE_FLOOR}
 
 
@@ -13228,6 +13414,8 @@ def main() -> None:
         f"({SM_APPLY_MODE}) | WEEKLY_ALIGN={WEEKLY_ALIGN_MODE} | SWING_EXIT_ENGINE={SWING_EXIT_ENGINE}")
     log(f"v9.7.7 switches: SMART_MONEY_ACCEL={USE_SMART_MONEY_ACCEL} (footprint window={FP_WINDOW}, min_prints={FP_MIN_PRINTS}, bonus={FP_BONUS_POINTS:g}) | "
         f"AUTO_APPLY_LEARNING={AUTO_APPLY_LEARNING} | THRESHOLD_LEARNING={THRESHOLD_LEARNING_ENABLED} (scope={LEARN_VERSION_SCOPE})")
+    log(f"v9.7.8 switches: ALPHA_BOOST={USE_ALPHA_BOOST} (rank-only; cmf_streak={AB_CMF_STREAK}, cmf_bonus={AB_CMF_BONUS_POINTS:g}, "
+        f"compress_max={AB_COMPRESS_MAX_POINTS:g}, cap={AB_BONUS_CAP:g})")
     log(f"Market cap threshold: ${MIN_MARKET_CAP_USD/1e9:.1f}B | Pipeline: screener cache → precheck unknowns → fail-open only if unresolved")
     log(f"Entry Ready threshold: quality>={ENTRY_READY_MIN_SCORE:.1f} | candidate_score>={ENTRY_CANDIDATE_MIN_SCORE:.1f}")
     log("RESET VERIFIED FIX FILE")
@@ -13576,4 +13764,4 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 
-# END OF FILE - stock_scanner_unified.py v9.7.7 (2026-10-31)
+# END OF FILE - stock_scanner_unified.py v9.7.8 (2026-11-01)
