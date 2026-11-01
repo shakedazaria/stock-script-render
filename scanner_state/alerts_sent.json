@@ -64,5 +64,16 @@
       }
     ]
   },
-  "RS_Flat Base / Rectangle Breakout_66": "2026-10-29T11:07:48.822281"
+  "RS_Flat Base / Rectangle Breakout_66": "2026-10-29T11:07:48.822281",
+  "THG": {
+    "time": 1793532624.309429,
+    "patterns": [
+      {
+        "name": "EMA21/MA50 Pullback Bounce",
+        "level": 242.089996,
+        "time": 1793532624.309429
+      }
+    ]
+  },
+  "THG_EMA21/MA50 Pullback Bounce_66": "2026-11-01T11:30:24.309432"
 }

@@ -29,3 +29,6 @@ timestamp,ticker,pattern,entry_quality,professional_score,professional_status,la
 2026-10-29T10:05:52,RS,Flat Base / Rectangle Breakout,81.0,89.0,PRO_READY,ELITE,84.0,99.2,95.0,WARM,82.2,100.0,86.0,66.0,
 2026-10-29T10:05:52,RS,Darvas Box Breakout,81.0,89.0,PRO_READY,ELITE,84.0,99.2,95.0,WARM,82.2,100.0,86.0,66.0,
 2026-10-29T10:05:53,RS,VCP Breakout,83.0,87.7,PRO_READY,STRONG,84.0,99.2,95.0,WARM,82.2,100.0,86.0,52.0,
+2026-11-01T11:11:41,THG,Flat Base / Rectangle Breakout,81.0,94.7,PRO_WATCHLIST,ELITE,100.0,98.8,95.0,WARM,68.7,100.0,97.0,76.0,סטופ צמוד מדי לפריצה (6.3% < 7.0%)
+2026-11-01T11:11:41,THG,Darvas Box Breakout,81.0,94.7,PRO_WATCHLIST,ELITE,100.0,98.8,95.0,WARM,68.7,100.0,97.0,76.0,סטופ צמוד מדי לפריצה (6.3% < 7.0%)
+2026-11-01T11:11:41,THG,EMA21/MA50 Pullback Bounce,76.0,93.5,PRO_READY,ELITE,100.0,98.8,95.0,WARM,68.7,100.0,94.0,70.0,
