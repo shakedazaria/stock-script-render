@@ -51,10 +51,34 @@ footprint tables (how often a print / an acceleration occurs, and outcome by pri
 learner (run_automated_threshold_learning) on the backtest rows, into a temp folder - your scanner_learned_params.json is
 not touched - so the learning rules can be judged on years of data before the live CSV has enough rows.
 
+v3.4 (2026-11-01): for scanner v9.7.7 (the scanner file is NOT changed). The v3.3 CSV had no per-bar volume / range series, so
+the footprint could only be judged at two fixed points (0.5% and 1.5% range cap, 1.5x volume). v3.4 re-counts the footprint
+"print" over a research GRID, entirely inside the harness, from the same OHLCV the scanner sees (every value at day t uses bars
+<= t only; the 20-bar volume baseline and the ATR14 exclude the print bar itself):
+  print_i = volume_i >= VOLMULT * mean(volume of the 20 bars before i)  AND  close_i >= open_i  AND  RANGE RULE
+  RANGE RULE (one of):  abs   : (high-low)/close <= CAP%                     (CAP in percent, the DARKPOOL_PRICE_MAX unit)
+                        atr   : (high-low) <= K * ATR14 of the 14 bars before i  (volatility-relative compression cap)
+                        any   : no range rule (how many high-volume up-close bars exist at all)
+  count = number of prints in the last FP_WINDOW (10) bars, NaN until the whole window has a full baseline.
+Columns written to the results CSV (small integers; empty = not known):
+  fp_prints_atr_01 / _02 / _03 (+ _04 / _06 / _08)   prints under 0.1x / 0.2x / 0.3x (+ 0.4x / 0.6x / 0.8x) ATR14 at the scanner's
+                                                       own volume multiplier (SM_SPIKE_MULT, 1.5). The extra 0.4-0.8x columns are
+                                                       there because the median ATR% is 2.79%, so 0.1x-0.3x of ATR is a 0.28%-0.84%
+                                                       bar range - about as rare as the 0.5% cap that proved too rare; keep only the
+                                                       three with --atr-mults 0.1,0.2,0.3.
+  fp_grid_v{12,15,18,22}_{abs05,abs10,abs15,abs20,atr01..atr08,any}   the full matrix: volume multiplier x range rule
+                                                       (codes are tenths: v15 = 1.5x, abs05 = 0.5%, atr03 = 0.3x ATR14).
+Sanity anchors (tested): fp_grid_v15_abs05 == fp_prints and fp_grid_v15_abs15 == fp_prints_wide of the scanner.
+The summary prints one row per grid cell (how often >=1 / >=2 prints occur, outcome of episodes with >=2 prints vs the rest).
+The learner replay no longer fails without scikit-learn: if the package is missing or broken it prints a clear WARNING, skips the
+tree, and prints pandas-only quintile tables instead - it never raises. (The tree itself still needs scikit-learn.)
+
 Usage (in your own environment, where yfinance is installed):
   python scanner_backtest.py --scanner stock_scanner_unified.py \
       --tickers AAPL,MSFT,NVDA --start 2023-01-01 --end 2026-09-30 --out bt.csv
   or --tickers-file tickers.txt (one symbol per line)
+  v3.4 grid options (all optional; defaults shown):  --vol-grid 1.2,1.5,1.8,2.2  --abs-caps 0.5,1.0,1.5,2.0
+      --atr-mults 0.1,0.2,0.3,0.4,0.6,0.8   --no-fp-grid  (switches the grid columns off; the output is then identical to v3.3)
 
 Survivorship bias: a list of today's tickers excludes companies that were
 delisted. Treat results as relative comparisons between rules, not as an
@@ -260,6 +284,152 @@ def gate_row(gates, day):
     return out
 
 
+# ---------------------------------------------------------------- v3.4: footprint grid (volume multiplier x range rule)
+HARNESS_VERSION = "v3.4"
+FP_GRID_VOL_MULTS = (1.2, 1.5, 1.8, 2.2)
+FP_GRID_ABS_CAPS_PCT = (0.5, 1.0, 1.5, 2.0)
+FP_GRID_ATR_MULTS = (0.1, 0.2, 0.3, 0.4, 0.6, 0.8)
+FP_GRID_ATR_LEN = 14
+FP_GRID_MIN_PRINTS = 2          # same meaning as the scanner's FP_MIN_PRINTS: ">=2 prints in the window"
+FP_GRID_MAX_VALUES = 12         # per dimension; keeps the CSV and the summary table readable
+DEFAULT_FP_GRID = {"enabled": True, "vol_mults": FP_GRID_VOL_MULTS, "abs_caps": FP_GRID_ABS_CAPS_PCT,
+                   "atr_mults": FP_GRID_ATR_MULTS}
+
+
+def parse_float_list(text, name):
+    """'1.2, 1.5' -> (1.2, 1.5). Positive finite numbers only, duplicates dropped, order kept. '' -> () (dimension switched off).
+    Raises ValueError with a readable message otherwise."""
+    out = []
+    for part in str(text if text is not None else "").replace(";", ",").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            v = float(part)
+        except ValueError:
+            raise ValueError(f"{name}: '{part}' is not a number")
+        if not np.isfinite(v) or v <= 0:
+            raise ValueError(f"{name}: {part} must be a positive finite number")
+        if v not in out:
+            out.append(v)
+    if len(out) > FP_GRID_MAX_VALUES:
+        raise ValueError(f"{name}: at most {FP_GRID_MAX_VALUES} values (got {len(out)})")
+    return tuple(out)
+
+
+def _code(x):
+    """Column code of a grid value: tenths when it is a multiple of 0.1 (1.5 -> '15', 0.3 -> '03', 2.0 -> '20'), else 0p-style."""
+    t = float(x) * 10.0
+    if abs(t - round(t)) < 1e-9 and round(t) >= 1:
+        return f"{int(round(t)):02d}"
+    return f"{float(x):g}".replace(".", "p")
+
+
+def fp_grid_specs(cfg, default_vol):
+    """Ordered (column, volume multiplier, kind, value) for every grid column; kind in abs | atr | any."""
+    specs = []
+    for k in cfg.get("atr_mults", ()):
+        specs.append((f"fp_prints_atr_{_code(k)}", float(default_vol), "atr", float(k)))
+    for vm in cfg.get("vol_mults", ()):
+        for cap in cfg.get("abs_caps", ()):
+            specs.append((f"fp_grid_v{_code(vm)}_abs{_code(cap)}", float(vm), "abs", float(cap)))
+        for k in cfg.get("atr_mults", ()):
+            specs.append((f"fp_grid_v{_code(vm)}_atr{_code(k)}", float(vm), "atr", float(k)))
+        specs.append((f"fp_grid_v{_code(vm)}_any", float(vm), "any", None))
+    names = [sp[0] for sp in specs]
+    if len(set(names)) != len(names):
+        raise ValueError("footprint grid: two settings map to the same column name - use values that differ by at least 0.1")
+    return specs
+
+
+def footprint_grid_frame(df, cfg=None, default_vol=1.5, window=10, lookback=20, atr_len=FP_GRID_ATR_LEN):
+    """Vectorised, causal print counts for every grid cell. Same index as `df`; float columns (NaN = not known).
+
+    Definition (same as the scanner's footprint, see the module docstring): a bar is a print when it is a valid bar (finite OHLCV,
+    close > 0, high > low), volume >= vol_mult * mean(volume of the `lookback` bars BEFORE it), it closes at/above its open, and
+    it passes the range rule. The count is the rolling sum over `window` bars; NaN until the whole window has a full baseline
+    (for the ATR cells also a full ATR14 of prior bars)."""
+    cfg = DEFAULT_FP_GRID if cfg is None else cfg
+    specs = fp_grid_specs(cfg, default_vol)
+    if len(df) == 0 or not specs:
+        return pd.DataFrame(index=df.index, columns=[sp[0] for sp in specs], dtype=float)
+    window, lookback = max(2, int(window)), max(2, int(lookback))
+
+    def num(key):
+        return pd.to_numeric(df[key], errors="coerce").replace([np.inf, -np.inf], np.nan)
+
+    o, h, lo, c, v = (num(k) for k in ("open", "high", "low", "close", "volume"))
+    base = v.shift(1).rolling(lookback, min_periods=lookback).mean()           # prior-bars volume baseline (bar excluded)
+    base_ok = base.notna() & (base > 0)
+    bar_ok = o.notna() & h.notna() & lo.notna() & c.notna() & v.notna() & (c > 0) & (v >= 0) & (h > lo)
+    rng = h - lo
+    rng_frac = rng / c.where(c > 0)
+    tr = pd.concat([rng, (h - c.shift()).abs(), (lo - c.shift()).abs()], axis=1).max(axis=1)
+    atr_prev = tr.rolling(atr_len, min_periods=atr_len).mean().shift(1)         # ATR14 of the bars BEFORE the print bar
+    atr_ok = atr_prev.notna() & (atr_prev > 0)
+    full_vol = base_ok.astype(float).rolling(window, min_periods=window).min().eq(1.0)
+    full_atr = (base_ok & atr_ok).astype(float).rolling(window, min_periods=window).min().eq(1.0)
+    up = c >= o
+    spikes = {}
+
+    def spike(vm):
+        if vm not in spikes:
+            spikes[vm] = bar_ok & base_ok & up & (v >= vm * base)
+        return spikes[vm]
+
+    def count(flag, full):
+        return flag.astype(float).rolling(window, min_periods=window).sum().where(full)
+
+    out = {}
+    for name, vm, kind, val in specs:
+        sp = spike(vm)
+        if kind == "abs":
+            out[name] = count(sp & (rng_frac <= val / 100.0), full_vol)
+        elif kind == "atr":
+            out[name] = count(sp & atr_ok & (rng <= val * atr_prev), full_atr)
+        else:
+            out[name] = count(sp, full_vol)
+    return pd.DataFrame(out, index=df.index)
+
+
+class FootprintGrid:
+    """Per-ticker grid with O(1) lookup of one signal day as plain ints (None = not known)."""
+
+    def __init__(self, frame):
+        self.columns = list(frame.columns)
+        self.values = frame.to_numpy(dtype=float)
+        self.pos = {ts: i for i, ts in enumerate(frame.index)}
+
+    def row(self, day):
+        i = self.pos.get(day)
+        if i is None:
+            return {c: None for c in self.columns}
+        vals = self.values[i]
+        return {c: (int(round(x)) if np.isfinite(x) else None) for c, x in zip(self.columns, vals)}
+
+
+def footprint_grid(m, df, cfg=None):
+    """One grid per ticker (None when switched off or when anything goes wrong - a research column must never stop the run)."""
+    cfg = DEFAULT_FP_GRID if cfg is None else cfg
+    if not cfg.get("enabled", True):
+        return None
+    try:
+        return FootprintGrid(footprint_grid_frame(df, cfg, default_vol=float(getattr(m, "SM_SPIKE_MULT", 1.5)),
+                                                  window=int(getattr(m, "FP_WINDOW", 10)),
+                                                  lookback=int(getattr(m, "VOLUME_AVG_LOOKBACK", 20))))
+    except Exception as exc:
+        print(f"footprint grid failed ({type(exc).__name__}: {exc}) - grid columns skipped for this ticker")
+        return None
+
+
+def finalize_grid_columns(res):
+    """Grid counts are small integers: write them as nullable Int8 ('0', '1', ... or empty) instead of '0.0'. In place."""
+    for col in res.columns:
+        if col.startswith("fp_grid_") or col.startswith("fp_prints_atr_"):
+            res[col] = pd.to_numeric(res[col], errors="coerce").round().astype("Int8")
+    return res
+
+
 def path_rows(df, feats, i, symbol, day, pattern):
     """Forward bars i+1..i+PATH_BARS; indicator values at bar k use data up to bar k only."""
     out = []
@@ -309,12 +479,14 @@ def feature_row(f, day, alert):
 
 
 # ---------------------------------------------------------------- core loop
-def scan_history(m, symbol, df, spy, pit, start, end, horizons=(5, 10, 20), min_bars=260, window_bars=320, paths=None):
+def scan_history(m, symbol, df, spy, pit, start, end, horizons=(5, 10, 20), min_bars=260, window_bars=320, paths=None,
+                 grid_cfg=None):
     cfg = m._make_v9_pattern_config()
     rows = []
     dates = df.index
     feats = compute_features(df, spy)
     gates = gate_features(m, df)
+    grid = footprint_grid(m, df, grid_cfg)                  # v3.4: volume x range-rule matrix, once per ticker
     for i in range(min_bars, len(df) - 1):
         day = dates[i]
         if day < pd.Timestamp(start) or day > pd.Timestamp(end):
@@ -377,6 +549,8 @@ def scan_history(m, symbol, df, spy, pit, start, end, horizons=(5, 10, 20), min_
             row.update({"rs_legacy": rs_legacy, "rs_swing": rs_swing, "rs_swing_decay_pts": rs_decay_pts,
                         "rs_line_vs_ema_pct": rs_line_pct})
             row.update(gate_row(gates, day))
+            if grid is not None:
+                row.update(grid.row(day))
             row.update(metric_row(quality))
             risk_flags = quality.get("risk_flags") or []
             row.update({"rank_penalty": quality.get("rank_penalty"), "rank_bonus": quality.get("rank_bonus"),
@@ -418,6 +592,7 @@ def summarize(res):
         print("\nBy number of entry blockers:\n", table("blockers_bucket").to_string())
         gate_tables(ep, r20)
         footprint_tables(ep, r20)
+        footprint_grid_tables(ep, r20)
         single = ep[ep["n_blockers"] == 1].copy()
         if not single.empty:
             single["only_blocker"] = single["blockers"].str.replace(r"\s*\(.*?\)", "", regex=True)
@@ -486,20 +661,164 @@ def footprint_tables(ep, r20):
         print(f"footprint tables skipped ({type(exc).__name__}: {exc})")
 
 
+def _decode_code(code):
+    return float(code.replace("p", ".")) if "p" in code else int(code) / 10.0
+
+
+def _grid_label(name):
+    """fp_grid_v15_abs05 -> (1.5, 'cap 0.5%'); fp_grid_v22_atr03 -> (2.2, '0.3x ATR14'); fp_grid_v12_any -> (1.2, 'no range cap')."""
+    import re
+    mt = re.match(r"^fp_grid_v([0-9p]+)_(abs|atr)([0-9p]+)$", name)
+    if mt:
+        val = _decode_code(mt.group(3))
+        return _decode_code(mt.group(1)), (f"cap {val:g}%" if mt.group(2) == "abs" else f"{val:g}x ATR14")
+    mt = re.match(r"^fp_grid_v([0-9p]+)_any$", name)
+    if mt:
+        return _decode_code(mt.group(1)), "no range cap"
+    return float("nan"), name
+
+
+def footprint_grid_tables(ep, r20):
+    """v3.4: one row per grid cell (volume multiplier x range rule): how often >=1 / >=2 prints occur in the last 10 sessions and
+    what the episodes with >=2 prints did compared with all other episodes of the same cell. Mean Rc = R clipped to [-3, 5].
+    Cells with only a handful of >=2 episodes cannot be judged - n is printed for exactly that reason. Never raises."""
+    try:
+        cells = [c for c in ep.columns if c.startswith("fp_grid_")]
+        if not cells:
+            return
+        d = ep.copy()
+        d[r20] = pd.to_numeric(d[r20], errors="coerce")
+        d["_rc"] = d[r20].clip(-3.0, 5.0)
+        d["_ret"] = pd.to_numeric(d["horizon_return_pct_20d"], errors="coerce") if "horizon_return_pct_20d" in d else np.nan
+        has_cmf = "fp_cmf_exp" in d
+        if has_cmf:
+            d["_cmf"] = pd.to_numeric(d["fp_cmf_exp"], errors="coerce")
+        need = FP_GRID_MIN_PRINTS
+        rows = []
+        for col in cells:
+            x = pd.to_numeric(d[col], errors="coerce").astype("float64")
+            known = x.notna()
+            if not known.any():
+                continue
+            vol, rule = _grid_label(col)
+            hit = known & (x >= need)
+            sub = d[hit & d[r20].notna()]
+            rest = d[known & ~hit & d[r20].notna()]
+            row = {"cell": col.replace("fp_grid_", ""), "vol_x": vol, "range_rule": rule, "known": int(known.sum()),
+                   "n>=1": int((known & (x >= 1)).sum()), "%>=1": round(100.0 * float((x[known] >= 1).mean()), 2),
+                   f"n>={need}": int(hit.sum()), f"%>={need}": round(100.0 * float((x[known] >= need).mean()), 2),
+                   "win_%": round(100.0 * float((sub[r20] > 0).mean()), 1) if len(sub) else np.nan,
+                   "win_%_rest": round(100.0 * float((rest[r20] > 0).mean()), 1) if len(rest) else np.nan,
+                   "Rc": round(float(sub["_rc"].mean()), 3) if len(sub) else np.nan,
+                   "Rc_rest": round(float(rest["_rc"].mean()), 3) if len(rest) else np.nan,
+                   "ret_20d_%": round(float(sub["_ret"].mean()), 2) if len(sub) else np.nan}
+            if has_cmf:
+                acc = sub[sub["_cmf"] == 1.0]
+                row.update({"n_accel": int(len(acc)),
+                            "win_%_accel": round(100.0 * float((acc[r20] > 0).mean()), 1) if len(acc) else np.nan,
+                            "Rc_accel": round(float(acc["_rc"].mean()), 3) if len(acc) else np.nan})
+            rows.append(row)
+        if not rows:
+            return
+        table = pd.DataFrame(rows).set_index("cell")
+        print(f"\nFootprint grid (episodes; a cell = volume multiplier x range rule; prints counted over the last 10 sessions;\n"
+              f"win_% / Rc / ret_20d_% are for episodes with >={need} prints, *_rest for all other episodes of the same cell; "
+              f"n_accel = those with CMF expansion):")
+        print(table.to_string())
+        print("Read n>=%d first: a cell with fewer than ~100 such episodes cannot show an edge of a few points either way." % need)
+    except Exception as exc:
+        print(f"footprint grid tables skipped ({type(exc).__name__}: {exc})")
+
+
 LEARN_FEATURE_COLUMNS = {"rs_score": "rs_score", "rs_swing_score": "rs_swing", "breakout_pct": "breakout_pct",
                          "median_dv20": "median_dv20", "close_position": "close_position", "fp_score": "fp_score"}
+LEARN_RESULT_COLUMNS = ("signal_date", "ticker", "pattern", "entry_quality", "evaluation_status", "bracket_result_20d",
+                        "bracket_net_r_20d")
+
+
+def sklearn_available():
+    """(True, version) when scikit-learn imports, else (False, reason). Catches every Exception, not only ImportError: a broken
+    binary install (for example a numpy ABI mismatch) raises ValueError / AttributeError / OSError instead."""
+    try:
+        import sklearn
+        from sklearn.tree import DecisionTreeClassifier  # noqa: F401
+        return True, str(getattr(sklearn, "__version__", "?"))
+    except Exception as exc:
+        return False, f"{type(exc).__name__}: {exc}"
+
+
+def _learn_warning(reason):
+    print("\n=== Learner replay on backtest rows (research only) ===")
+    print(f"WARNING: scikit-learn is not usable in this environment ({reason}).")
+    print("         The decision-tree learner replay is SKIPPED - this is not a failure of the backtest itself, the CSV is complete.")
+    print("         To enable it add scikit-learn to the pip install step of the workflow (pip install scikit-learn).")
+    print("         Showing a descriptive, pandas-only fallback below (no tree, no threshold proposal).")
+
+
+def learn_descriptive(res, target=2.5):
+    """pandas-only stand-in for the tree: for every learner feature, outcome by quintile of the feature (one row per episode,
+    COMPLETE outcomes, AMBIGUOUS_BOTH excluded). Descriptive only - it proposes nothing. Never raises."""
+    try:
+        r20 = "bracket_net_r_20d"
+        d = res.copy()
+        d["_dt"] = pd.to_datetime(d["signal_date"])
+        d = d.sort_values(["ticker", "pattern", "_dt"])
+        gap = d.groupby(["ticker", "pattern"])["_dt"].diff().dt.days
+        ep = d[gap.isna() | (gap > 14)].copy()
+        if "evaluation_status" in ep:
+            ep = ep[ep["evaluation_status"] == "COMPLETE"]
+        if "bracket_result_20d" in ep:
+            ep = ep[ep["bracket_result_20d"].astype(str) != "AMBIGUOUS_BOTH"]
+        ep = ep.copy()
+        ep[r20] = pd.to_numeric(ep[r20], errors="coerce")
+        ep = ep[ep[r20].notna()].copy()
+        if len(ep) < 50:
+            print(f"Descriptive fallback: only {len(ep)} complete episodes - not enough for quintile tables.")
+            return
+        ep["_rc"] = ep[r20].clip(-3.0, 5.0)
+        print(f"Descriptive fallback on {len(ep)} episodes: base win {100 * (ep[r20] > 0).mean():.1f}% | mean Rc {ep['_rc'].mean():+.3f} | "
+              f"R>={target:g} {100 * (ep[r20] >= target).mean():.1f}%")
+        for feat, col in LEARN_FEATURE_COLUMNS.items():
+            if col not in ep:
+                continue
+            x = pd.to_numeric(ep[col], errors="coerce")
+            ok = x.notna()
+            if ok.sum() < 50 or x[ok].nunique() < 3:
+                continue
+            q = pd.qcut(x[ok], 5, duplicates="drop")
+            g = ep[ok].groupby(q, observed=True)
+            tab = pd.DataFrame({"n": g.size(), "win_%": (g[r20].apply(lambda s: (s > 0).mean()) * 100).round(1),
+                                "mean_Rc": g["_rc"].mean().round(3),
+                                f"R>={target:g}_%": (g[r20].apply(lambda s: (s >= target).mean()) * 100).round(1)})
+            print(f"\nBy {feat} (quintiles of column '{col}'):\n{tab.to_string()}")
+    except Exception as exc:
+        print(f"Descriptive fallback skipped ({type(exc).__name__}: {exc})")
 
 
 def learn_report(res, m):
-    """v3.3: replay run_automated_threshold_learning on the backtest rows (temp folder; the real learned-params file is not
-    touched). Rows are converted to the live evaluations-CSV layout, so the exact same code path runs."""
-    fn = getattr(m, "run_automated_threshold_learning", None)
-    if fn is None or res is None or res.empty:
-        return
+    """v3.3/v3.4: replay run_automated_threshold_learning on the backtest rows (temp folder; the real learned-params file is not
+    touched). Rows are converted to the live evaluations-CSV layout, so the exact same code path runs.
+    v3.4: never raises. Without a usable scikit-learn (or a scanner without the learner, or any failure inside it) it prints a
+    clear WARNING with the reason and falls back to learn_descriptive() instead of a tree."""
     try:
+        if res is None or res.empty:
+            return
+        target = float(getattr(m, "LEARN_TARGET_R", 2.5))
+        ok, info = sklearn_available()
+        if not ok:
+            _learn_warning(info)
+            learn_descriptive(res, target)
+            return
+        fn = getattr(m, "run_automated_threshold_learning", None)
+        if fn is None:
+            print("\n=== Learner replay on backtest rows (research only) ===")
+            print("WARNING: this scanner has no run_automated_threshold_learning (needs v9.7.7 or later) - replay SKIPPED.")
+            learn_descriptive(res, target)
+            return
         import json
         import tempfile
-        d = res.copy()
+        keep = [c for c in LEARN_RESULT_COLUMNS + tuple(LEARN_FEATURE_COLUMNS.values()) if c in res.columns]
+        d = res[keep]                                   # only the columns the learner needs (the full frame has 150+ columns)
         metas = []
         for rec in d.to_dict("records"):
             metrics = {}
@@ -517,9 +836,14 @@ def learn_report(res, m):
             csv_path = os.path.join(tmp, "bt_evaluations.csv")
             frame.to_csv(csv_path, index=False)
             rep = fn(csv_path=csv_path, params_path=os.path.join(tmp, "bt_learned_params.json"), write=True)
+        if (rep or {}).get("status") == "NO_SKLEARN":    # the scanner's own import check disagreed with ours
+            _learn_warning("the scanner reported NO_SKLEARN")
+            learn_descriptive(res, target)
+            return
         data = rep.get("data") or {}
         print("\n=== Learner replay on backtest rows (research only) ===")
-        print(f"status={rep.get('status')} | episodes={data.get('episodes')} | positives(R>={m.LEARN_TARGET_R:g})={data.get('positives')} "
+        print(f"scikit-learn {info}")
+        print(f"status={rep.get('status')} | episodes={data.get('episodes')} | positives(R>={target:g})={data.get('positives')} "
               f"| base rate={data.get('base_rate')} | split={data.get('cut_date')}")
         print(f"features used={data.get('features_used')} | dropped={data.get('features_dropped')}")
         if (rep.get("model") or {}).get("tree_text"):
@@ -530,7 +854,12 @@ def learn_report(res, m):
         print("validation:", rep.get("validation"))
         print("rejection reasons:", rep.get("rejection_reasons"))
     except Exception as exc:
-        print(f"learner replay skipped ({type(exc).__name__}: {exc})")
+        try:
+            print("\n=== Learner replay on backtest rows (research only) ===")
+            print(f"WARNING: learner replay failed and was skipped ({type(exc).__name__}: {exc}). The backtest CSV is unaffected.")
+            learn_descriptive(res, 2.5)
+        except Exception:
+            pass
 
 
 def sample_universe(path, n, seed, min_cap, offset=0):
@@ -574,7 +903,23 @@ def main():
     ap.add_argument("--offset", type=int, default=0, help="skip this many tickers of the shuffled list (disjoint shards)")
     ap.add_argument("--window-bars", type=int, default=0, help="bars of history per signal day (0 = all, the default)")
     ap.add_argument("--paths-out", default="", help="also write the forward price path of every ENTRY_READY signal to this CSV")
+
+    def float_list(name):
+        def conv(text):
+            try:
+                return parse_float_list(text, name)
+            except ValueError as exc:
+                raise argparse.ArgumentTypeError(str(exc))
+        return conv
+    ap.add_argument("--no-fp-grid", action="store_true", help="v3.4: do not compute the footprint grid columns")
+    ap.add_argument("--vol-grid", type=float_list("--vol-grid"), default=FP_GRID_VOL_MULTS,
+                    help="v3.4: volume multipliers of the footprint grid (default 1.2,1.5,1.8,2.2)")
+    ap.add_argument("--abs-caps", type=float_list("--abs-caps"), default=FP_GRID_ABS_CAPS_PCT,
+                    help="v3.4: absolute range caps in percent of the close (default 0.5,1.0,1.5,2.0)")
+    ap.add_argument("--atr-mults", type=float_list("--atr-mults"), default=FP_GRID_ATR_MULTS,
+                    help="v3.4: range caps as multiples of ATR14 (default 0.1,0.2,0.3,0.4,0.6,0.8)")
     args = ap.parse_args()
+    grid_cfg = {"enabled": not args.no_fp_grid, "vol_mults": args.vol_grid, "abs_caps": args.abs_caps, "atr_mults": args.atr_mults}
     run_t0 = time.time()
 
     import yfinance as yf
@@ -593,6 +938,12 @@ def main():
     spy = download("SPY", hist_start, hist_end, yf)
     pit = PointInTimeSPY(spy)
     patch(m, pit)
+    if grid_cfg["enabled"]:
+        fp_grid_specs(grid_cfg, float(getattr(m, "SM_SPIKE_MULT", 1.5)))      # fail fast on colliding settings, before any download
+        print(f"Harness scanner_backtest {HARNESS_VERSION} | footprint grid: volume x{','.join(f'{x:g}' for x in grid_cfg['vol_mults'])} | "
+              f"abs caps {','.join(f'{x:g}' for x in grid_cfg['abs_caps'])}% | ATR14 mults {','.join(f'{x:g}' for x in grid_cfg['atr_mults'])}")
+    else:
+        print(f"Harness scanner_backtest {HARNESS_VERSION} | footprint grid: off")
 
     rows = []
     paths = [] if args.paths_out else None
@@ -602,17 +953,20 @@ def main():
         if df is None or len(df) < 300:
             print(f"[{k}/{len(symbols)}] {sym}: not enough data")
             continue
-        got = scan_history(m, sym, df, spy, pit, args.start, args.end, window_bars=args.window_bars, paths=paths)
+        got = scan_history(m, sym, df, spy, pit, args.start, args.end, window_bars=args.window_bars, paths=paths,
+                           grid_cfg=grid_cfg)
         rows.extend(got)
         print(f"[{k}/{len(symbols)}] {sym}: {len(got)} candidate-days in {time.time() - t0:.0f}s")
     res = pd.DataFrame(rows)
+    if not res.empty:
+        finalize_grid_columns(res)
     res.to_csv(args.out, index=False)
     if paths is not None:
         pd.DataFrame(paths).to_csv(args.paths_out, index=False)
         print(f"Saved {len(paths)} forward-path rows -> {args.paths_out}")
     print(f"\nSaved {len(res)} rows -> {args.out} | scanner {getattr(m, 'CODE_VERSION', '?')} | total {time.time() - run_t0:.0f}s")
     summarize(res)
-    learn_report(res, m)
+    learn_report(res, m)                      # never raises (v3.4): without scikit-learn it prints a WARNING and a descriptive fallback
 
 
 if __name__ == "__main__":
