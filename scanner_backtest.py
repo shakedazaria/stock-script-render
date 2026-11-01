@@ -35,6 +35,22 @@ RS line vs its EMA21, 10-day RS-line slope), point-in-time weekly context comput
 daily bars (true 30-week MA and weekly EMA10 including the current partial week, no look-ahead)
 and volume in the saved paths (for candle + volume-climax exit tests).
 
+v3.2 (2026-10-31): for scanner v9.7.6. Exports the point-in-time columns of the two layers the v9.7.5 backtest could
+not validate: median_dv20 / mean_dv20 / top_day_share20 (20 sessions BEFORE the signal bar, so the $15M median test can
+be replayed), liq_ok / liq_gate_ok, and the smart-money columns (sm_acc_days, sm_dist_days, sm_seq, sm_cmf, sm_cmf_delta,
+sm_cmf_exp, sm_bull_div, sm_bear_div, sm_bump). They come from the scanner's own gate_feature_frame(), computed ONCE per
+ticker (every value at day t uses bars <= t only - checked by the scanner's tests). It also exports the RS rank penalty the
+scanner applied (rank_penalty / rank_bonus / risk_flags) and the scanner's own RS-line measure (rs_line_vs_ema_pct).
+RS note: with scanner >= v9.7.6 and RS_MODE=swing the gate-facing rs_score is the LEGACY score, the swing score is
+rs_swing_score; with v9.7.5 rs_score itself was the swing score - the harness reads whichever exists.
+
+v3.3 (2026-10-31): for scanner v9.7.7. Exports the institutional-footprint columns (fp_prints, fp_cmf_delta, fp_cmf_exp,
+fp_accel, fp_score, fp_bonus and fp_prints_wide = prints counted with a 1.5% range cap instead of 0.5%) from the scanner's
+gate_feature_frame(), plus close_position and breakout_pct of the signal bar (the scanner's own entry metrics). It prints
+footprint tables (how often a print / an acceleration occurs, and outcome by prints) and finally replays the scanner's weekly
+learner (run_automated_threshold_learning) on the backtest rows, into a temp folder - your scanner_learned_params.json is
+not touched - so the learning rules can be judged on years of data before the live CSV has enough rows.
+
 Usage (in your own environment, where yfinance is installed):
   python scanner_backtest.py --scanner stock_scanner_unified.py \
       --tickers AAPL,MSFT,NVDA --start 2023-01-01 --end 2026-09-30 --out bt.csv
@@ -150,6 +166,8 @@ def patch(m, pit, reuse_indicators=True):
     m.get_market_regime = lambda: pit.regime(m.REGIME_MA_PERIOD)
     m._regime_cache = None
     m.log = lambda msg: None  # keep the console readable
+    if hasattr(m, "GATE_SHADOW_METRICS"):
+        m.GATE_SHADOW_METRICS = False   # v9.7.6+: liquidity / smart-money columns come from gate_feature_frame (once per ticker)
 
 
 # ---------------------------------------------------------------- point-in-time features
@@ -202,6 +220,44 @@ def compute_features(df, spy=None):
 
 
 PATH_BARS = 25
+
+GATE_COLUMNS = ("median_dv20", "mean_dv20", "top_day_share20", "liq_ok", "liq_gate_ok", "sm_acc_days", "sm_dist_days",
+                "sm_seq", "sm_cmf", "sm_cmf_delta", "sm_cmf_exp", "sm_bull_div", "sm_bear_div", "sm_bump",
+                "fp_prints", "fp_cmf_delta", "fp_cmf_exp", "fp_accel", "fp_score", "fp_bonus", "fp_prints_wide")
+
+
+def gate_features(m, df):
+    """v3.2: one gate_feature_frame() per ticker (scanner >= v9.7.6); None when the scanner does not have it."""
+    fn = getattr(m, "gate_feature_frame", None)
+    if fn is None:
+        return None
+    try:
+        return fn(df)
+    except Exception as exc:                      # a research column must never stop the run
+        print(f"gate_feature_frame failed ({type(exc).__name__}) - gate columns skipped for this ticker")
+        return None
+
+
+def metric_row(quality):
+    """v3.3: the two entry metrics the learner uses that are not in the gate frame (the scanner computes them per candidate)."""
+    mt = (quality or {}).get("metrics") or {}
+    out = {}
+    for k in ("close_position", "breakout_pct"):
+        v = mt.get(k)
+        out[k] = round(float(v), 6) if v is not None and np.isfinite(float(v)) else None
+    return out
+
+
+def gate_row(gates, day):
+    """Gate columns at the signal date as plain floats (None when missing)."""
+    out = {c: None for c in GATE_COLUMNS}
+    if gates is None or day not in gates.index:
+        return out
+    r = gates.loc[day]
+    for c in GATE_COLUMNS:
+        if c in r.index and pd.notna(r[c]):
+            out[c] = round(float(r[c]), 6)
+    return out
 
 
 def path_rows(df, feats, i, symbol, day, pattern):
@@ -258,6 +314,7 @@ def scan_history(m, symbol, df, spy, pit, start, end, horizons=(5, 10, 20), min_
     rows = []
     dates = df.index
     feats = compute_features(df, spy)
+    gates = gate_features(m, df)
     for i in range(min_bars, len(df) - 1):
         day = dates[i]
         if day < pd.Timestamp(start) or day > pd.Timestamp(end):
@@ -271,7 +328,7 @@ def scan_history(m, symbol, df, spy, pit, start, end, horizons=(5, 10, 20), min_
         pit.set_date(day)
         regime = pit.regime(m.REGIME_MA_PERIOD)
         rs = m.compute_rs_score(symbol, hist).get("rs_score")
-        rs_legacy = rs_swing = rs_decay_pts = None
+        rs_legacy = rs_swing = rs_decay_pts = rs_line_pct = None
         if hasattr(m, "RS_MODE"):                         # v9.7.5+: score the same bar both ways (gate keeps running mode)
             keep_mode = m.RS_MODE
             try:
@@ -279,7 +336,9 @@ def scan_history(m, symbol, df, spy, pit, start, end, horizons=(5, 10, 20), min_
                 rs_legacy = m.compute_rs_score(symbol, hist).get("rs_score")
                 m.RS_MODE = "swing"
                 sw = m.compute_rs_score(symbol, hist)
-                rs_swing, rs_decay_pts = sw.get("rs_score"), sw.get("rs_decay_1m_vs_3m")
+                # v9.7.6: in "swing" the gate score stays legacy and the swing score is rs_swing_score; v9.7.5: rs_score was the swing score
+                rs_swing = sw.get("rs_swing_score", sw.get("rs_score"))
+                rs_decay_pts, rs_line_pct = sw.get("rs_decay_1m_vs_3m"), sw.get("rs_line_vs_ema_pct")
             finally:
                 m.RS_MODE = keep_mode
         cands = m.find_v9_pattern_candidates(symbol, hist, rs_score=rs, market_regime=regime["regime"],
@@ -315,7 +374,13 @@ def scan_history(m, symbol, df, spy, pit, start, end, horizons=(5, 10, 20), min_
                    "regime": regime["regime"], "rs_score": rs, "planned_entry": obs["planned_entry"],
                    "stop": obs["stop"], "target": obs["target"], "rr": alert.get("rr_ratio")}
             row.update(feature_row(feats, day, alert))
-            row.update({"rs_legacy": rs_legacy, "rs_swing": rs_swing, "rs_swing_decay_pts": rs_decay_pts})
+            row.update({"rs_legacy": rs_legacy, "rs_swing": rs_swing, "rs_swing_decay_pts": rs_decay_pts,
+                        "rs_line_vs_ema_pct": rs_line_pct})
+            row.update(gate_row(gates, day))
+            row.update(metric_row(quality))
+            risk_flags = quality.get("risk_flags") or []
+            row.update({"rank_penalty": quality.get("rank_penalty"), "rank_bonus": quality.get("rank_bonus"),
+                        "risk_flags": " | ".join(risk_flags) if isinstance(risk_flags, (list, tuple)) else None})
             row.update({k: v for k, v in outcome.items() if not isinstance(v, (list, dict))})
             rows.append(row)
             if paths is not None and row["entry_ready"]:
@@ -351,10 +416,121 @@ def summarize(res):
         print("\nBy EMA28 filter verdict:\n", table("ema28_ok").to_string())
         ep["blockers_bucket"] = pd.cut(ep["n_blockers"], [-1, 0, 1, 2, 4, 99], labels=["0", "1", "2", "3-4", "5+"])
         print("\nBy number of entry blockers:\n", table("blockers_bucket").to_string())
+        gate_tables(ep, r20)
+        footprint_tables(ep, r20)
         single = ep[ep["n_blockers"] == 1].copy()
         if not single.empty:
             single["only_blocker"] = single["blockers"].str.replace(r"\s*\(.*?\)", "", regex=True)
             print("\nWhen a gate was the ONLY blocker:\n", table_single(single, r20).to_string())
+
+
+def gate_tables(ep, r20):
+    """v3.2: outcome by the new columns. Printed only for columns that exist; never raises."""
+    try:
+        d = ep.dropna(subset=[r20]).copy()
+        if d.empty:
+            return
+        def tab(col):
+            g = d.dropna(subset=[col]).groupby(col, observed=True)[r20]
+            return pd.DataFrame({"n": g.size(), "mean_R_20d": g.mean().round(3),
+                                 "win_%": (g.apply(lambda s: (s > 0).mean()) * 100).round(1)})
+        if "median_dv20" in d and d["median_dv20"].notna().any():
+            d["median_dv20_bucket"] = pd.cut(d["median_dv20"], [0, 5e6, 15e6, 50e6, 200e6, float("inf")],
+                                             labels=["<5M", "5-15M", "15-50M", "50-200M", ">200M"])
+            print("\nBy median dollar volume (20 sessions before the signal):\n", tab("median_dv20_bucket").to_string())
+            print("\nBy liquidity gate (median>=15M, price>=5):\n", tab("liq_gate_ok").to_string())
+        if "sm_bump" in d and d["sm_bump"].notna().any():
+            d["sm_bump_bucket"] = pd.cut(d["sm_bump"], [-99, -0.01, 0.01, 4.99, 99], labels=["<0", "0", "1-4", ">=5"])
+            print("\nBy smart-money bump:\n", tab("sm_bump_bucket").to_string())
+        if "rank_penalty" in d and d["rank_penalty"].notna().any():
+            d["rank_penalty_on"] = d["rank_penalty"].astype(float) > 0
+            print("\nBy RS rank penalty applied:\n", tab("rank_penalty_on").to_string())
+    except Exception as exc:
+        print(f"gate tables skipped ({type(exc).__name__}: {exc})")
+
+
+def footprint_tables(ep, r20):
+    """v3.3: how often the footprint fires and what happened afterwards. Reports win-rate, mean R AND mean 20d return,
+    because R is confounded by stop width (a tight stop inflates R without a better trade). Never raises."""
+    try:
+        d = ep.copy()
+        if "fp_prints" not in d or not d["fp_prints"].notna().any():
+            return
+        for c in ("fp_prints", "fp_accel", "fp_score", "fp_prints_wide", "horizon_return_pct_20d"):
+            if c in d:
+                d[c] = pd.to_numeric(d[c], errors="coerce")
+        known = d["fp_prints"].notna()
+        print(f"\nFootprint frequency on {int(known.sum())} episodes with a full window: "
+              f">=1 print {(d.loc[known, 'fp_prints'] >= 1).mean():.1%} | >=2 prints {(d.loc[known, 'fp_prints'] >= 2).mean():.1%} | "
+              f"acceleration (>=2 prints + CMF expansion) {d.loc[known, 'fp_accel'].mean():.1%}")
+        if "fp_prints_wide" in d and d["fp_prints_wide"].notna().any():
+            kw = d["fp_prints_wide"].notna()
+            print(f"  with the looser 1.5% range cap: >=1 print {(d.loc[kw, 'fp_prints_wide'] >= 1).mean():.1%} | >=2 prints {(d.loc[kw, 'fp_prints_wide'] >= 2).mean():.1%}")
+        dd = d.dropna(subset=[r20, "fp_prints"]).copy()
+        if dd.empty:
+            return
+        dd[r20] = pd.to_numeric(dd[r20], errors="coerce")
+        dd["prints_bucket"] = pd.cut(dd["fp_prints"], [-1, 0, 1, 2, 99], labels=["0", "1", "2", "3+"])
+        def tab(col):
+            g = dd.groupby(col, observed=True)
+            return pd.DataFrame({"n": g.size(), "win_%": (g[r20].apply(lambda s: (s > 0).mean()) * 100).round(1),
+                                 "mean_R_20d": g[r20].mean().round(3), "ret_20d_%": g["horizon_return_pct_20d"].mean().round(2),
+                                 f"R>={2.5:g}_%": (g[r20].apply(lambda s: (s >= 2.5).mean()) * 100).round(1)})
+        print("\nBy footprint prints in the last 10 sessions:\n", tab("prints_bucket").to_string())
+        if dd["fp_accel"].notna().any():
+            print("\nBy smart-money acceleration (prints>=2 and CMF expansion):\n", tab("fp_accel").to_string())
+        if dd["fp_score"].notna().any():
+            dd["fp_score_bucket"] = pd.cut(dd["fp_score"], [-1, 0.001, 25, 50, 75, 100], labels=["0", "0-25", "25-50", "50-75", "75-100"])
+            print("\nBy footprint score:\n", tab("fp_score_bucket").to_string())
+    except Exception as exc:
+        print(f"footprint tables skipped ({type(exc).__name__}: {exc})")
+
+
+LEARN_FEATURE_COLUMNS = {"rs_score": "rs_score", "rs_swing_score": "rs_swing", "breakout_pct": "breakout_pct",
+                         "median_dv20": "median_dv20", "close_position": "close_position", "fp_score": "fp_score"}
+
+
+def learn_report(res, m):
+    """v3.3: replay run_automated_threshold_learning on the backtest rows (temp folder; the real learned-params file is not
+    touched). Rows are converted to the live evaluations-CSV layout, so the exact same code path runs."""
+    fn = getattr(m, "run_automated_threshold_learning", None)
+    if fn is None or res is None or res.empty:
+        return
+    try:
+        import json
+        import tempfile
+        d = res.copy()
+        metas = []
+        for rec in d.to_dict("records"):
+            metrics = {}
+            for feat, col in LEARN_FEATURE_COLUMNS.items():
+                v = rec.get(col)
+                if v is not None and isinstance(v, (int, float)) and np.isfinite(v):
+                    metrics[feat] = float(v)
+            metas.append(json.dumps({"entry_diagnostics_v3": {"metrics": metrics}}))
+        frame = pd.DataFrame({"code_version": getattr(m, "CODE_VERSION", ""), "schema_version": 2,
+                              "signal_date": d["signal_date"], "ticker": d["ticker"], "pattern": d["pattern"], "stage": "BACKTEST",
+                              "entry_quality": d.get("entry_quality"), "evaluation_status": d.get("evaluation_status"),
+                              "bracket_result_20d": d.get("bracket_result_20d"), "bracket_net_r_20d": d.get("bracket_net_r_20d"),
+                              "metadata_json": metas})
+        with tempfile.TemporaryDirectory() as tmp:
+            csv_path = os.path.join(tmp, "bt_evaluations.csv")
+            frame.to_csv(csv_path, index=False)
+            rep = fn(csv_path=csv_path, params_path=os.path.join(tmp, "bt_learned_params.json"), write=True)
+        data = rep.get("data") or {}
+        print("\n=== Learner replay on backtest rows (research only) ===")
+        print(f"status={rep.get('status')} | episodes={data.get('episodes')} | positives(R>={m.LEARN_TARGET_R:g})={data.get('positives')} "
+              f"| base rate={data.get('base_rate')} | split={data.get('cut_date')}")
+        print(f"features used={data.get('features_used')} | dropped={data.get('features_dropped')}")
+        if (rep.get("model") or {}).get("tree_text"):
+            print(rep["model"]["tree_text"])
+        print("best leaf:", rep.get("best_leaf"))
+        print("proposed gates:", rep.get("gates"), "| score floor:", rep.get("min_score_floor"))
+        print("ignored constraints:", rep.get("ignored_constraints"))
+        print("validation:", rep.get("validation"))
+        print("rejection reasons:", rep.get("rejection_reasons"))
+    except Exception as exc:
+        print(f"learner replay skipped ({type(exc).__name__}: {exc})")
 
 
 def sample_universe(path, n, seed, min_cap, offset=0):
@@ -436,6 +612,7 @@ def main():
         print(f"Saved {len(paths)} forward-path rows -> {args.paths_out}")
     print(f"\nSaved {len(res)} rows -> {args.out} | scanner {getattr(m, 'CODE_VERSION', '?')} | total {time.time() - run_t0:.0f}s")
     summarize(res)
+    learn_report(res, m)
 
 
 if __name__ == "__main__":
