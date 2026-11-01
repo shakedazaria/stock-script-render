@@ -51,6 +51,12 @@ footprint tables (how often a print / an acceleration occurs, and outcome by pri
 learner (run_automated_threshold_learning) on the backtest rows, into a temp folder - your scanner_learned_params.json is
 not touched - so the learning rules can be judged on years of data before the live CSV has enough rows.
 
+v3.5 (2026-11-01): for scanner v9.7.8. Exports the alpha-boost measurements (ab_cmf_streak, ab_cmf_ok, ab_compress_ratio,
+ab_compress_ref, ab_compress_tight_n, ab_compress_bonus, ab_bonus) from the scanner's gate_feature_frame() - point-in-time, bars <= t
+only - and prints an "Alpha Boost" table: outcome by CMF-rise streak, by number of tight bars before the signal bar, by ab_bonus,
+and the cross-sectional median of ab_compress_ratio (the value to put into AB_COMPRESS_REF_MEDIAN if a fixed universe reference is
+wanted). Nothing else changes; with an older scanner the columns are empty and the table is skipped.
+
 v3.4 (2026-11-01): for scanner v9.7.7 (the scanner file is NOT changed). The v3.3 CSV had no per-bar volume / range series, so
 the footprint could only be judged at two fixed points (0.5% and 1.5% range cap, 1.5x volume). v3.4 re-counts the footprint
 "print" over a research GRID, entirely inside the harness, from the same OHLCV the scanner sees (every value at day t uses bars
@@ -247,7 +253,10 @@ PATH_BARS = 25
 
 GATE_COLUMNS = ("median_dv20", "mean_dv20", "top_day_share20", "liq_ok", "liq_gate_ok", "sm_acc_days", "sm_dist_days",
                 "sm_seq", "sm_cmf", "sm_cmf_delta", "sm_cmf_exp", "sm_bull_div", "sm_bear_div", "sm_bump",
-                "fp_prints", "fp_cmf_delta", "fp_cmf_exp", "fp_accel", "fp_score", "fp_bonus", "fp_prints_wide")
+                "fp_prints", "fp_cmf_delta", "fp_cmf_exp", "fp_accel", "fp_score", "fp_bonus", "fp_prints_wide",
+                # v3.5: scanner >= v9.7.8 alpha-boost measurements (None for an older scanner)
+                "ab_cmf_streak", "ab_cmf_ok", "ab_compress_ratio", "ab_compress_ref", "ab_compress_tight_n", "ab_compress_bonus",
+                "ab_bonus")
 
 
 def gate_features(m, df):
@@ -285,7 +294,7 @@ def gate_row(gates, day):
 
 
 # ---------------------------------------------------------------- v3.4: footprint grid (volume multiplier x range rule)
-HARNESS_VERSION = "v3.4"
+HARNESS_VERSION = "v3.5"
 FP_GRID_VOL_MULTS = (1.2, 1.5, 1.8, 2.2)
 FP_GRID_ABS_CAPS_PCT = (0.5, 1.0, 1.5, 2.0)
 FP_GRID_ATR_MULTS = (0.1, 0.2, 0.3, 0.4, 0.6, 0.8)
@@ -593,6 +602,7 @@ def summarize(res):
         gate_tables(ep, r20)
         footprint_tables(ep, r20)
         footprint_grid_tables(ep, r20)
+        alpha_boost_tables(ep, r20)
         single = ep[ep["n_blockers"] == 1].copy()
         if not single.empty:
             single["only_blocker"] = single["blockers"].str.replace(r"\s*\(.*?\)", "", regex=True)
@@ -676,6 +686,37 @@ def _grid_label(name):
     if mt:
         return _decode_code(mt.group(1)), "no range cap"
     return float("nan"), name
+
+
+def alpha_boost_tables(ep, r20):
+    """v3.5: outcome (win %, mean Rc = R clipped to [-3, 5], mean 20d return) by the v9.7.8 alpha-boost measurements, one row per
+    bucket, plus the cross-sectional median of ab_compress_ratio. Printed only when the columns hold data; never raises."""
+    try:
+        if "ab_bonus" not in ep or pd.to_numeric(ep["ab_bonus"], errors="coerce").notna().sum() == 0:
+            return
+        d = ep.copy()
+        d[r20] = pd.to_numeric(d[r20], errors="coerce")
+        d = d.dropna(subset=[r20])
+        d["_rc"] = d[r20].clip(-3.0, 5.0)
+        d["_ret"] = pd.to_numeric(d["horizon_return_pct_20d"], errors="coerce") if "horizon_return_pct_20d" in d else np.nan
+        d["_win"] = (d[r20] > 0).astype(float)
+
+        def tab(label, key):
+            g = d.assign(_k=key).dropna(subset=["_k"]).groupby("_k", observed=True)
+            t = pd.DataFrame({"n": g.size(), "win_%": (100 * g["_win"].mean()).round(2), "mean_Rc": g["_rc"].mean().round(3),
+                              "ret20_%": g["_ret"].mean().round(3)})
+            print(f"\n  {label}:\n" + t.to_string())
+
+        print("\nAlpha Boost (scanner >= v9.7.8; episodes, point-in-time):")
+        num = lambda c: pd.to_numeric(d[c], errors="coerce") if c in d else pd.Series(np.nan, index=d.index)
+        tab("by CMF rising-streak (sessions)", pd.cut(num("ab_cmf_streak"), [-1, 0, 2, 4, 6, 999], labels=["0", "1-2", "3-4", "5-6", "7+"]))
+        tab("by tight bars among the 5 before the signal bar", num("ab_compress_tight_n"))
+        tab("by ab_bonus (rank points)", pd.cut(num("ab_bonus"), [-1, 0, 2, 4, 6, 8, 10], labels=["0", "0-2", "2-4", "4-6", "6-8", "8-10"]))
+        med = pd.to_numeric(ep["ab_compress_ratio"], errors="coerce").median() if "ab_compress_ratio" in ep else np.nan
+        if np.isfinite(med):
+            print(f"\n  median ab_compress_ratio over all episodes (range / prior ATR14) = {med:.4f}")
+    except Exception as exc:
+        print(f"Alpha Boost table skipped ({type(exc).__name__})")
 
 
 def footprint_grid_tables(ep, r20):
