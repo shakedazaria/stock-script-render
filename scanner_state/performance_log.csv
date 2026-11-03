@@ -15,3 +15,6 @@ date_sent,ticker,pattern,entry,stop,target,score,rr,price_5d,price_10d,price_20d
 2026-10-28,NOV,Darvas Box Breakout,20.55,18.14,26.58,75.5,2.5,,,,,,,False
 2026-10-29,RS,Flat Base / Rectangle Breakout,437.18,396.8,538.14,89.0,2.5,,,,,,,False
 2026-11-01,THG,EMA21/MA50 Pullback Bounce,242.09,226.86,280.16,93.5,2.5,,,,,,,False
+2026-11-03,KO,EMA21/MA50 Pullback Bounce,95.83,90.13,110.09,90.5,2.5,,,,,,,False
+2026-11-03,UBSI,EMA21/MA50 Pullback Bounce,49.31,47.33,54.25,87.1,2.5,,,,,,,False
+2026-11-03,PEBO,Darvas Box Breakout,39.5,36.24,47.66,81.8,2.5,,,,,,,False

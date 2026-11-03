@@ -10,17 +10,6 @@
     ]
   },
   "BIO_EMA21/MA50 Pullback Bounce_66": "2026-10-06T09:11:29.318681",
-  "SCSC": {
-    "time": 1790838585.272034,
-    "patterns": [
-      {
-        "name": "EMA21/MA50 Pullback Bounce",
-        "level": 58.13,
-        "time": 1790838585.272034
-      }
-    ]
-  },
-  "SCSC_EMA21/MA50 Pullback Bounce_66": "2026-10-01T07:09:45.272036",
   "URGN": {
     "time": 1791279013.745708,
     "patterns": [
@@ -75,5 +64,38 @@
       }
     ]
   },
-  "THG_EMA21/MA50 Pullback Bounce_66": "2026-11-01T11:30:24.309432"
+  "THG_EMA21/MA50 Pullback Bounce_66": "2026-11-01T11:30:24.309432",
+  "KO": {
+    "time": 1793706691.33646,
+    "patterns": [
+      {
+        "name": "EMA21/MA50 Pullback Bounce",
+        "level": 95.83,
+        "time": 1793706691.33646
+      }
+    ]
+  },
+  "KO_EMA21/MA50 Pullback Bounce_66": "2026-11-03T11:51:31.336462",
+  "UBSI": {
+    "time": 1793706691.362686,
+    "patterns": [
+      {
+        "name": "EMA21/MA50 Pullback Bounce",
+        "level": 49.31,
+        "time": 1793706691.362686
+      }
+    ]
+  },
+  "UBSI_EMA21/MA50 Pullback Bounce_66": "2026-11-03T11:51:31.362691",
+  "PEBO": {
+    "time": 1793706691.388515,
+    "patterns": [
+      {
+        "name": "Darvas Box Breakout",
+        "level": 39.5,
+        "time": 1793706691.388515
+      }
+    ]
+  },
+  "PEBO_Darvas Box Breakout_66": "2026-11-03T11:51:31.388520"
 }
