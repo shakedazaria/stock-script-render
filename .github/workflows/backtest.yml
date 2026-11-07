@@ -79,5 +79,8 @@ jobs:
             bt_results.csv
             bt_paths.csv
             bt_summary.txt
+            bt_results_null.csv
+            bt_results_null_by_date.csv
+            bt_results_null_table.csv
           retention-days: 7
           if-no-files-found: ignore
