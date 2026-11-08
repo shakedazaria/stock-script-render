@@ -3269,39 +3269,43 @@
       "daily_reversal_uses_closed_candles_only": true
     },
     "exit_intelligence": {
-      "status": "HOLD",
-      "score": 0.0,
-      "signals": [],
-      "categories": [],
+      "status": "EXIT",
+      "score": 35.0,
+      "signals": [
+        "\u05e1\u05d2\u05d9\u05e8\u05d4 \u05de\u05ea\u05d7\u05ea EMA10 (417.00 < 428.36)",
+        "\u05e1\u05d2\u05d9\u05e8\u05d4 \u05de\u05ea\u05d7\u05ea EMA21 (417.00 < 422.36)"
+      ],
+      "categories": [
+        "price"
+      ],
       "profit_protection_active": true,
       "profit_exit_floor": 437.18,
       "max_profit_pct": 4.06,
-      "closed_bar_date": "2026-11-04",
+      "closed_bar_date": "2026-11-06",
       "target_reached": false,
-      "exit_confirmed": false,
-      "exit_reason": null,
+      "exit_confirmed": true,
+      "exit_reason": "Profit Protection \u05e0\u05e9\u05d1\u05e8 \u05d1\u05e1\u05d2\u05d9\u05e8\u05d4 (417.00 \u2264 437.18)",
       "max_r": 0.44,
-      "r_now": 0.12,
+      "r_now": -0.5,
       "activation_pct": 4.0,
       "momentum_expanded": false,
-      "trail_ema": 434.6211,
-      "closes_below_trail": 0,
       "earnings_exit": {
         "triggered": false,
         "kind": "none",
         "note": "status=stale_past_only"
       }
     },
-    "closed": false,
-    "close_reason": null,
-    "close_price": null,
-    "close_date": null,
-    "pnl_pct": null,
+    "closed": true,
+    "close_reason": "\ud83d\udd04 \u05e9\u05d9\u05e0\u05d5\u05d9 \u05db\u05d9\u05d5\u05d5\u05df \u05de\u05d0\u05d5\u05e9\u05e8 \u2014 Profit Protection \u05e0\u05e9\u05d1\u05e8 \u05d1\u05e1\u05d2\u05d9\u05e8\u05d4 (417.00 \u2264 437.18)",
+    "close_price": 417.0,
+    "close_date": "2026-11-08",
+    "pnl_pct": -4.62,
     "data_status": "ok",
-    "last_tracker_price": 441.95001220703125,
-    "last_tracker_date": "2026-11-05",
+    "last_tracker_price": 417.0,
+    "last_tracker_date": "2026-11-08",
     "soft_warnings": [],
-    "momentum_expanded": false
+    "momentum_expanded": false,
+    "exit_kind": "REVERSAL_EXIT"
   },
   {
     "ticker": "THG",
@@ -3345,29 +3349,33 @@
     },
     "exit_intelligence": {
       "status": "HOLD",
-      "score": 0.0,
-      "signals": [],
-      "categories": [],
+      "score": 15.0,
+      "signals": [
+        "Shooting Star / upper-wick rejection"
+      ],
+      "categories": [
+        "candle"
+      ],
       "profit_protection_active": true,
       "profit_exit_floor": 242.09,
       "max_profit_pct": 4.37,
-      "closed_bar_date": "2026-11-04",
+      "closed_bar_date": "2026-11-06",
       "target_reached": false,
       "exit_confirmed": false,
       "exit_reason": null,
       "max_r": 0.69,
-      "r_now": 0.51,
+      "r_now": 0.05,
       "activation_pct": 2.96,
       "momentum_expanded": false,
-      "trail_ema": 241.2685,
+      "trail_ema": 242.7525,
       "closes_below_trail": 0,
       "earnings_exit": {
         "triggered": false,
-        "safe_sessions_left": 53,
+        "safe_sessions_left": 51,
         "event_session": "2027-01-27",
         "first_exposed_session": "2027-01-25",
         "last_safe_session": "2027-01-22",
-        "asof_session": "2026-11-04",
+        "asof_session": "2026-11-06",
         "passed": false,
         "timing": "unknown",
         "lead_sessions": 1,
@@ -3383,8 +3391,8 @@
     "pnl_pct": null,
     "data_status": "ok",
     "momentum_expanded": false,
-    "last_tracker_price": 249.92999267578125,
-    "last_tracker_date": "2026-11-05",
+    "last_tracker_price": 242.89999389648438,
+    "last_tracker_date": "2026-11-08",
     "soft_warnings": []
   },
   {
@@ -3428,22 +3436,21 @@
       "tighten_on_reversal_candle_with_volume_climax": true
     },
     "exit_intelligence": {
-      "status": "WATCH",
+      "status": "BUILDING",
       "score": 0.0,
       "signals": [
-        "\u05e4\u05e8\u05d9\u05e6\u05ea \u05e9\u05d5\u05d5\u05d0 \u05d0\u05e4\u05e9\u05e8\u05d9\u05ea: \u05e1\u05d2\u05d9\u05e8\u05d4 \u05de\u05ea\u05d7\u05ea \u05dc\u05e8\u05de\u05ea \u05d4\u05e4\u05e8\u05d9\u05e6\u05d4 (95.80 < 95.83) \u05d1\u05e0\u05e4\u05d7 \u00d71.6",
         "Profit Protection \u05de\u05de\u05ea\u05d9\u05df \u05dc-+2.9% (\u05e9\u05d9\u05d0 \u05db\u05e8\u05d2\u05e2 +0.8%)"
       ],
       "categories": [],
       "profit_protection_active": false,
       "profit_exit_floor": null,
       "max_profit_pct": 0.76,
-      "closed_bar_date": "2026-11-04",
+      "closed_bar_date": "2026-11-06",
       "target_reached": false,
       "exit_confirmed": false,
       "exit_reason": null,
       "max_r": 0.13,
-      "r_now": -0.01,
+      "r_now": -0.03,
       "activation_pct": 2.88,
       "earnings_exit": {
         "triggered": false,
@@ -3457,8 +3464,8 @@
     "close_date": null,
     "pnl_pct": null,
     "data_status": "ok",
-    "last_tracker_price": 95.80000305175781,
-    "last_tracker_date": "2026-11-05",
+    "last_tracker_price": 95.66999816894531,
+    "last_tracker_date": "2026-11-08",
     "soft_warnings": []
   },
   {
@@ -3502,30 +3509,29 @@
       "tighten_on_reversal_candle_with_volume_climax": true
     },
     "exit_intelligence": {
-      "status": "WATCH",
+      "status": "BUILDING",
       "score": 0.0,
       "signals": [
-        "\u05e4\u05e8\u05d9\u05e6\u05ea \u05e9\u05d5\u05d5\u05d0 \u05d0\u05e4\u05e9\u05e8\u05d9\u05ea: \u05e1\u05d2\u05d9\u05e8\u05d4 \u05de\u05ea\u05d7\u05ea \u05dc\u05e8\u05de\u05ea \u05d4\u05e4\u05e8\u05d9\u05e6\u05d4 (49.23 < 49.31) \u05d1\u05e0\u05e4\u05d7 \u00d71.7",
         "Profit Protection \u05de\u05de\u05ea\u05d9\u05df \u05dc-+2.9% (\u05e9\u05d9\u05d0 \u05db\u05e8\u05d2\u05e2 +2.1%)"
       ],
       "categories": [],
       "profit_protection_active": false,
       "profit_exit_floor": null,
       "max_profit_pct": 2.13,
-      "closed_bar_date": "2026-11-04",
+      "closed_bar_date": "2026-11-06",
       "target_reached": false,
       "exit_confirmed": false,
       "exit_reason": null,
       "max_r": 0.53,
-      "r_now": -0.04,
+      "r_now": -0.55,
       "activation_pct": 2.9,
       "earnings_exit": {
         "triggered": false,
-        "safe_sessions_left": 51,
+        "safe_sessions_left": 49,
         "event_session": "2027-01-21",
         "first_exposed_session": "2027-01-21",
         "last_safe_session": "2027-01-20",
-        "asof_session": "2026-11-04",
+        "asof_session": "2026-11-06",
         "passed": false,
         "timing": "unknown",
         "lead_sessions": 1,
@@ -3540,8 +3546,8 @@
     "close_date": null,
     "pnl_pct": null,
     "data_status": "ok",
-    "last_tracker_price": 49.22999954223633,
-    "last_tracker_date": "2026-11-05",
+    "last_tracker_price": 48.220001220703125,
+    "last_tracker_date": "2026-11-08",
     "soft_warnings": []
   },
   {
@@ -3594,20 +3600,20 @@
       "profit_protection_active": false,
       "profit_exit_floor": null,
       "max_profit_pct": 2.43,
-      "closed_bar_date": "2026-11-04",
+      "closed_bar_date": "2026-11-06",
       "target_reached": false,
       "exit_confirmed": false,
       "exit_reason": null,
       "max_r": 0.29,
-      "r_now": 0.1,
+      "r_now": -0.28,
       "activation_pct": 2.96,
       "earnings_exit": {
         "triggered": false,
-        "safe_sessions_left": 49,
+        "safe_sessions_left": 47,
         "event_session": "2027-01-19",
         "first_exposed_session": "2027-01-19",
         "last_safe_session": "2027-01-15",
-        "asof_session": "2026-11-04",
+        "asof_session": "2026-11-06",
         "passed": false,
         "timing": "unknown",
         "lead_sessions": 1,
@@ -3622,8 +3628,8 @@
     "close_date": null,
     "pnl_pct": null,
     "data_status": "ok",
-    "last_tracker_price": 39.84000015258789,
-    "last_tracker_date": "2026-11-05",
+    "last_tracker_price": 38.599998474121094,
+    "last_tracker_date": "2026-11-08",
     "soft_warnings": []
   }
 ]
