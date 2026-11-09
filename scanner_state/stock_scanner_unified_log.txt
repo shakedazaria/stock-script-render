@@ -51889,3 +51889,16 @@
 [2026-11-08 11:18:03] 🧪 V9.3 ENTRY FUNNEL — by pattern: Darvas Box Breakout: ready=0, watch=112 | Flat Base / Rectangle Breakout: ready=0, watch=99 | VCP Breakout: ready=0, watch=48 | EMA21/MA50 Pullback Bounce: ready=0, watch=48 | Breakout Retest Entry: ready=0, watch=29 | Falling Wedge: ready=0, watch=4 | Double Bottom: ready=0, watch=2 | Bullish Triangle: ready=0, watch=1 | Cup & Handle: ready=0, watch=1
 [2026-11-08 11:18:03] 💾 Market scan date saved: 2026-11-06
 [2026-11-08 11:18:03] 💾 Market candle fingerprint saved: 3 source(s) → scanner_state/last_market_scan_state.json
+[2026-11-09 11:15:13] ============================================================
+[2026-11-09 11:15:13] Stock Scanner Unified — START
+[2026-11-09 11:15:13] Code version: 2026-11-01-v9.7.8-swing
+[2026-11-09 11:15:13] v9.7.6 switches: RS_MODE=swing | EARNINGS_EXIT=True (lead=1, probable=True) | MEDIAN_LIQUIDITY=False | SMART_MONEY=False (rank) | WEEKLY_ALIGN=off | SWING_EXIT_ENGINE=True
+[2026-11-09 11:15:13] v9.7.7 switches: SMART_MONEY_ACCEL=False (footprint window=10, min_prints=2, bonus=4) | AUTO_APPLY_LEARNING=False | THRESHOLD_LEARNING=True (scope=current)
+[2026-11-09 11:15:13] v9.7.8 switches: ALPHA_BOOST=False (rank-only; cmf_streak=5, cmf_bonus=6, compress_max=4, cap=10)
+[2026-11-09 11:15:13] Market cap threshold: $1.0B | Pipeline: screener cache → precheck unknowns → fail-open only if unresolved
+[2026-11-09 11:15:13] Entry Ready threshold: quality>=60.0 | candidate_score>=35.0
+[2026-11-09 11:15:13] RESET VERIFIED FIX FILE
+[2026-11-09 11:15:13] ============================================================
+[2026-11-09 11:15:24] 🛡️ Market Day Guard candles: Yahoo:SPY=2026-11-06 close=735.289978 vol=58848000, Yahoo:QQQ=2026-11-06 close=656.099976 vol=70469100, TwelveData:SPY=2026-11-06 close=735.28998 vol=58848000
+[2026-11-09 11:15:24] 🗓️ Market Day Guard: אין תאריך חדש ואין שינוי ב-OHLCV מאז הסריקה האחרונה (2026-11-06); אומת מול 2 מקור/ות זהים
+[2026-11-09 11:15:24] ⏸️ No new market session — exiting before scan to prevent duplicate alerts.
