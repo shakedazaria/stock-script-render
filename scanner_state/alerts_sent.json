@@ -64,5 +64,16 @@
       }
     ]
   },
-  "PEBO_Darvas Box Breakout_66": "2026-11-03T11:51:31.388520"
+  "PEBO_Darvas Box Breakout_66": "2026-11-03T11:51:31.388520",
+  "RSG": {
+    "time": 1794485240.341868,
+    "patterns": [
+      {
+        "name": "Breakout Retest Entry",
+        "level": 249.34,
+        "time": 1794485240.341868
+      }
+    ]
+  },
+  "RSG_Breakout Retest Entry_66": "2026-11-12T12:07:20.341870"
 }
