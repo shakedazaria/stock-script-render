@@ -1,36 +1,36 @@
 {
-  "market_date": "2026-11-13",
-  "saved_at": "2026-11-15T12:06:47",
+  "market_date": "2026-11-16",
+  "saved_at": "2026-11-17T12:54:56",
   "candles": {
     "Yahoo:SPY": {
       "source": "Yahoo:SPY",
       "symbol": "SPY",
-      "date": "2026-11-13",
-      "open": 760.070007,
-      "high": 760.119995,
-      "low": 747.880005,
-      "close": 754.369995,
-      "volume": 38391200
+      "date": "2026-11-16",
+      "open": 749.659973,
+      "high": 749.820007,
+      "low": 738.070007,
+      "close": 739.950012,
+      "volume": 69044100
     },
     "Yahoo:QQQ": {
       "source": "Yahoo:QQQ",
       "symbol": "QQQ",
-      "date": "2026-11-13",
-      "open": 688.539978,
-      "high": 688.75,
-      "low": 671.679993,
-      "close": 679.890015,
-      "volume": 41798500
+      "date": "2026-11-16",
+      "open": 671.039978,
+      "high": 672.150024,
+      "low": 660.47998,
+      "close": 661.75,
+      "volume": 42801200
     },
     "TwelveData:SPY": {
       "source": "TwelveData:SPY",
       "symbol": "SPY",
-      "date": "2026-11-13",
-      "open": 760.070007,
-      "high": 760.12,
-      "low": 747.88,
-      "close": 754.37,
-      "volume": 38391200
+      "date": "2026-11-16",
+      "open": 749.65997,
+      "high": 749.82001,
+      "low": 738.070007,
+      "close": 739.95001,
+      "volume": 69044100
     }
   }
 }
