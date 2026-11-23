@@ -3256,3 +3256,16 @@
 [2026-11-22 11:44:05] 🧪 V9.3 ENTRY FUNNEL — by pattern: EMA21/MA50 Pullback Bounce: ready=0, watch=187 | Flat Base / Rectangle Breakout: ready=0, watch=63 | Darvas Box Breakout: ready=0, watch=62 | VCP Breakout: ready=0, watch=50 | Breakout Retest Entry: ready=0, watch=4 | Falling Wedge: ready=0, watch=1 | Bullish Triangle: ready=0, watch=1
 [2026-11-22 11:44:05] 💾 Market scan date saved: 2026-11-20
 [2026-11-22 11:44:05] 💾 Market candle fingerprint saved: 3 source(s) → scanner_state/last_market_scan_state.json
+[2026-11-23 12:08:18] ============================================================
+[2026-11-23 12:08:18] Stock Scanner Unified — START
+[2026-11-23 12:08:18] Code version: 2026-11-01-v9.7.8-swing
+[2026-11-23 12:08:18] v9.7.6 switches: RS_MODE=swing | EARNINGS_EXIT=True (lead=1, probable=True) | MEDIAN_LIQUIDITY=False | SMART_MONEY=False (rank) | WEEKLY_ALIGN=off | SWING_EXIT_ENGINE=True
+[2026-11-23 12:08:18] v9.7.7 switches: SMART_MONEY_ACCEL=False (footprint window=10, min_prints=2, bonus=4) | AUTO_APPLY_LEARNING=False | THRESHOLD_LEARNING=True (scope=current)
+[2026-11-23 12:08:18] v9.7.8 switches: ALPHA_BOOST=False (rank-only; cmf_streak=5, cmf_bonus=6, compress_max=4, cap=10)
+[2026-11-23 12:08:18] Market cap threshold: $1.0B | Pipeline: screener cache → precheck unknowns → fail-open only if unresolved
+[2026-11-23 12:08:18] Entry Ready threshold: quality>=60.0 | candidate_score>=35.0
+[2026-11-23 12:08:18] RESET VERIFIED FIX FILE
+[2026-11-23 12:08:18] ============================================================
+[2026-11-23 12:08:28] 🛡️ Market Day Guard candles: Yahoo:SPY=2026-11-20 close=689.809998 vol=151049800, Yahoo:QQQ=2026-11-20 close=608.450012 vol=134360600, TwelveData:SPY=2026-11-20 close=689.81 vol=151049800
+[2026-11-23 12:08:28] 🗓️ Market Day Guard: אין תאריך חדש ואין שינוי ב-OHLCV מאז הסריקה האחרונה (2026-11-20); אומת מול 2 מקור/ות זהים
+[2026-11-23 12:08:28] ⏸️ No new market session — exiting before scan to prevent duplicate alerts.
