@@ -3637,7 +3637,7 @@
     "close_date": null,
     "pnl_pct": null,
     "data_status": "ok",
-    "last_tracker_price": 37.209999084472656,
+    "last_tracker_price": 37.369998931884766,
     "last_tracker_date": "2026-11-24",
     "soft_warnings": []
   },
@@ -3719,7 +3719,7 @@
     "close_date": null,
     "pnl_pct": null,
     "data_status": "ok",
-    "last_tracker_price": 247.69000244140625,
+    "last_tracker_price": 251.30999755859375,
     "last_tracker_date": "2026-11-24",
     "soft_warnings": []
   }
