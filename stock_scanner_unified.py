@@ -39,13 +39,18 @@ stock_scanner_unified.py
   כבוי עם USE_SMART_MONEY_ACCEL=False) ולמידת ספים שבועית (run_automated_threshold_learning; מוחל רק עם AUTO_APPLY_LEARNING=True).
   V9.7.8 מוסיף Alpha Boost Engine: בונוס דירוג בלבד (rank_key) על רצף CMF עולה ועל דחיסת טווח יחסית ל-ATR לפני הפריצה;
   כבוי עם USE_ALPHA_BOOST=False, לא חוסם, לא משנה ציוני כניסה, ועמודות ab_* נכנסות ל-gate_feature_frame לבקטסט הבא.
+  V9.7.9 (breadth): תקרת ה-6% מעל EMA28 כבויה (EMA28_UPPER_CAP_ENABLED=False; נשארים close>=EMA28 ו-EMA28 עולה),
+  TOP_ALERTS_TO_SEND=6, Professional כשכבת דירוג בלבד (PRO_RANK_ONLY=True), ו-MAX_OPEN_POSITIONS=20:
+  אין התראות כניסה חדשות כש-open_positions.json מחזיק 20 פוזיציות פתוחות. כל שינוי הפיך דרך משתנה סביבה.
+  V9.7.9 audit: close>=EMA28 ו-EMA28 עולה חלים על כל מועמד, גם Double Bottom (EMA28_GLOBAL_FILTER_STRICT=True);
+  סיכון ברירת מחדל לגודל פוזיציה 0.5% (RISK_PCT_PER_TRADE); בדיקת R:R>=ENTRY_MIN_RR גם בשער השליחה הסופי.
 """
 
 # ============================================================
 # RESET VERIFIED FIX FILE — 2026-09-30 V9.3
 # This marker proves this is the rebuilt fixed file, not an old download copy.
 # ============================================================
-CODE_VERSION = "2026-11-01-v9.7.8-swing"
+CODE_VERSION = "2026-11-24-v9.7.9-swing"
 RESET_VERIFIED_FIX_FILE = True
 
 
@@ -769,8 +774,14 @@ USE_HIGH_FOR_BREAKOUT = os.getenv("USE_HIGH_FOR_BREAKOUT", "False").lower() in (
 ALERT_DEDUP_LEVEL_PCT = float(os.getenv("ALERT_DEDUP_LEVEL_PCT", "0.015"))
 
 # --- EMA28 (תנאי גלובלי) ---
-# הסגירה חייבת להיות לא יותר מ-3% מעל EMA28
+# הסגירה לא יותר מ-EMA28_MAX_DIST_PCT מעל EMA28 — רק כש-EMA28_UPPER_CAP_ENABLED=True
 EMA28_MAX_DIST_PCT    = float(os.getenv("EMA28_MAX_DIST_PCT", "0.06"))   # 6% (v9.7.3, 2026-10-29; was 8% in v9.7.1, 3% before)
+# v9.7.9: upper cap OFF by default. Breadth simulation 2026-11-24 (v3.6 shards, 430 tickers, 2023-2026): 81.5% of
+# ENTRY_READY ticker-days were above 6%; those trades had Win20 52.4% / Rc +0.048 vs 49.6% / +0.023 inside the cap.
+EMA28_UPPER_CAP_ENABLED = os.getenv("EMA28_UPPER_CAP_ENABLED", "False").lower() in ("1","true","yes")
+# v9.7.9: close >= EMA28 and EMA28 rising apply to EVERY candidate, also when an early Double Bottom was found
+# (v9.7.8 skipped the global filter in that case). False restores the v9.7.8 exception.
+EMA28_GLOBAL_FILTER_STRICT = os.getenv("EMA28_GLOBAL_FILTER_STRICT", "True").lower() in ("1","true","yes")
 # EMA28 חייב בשיפוע עולה (הערך היום > אתמול)
 EMA28_REQUIRE_RISING  = os.getenv("EMA28_REQUIRE_RISING", "True").lower() in ("1","true","yes")
 
@@ -827,6 +838,9 @@ V9_INCLUDE_REJECTED_DEBUG     = os.getenv("V9_INCLUDE_REJECTED_DEBUG", "False").
 #  שהמועמד כבר עבר את V8 Entry Ready, כדי לבחור רק עסקאות עם Context חזק.
 # ============================================================
 PRO_ENGINE_ENABLED            = os.getenv("PRO_ENGINE_ENABLED", "True").lower() in ("1", "true", "yes")
+# v9.7.9: True = the Professional engine only scores and orders ENTRY_READY candidates (rank by professional_score);
+# its blockers and PRO_MIN_SCORE no longer discard a candidate. False = the v9.7.8 hard gate, unchanged.
+PRO_RANK_ONLY                 = os.getenv("PRO_RANK_ONLY", "True").lower() in ("1", "true", "yes")
 PRO_MIN_SCORE                 = float(os.getenv("PRO_MIN_SCORE", "75.0"))
 PRO_MIN_TREND_SCORE           = float(os.getenv("PRO_MIN_TREND_SCORE", "55.0"))
 PRO_MIN_RS_PROFILE_SCORE      = float(os.getenv("PRO_MIN_RS_PROFILE_SCORE", "65.0"))
@@ -1164,7 +1178,17 @@ DEDUP_ALERT_HOURS     = ALERT_COOLDOWN_HOURS
 # אם כבר יש פוזיציה פתוחה על אותו טיקר — לא שולחים עליו התראת כניסה נוספת.
 SUPPRESS_ALERTS_FOR_OPEN_POSITIONS = os.getenv("SUPPRESS_ALERTS_FOR_OPEN_POSITIONS", "True").lower() in ("1", "true", "yes")
 DEBUG_SCAN_REASONS    = os.getenv("DEBUG_SCAN_REASONS","True").lower() in ("1","true","yes")
-TOP_ALERTS_TO_SEND    = int(os.getenv("TOP_ALERTS_TO_SEND", "3"))
+TOP_ALERTS_TO_SEND    = int(os.getenv("TOP_ALERTS_TO_SEND", "6"))   # v9.7.9: 3 -> 6
+# v9.7.9: portfolio cap. No new entry alerts once open_positions.json holds this many open positions (0 = no cap).
+MAX_OPEN_POSITIONS    = int(os.getenv("MAX_OPEN_POSITIONS", "20"))
+# v9.7.9: risk per trade for the position size in the email (atr_stop_and_position). 0.5% by default because up to
+# 20 positions can be open; a value that is not a number in (0, 2%] falls back to 0.5%.
+try:
+    RISK_PCT_PER_TRADE = float(os.getenv("RISK_PCT_PER_TRADE", "0.005"))
+except ValueError:
+    RISK_PCT_PER_TRADE = 0.005
+if not (math.isfinite(RISK_PCT_PER_TRADE) and 0.0 < RISK_PCT_PER_TRADE <= 0.02):
+    RISK_PCT_PER_TRADE = 0.005
 
 # --- קבצים ---
 PROGRESS_FILE      = _state_path(os.getenv("PROGRESS_FILE",      "progress.json"))
@@ -1245,7 +1269,7 @@ if _tickers_env:
     except Exception:
         tickers = [t.strip() for t in _tickers_env.split(",") if t.strip()]
 else:
-    # יטען ב-main() — כאן רק placeholder
+    # ערך התחלתי ריק; רשימת המניות נטענת ב-main()
     tickers = []
 
 
@@ -3017,7 +3041,8 @@ def earnings_filter_ok(ticker: str) -> tuple[bool, str]:
             return False, f"earnings in {days_until} days ({edate})"
         return True, f"next earnings: {edate} ({days_until}d away)"
     except Exception as e:
-        return True, f"earnings check error: {e} — allowing"
+        # v9.7.9: worded as "earnings date unknown" so REQUIRE_VERIFIED_EARNINGS turns it into DATA_WAIT (no entry).
+        return True, f"earnings date unknown (check error: {type(e).__name__}) — not verified"
 
 # ============================================================
 #  v9.7.6 — SWING LAYERS (earnings forced exit · median liquidity · smart money · RS rank penalty)
@@ -4623,11 +4648,13 @@ def _volume_zscore(df: pd.DataFrame, lookback: int = 20) -> tuple[float, float]:
 def atr_stop_and_position(break_level: float, df: pd.DataFrame,
                            pattern_meta: dict | None = None,
                            capital: float = 100_000.0,
-                           risk_pct: float = 0.01,
+                           risk_pct: float | None = None,
                            atr_mult: float | None = None) -> tuple:
     """מחזיר (stop, target, size_shares, atr, rr_ratio).
     FIXED: סטופ חכם לפי ATR + שפל אחרון + תמיכת תבנית, עם מרחק 4.5%-12%.
+    v9.7.9: risk_pct=None -> RISK_PCT_PER_TRADE (0.5% by default).
     """
+    risk_pct = RISK_PCT_PER_TRADE if risk_pct is None else float(risk_pct)
     try:
         if df is None or df.empty:
             raise ValueError("empty df")
@@ -4706,7 +4733,7 @@ def atr_stop_and_position(break_level: float, df: pd.DataFrame,
 # ============================================================
 def _ema28_filter_ok(df: pd.DataFrame) -> tuple[bool, str]:
     """
-    תנאי גלובלי: הסגירה לא יותר מ-EMA28_MAX_DIST_PCT מעל EMA28,
+    תנאי גלובלי: הסגירה לא מתחת ל-EMA28 (ולא יותר מ-EMA28_MAX_DIST_PCT מעליו כש-EMA28_UPPER_CAP_ENABLED),
     ו-EMA28 בשיפוע עולה.
     מחזיר (ok, reason).
     """
@@ -4722,7 +4749,7 @@ def _ema28_filter_ok(df: pd.DataFrame) -> tuple[bool, str]:
         dist = (close_now - ema_now) / ema_now
         if dist < 0:
             return False, f"price below EMA28 ({dist*100:.1f}%)"
-        if dist > EMA28_MAX_DIST_PCT:
+        if EMA28_UPPER_CAP_ENABLED and dist > EMA28_MAX_DIST_PCT:
             return False, f"price too far above EMA28 ({dist*100:.1f}% > {EMA28_MAX_DIST_PCT*100:.0f}%)"
         if EMA28_REQUIRE_RISING and ema_now <= ema_prev:
             return False, f"EMA28 not rising ({ema_now:.2f} <= {ema_prev:.2f})"
@@ -5172,9 +5199,10 @@ def _entry_quality_metrics(df: pd.DataFrame, ticker: str, breakout_level: float,
         return metrics
 
 
-def _validate_long_trade_levels(alert: dict) -> tuple[bool, list[str], dict]:
+def _validate_long_trade_levels(alert: dict, min_rr: float | None = None) -> tuple[bool, list[str], dict]:
     """
     Hard safety validation for a long setup before Entry Ready scoring.
+    v9.7.9: with min_rr (the final send gate passes ENTRY_MIN_RR) the calculated R:R must also reach it.
     Uses breakout_level as the actual planned trigger/entry. A detector's internal
     reference price is not treated as the trade entry. No score can override this.
     """
@@ -5211,6 +5239,8 @@ def _validate_long_trade_levels(alert: dict) -> tuple[bool, list[str], dict]:
         values["calculated_rr"] = calc_rr
         if calc_rr is None or not math.isfinite(calc_rr) or calc_rr <= 0:
             problems.append("R:R מחושב לא תקין")
+        elif min_rr is not None and not _rr_at_least(calc_rr, float(min_rr)):
+            problems.append(f"R:R מחושב נמוך ({calc_rr:.2f} < {float(min_rr):.2f})")
     else:
         values["calculated_rr"] = None
 
@@ -8282,8 +8312,8 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
     except Exception as e:
         log(f"{symbol} Double Bottom early error: {e}")
 
-    # ── פילטר גלובלי: EMA28 — מדלג אם Double Bottom כבר נמצא ──
-    if not candidates:
+    # ── פילטר גלובלי: EMA28 — v9.7.9: חל גם כש-Double Bottom כבר נמצא (EMA28_GLOBAL_FILTER_STRICT) ──
+    if EMA28_GLOBAL_FILTER_STRICT or not candidates:
         ema_ok, ema_reason = _ema28_filter_ok(df)
         if not ema_ok:
             if DEBUG_SCAN_REASONS:
@@ -8468,9 +8498,9 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
         phase2 = check_for_consolidation_breakout(df, symbol, min_score=effective_min_score)
         # סנן סטאפים שרחוקים מדי מ-EMA28 או מ-MA150
         if phase2:
-            phase2 = [p for p in phase2
-                      if abs((price_now - float(df["ema28"].iloc[-1])) / float(df["ema28"].iloc[-1])) <= EMA28_MAX_DIST_PCT
-                      and ma_dist <= MA150_MAX_DISTANCE]
+            _d28 = (price_now - float(df["ema28"].iloc[-1])) / float(df["ema28"].iloc[-1])
+            _d28_ok = abs(_d28) <= EMA28_MAX_DIST_PCT if EMA28_UPPER_CAP_ENABLED else _d28 >= -EMA28_MAX_DIST_PCT
+            phase2 = [p for p in phase2 if _d28_ok and ma_dist <= MA150_MAX_DISTANCE]
         candidates.extend(phase2)
     except Exception as e:
         log(f"{symbol} Phase2 error: {e}")
@@ -8625,6 +8655,14 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
                 log_professional_quality_decision(alert, pro)
                 _record_setup_evaluation(alert, "PRO_PASSED" if pro.get("professional_ready") else "PRO_REJECTED", df)
 
+                if PRO_RANK_ONLY:
+                    # v9.7.9: ranking only. alert["score"] stays the entry-quality score (send thresholds);
+                    # _alert_rank_value() orders the email by professional_score. Nothing is discarded here.
+                    verdict = "ready" if pro.get("professional_ready", False) else "below bar: " + ("; ".join((pro.get("blockers", []) or [])[:4]) or "לא עבר Professional Quality")
+                    log(f"{symbol}: ⭐ PROFESSIONAL RANK {alert.get('pattern_type','')} | pro={alert['professional_score']:.1f} | entry={alert['entry_quality_score']:.1f} | label={pro.get('label','')} | {verdict}")
+                    pro_ready_candidates.append(alert)
+                    continue
+
                 if not pro.get("professional_ready", False):
                     blockers = pro.get("blockers", []) or []
                     short = "; ".join(blockers[:4]) if blockers else "לא עבר Professional Quality"
@@ -8638,6 +8676,16 @@ def scan_ticker(ticker: str, alert_history: dict, filter_stats: dict | None = No
                 pro_ready_candidates.append(alert)
             except Exception as e:
                 log(f"{symbol}: professional quality gate error: {type(e).__name__}: {e}")
+                if PRO_RANK_ONLY:
+                    # v9.7.9: ranking only — an engine error ranks the candidate last instead of discarding it.
+                    alert["professional_score"] = 0.0
+                    alert.setdefault("entry_quality_score", float(alert.get("score", 0) or 0))
+                    alert.setdefault("professional_quality", {"status": "PRO_WATCHLIST", "professional_ready": False,
+                                                              "professional_score": 0.0, "label": "ERROR",
+                                                              "blockers": [f"Professional engine error: {type(e).__name__}"],
+                                                              "components": {}})
+                    pro_ready_candidates.append(alert)
+                    continue
                 _fs("professional_quality")
 
         candidates = pro_ready_candidates
@@ -9196,6 +9244,15 @@ def is_position_open(ticker: str) -> bool:
     except Exception as e:
         log(f"is_position_open error for {ticker}: {e}")
     return False
+
+
+def _count_open_positions() -> int:
+    """v9.7.9: open (not closed) positions in POSITIONS_FILE — the number MAX_OPEN_POSITIONS is checked against.
+    Only an explicit closed flag (True / "true" / "1" / "yes") counts as closed; anything else counts as open (fail safe)."""
+    def _is_closed(p: dict) -> bool:
+        flag = p.get("closed", False)
+        return flag is True or str(flag).strip().lower() in ("1", "true", "yes")
+    return sum(1 for p in _load_positions() if isinstance(p, dict) and not _is_closed(p))
 
 
 def _save_positions(positions: list[dict]) -> None:
@@ -12735,10 +12792,13 @@ def _update_setup_evaluations() -> None:
 
 
 def _alert_rank_value(alert: dict) -> float:
-    """Ordering key = displayed score + Smart-Money rank bonus - RS rank penalty (both 0 unless the layers are active)."""
+    """Ordering key = displayed score + Smart-Money rank bonus - RS rank penalty (both 0 unless the layers are active).
+    v9.7.9: with PRO_RANK_ONLY the base is professional_score (falls back to score when it is missing)."""
     try:
         q = alert.get("entry_quality") if isinstance(alert.get("entry_quality"), dict) else {}
-        return (float(alert.get("score", 0) or 0) + float(q.get("rank_bonus", 0) or 0) - float(q.get("rank_penalty", 0) or 0))
+        base = alert.get("professional_score") if (PRO_ENGINE_ENABLED and PRO_RANK_ONLY) else None
+        base = float(base) if _is_finite_number(base) else float(alert.get("score", 0) or 0)
+        return (base + float(q.get("rank_bonus", 0) or 0) - float(q.get("rank_penalty", 0) or 0))
     except (TypeError, ValueError):
         return 0.0
 
@@ -12762,16 +12822,24 @@ def _select_final_alerts(alerts: list[dict], limit=None) -> list[dict]:
 def _deliver_selected_alerts(alerts: list[dict], history: dict) -> dict:
     valid = []
     for alert in alerts:
-        if _validate_long_trade_levels(alert)[0]:
+        if _validate_long_trade_levels(alert, min_rr=ENTRY_MIN_RR)[0]:
             valid.append(alert)
         else:
             _record_setup_evaluation(alert, "SAFETY_REJECTED", alert.get("_df"))
-    selected = _select_final_alerts(valid)
+    limit, open_now = None, None
+    if MAX_OPEN_POSITIONS > 0:
+        open_now = _count_open_positions()
+        limit = max(0, min(int(TOP_ALERTS_TO_SEND), MAX_OPEN_POSITIONS - open_now))
+        log(f"📦 Open positions {open_now}/{MAX_OPEN_POSITIONS} — new entry alerts allowed today: {limit}")
+    top_ids = {id(a) for a in _select_final_alerts(valid)}
+    selected = _select_final_alerts(valid, limit)
     selected_ids = {id(a) for a in selected}
     for alert in valid:
         if id(alert) not in selected_ids:
-            _record_setup_evaluation(alert, "TOP_EXCLUDED", alert.get("_df"))
+            _record_setup_evaluation(alert, "MAX_OPEN_EXCLUDED" if id(alert) in top_ids else "TOP_EXCLUDED", alert.get("_df"))
     if not selected:
+        if valid and open_now is not None and open_now >= MAX_OPEN_POSITIONS:
+            return {"sent": 0, "success": True, "status": "max_open_positions", "refused": 0, "open_positions": open_now}
         return {"sent": 0, "success": False, "status": "no_valid_selected", "refused": 0}
     email_copy = [dict(a) for a in selected]
     email_copy[0]["display_pattern_name"] = "🏆 " + _canonical_pattern_name(email_copy[0])
@@ -13005,7 +13073,7 @@ def send_email_alerts(alerts: list[dict]) -> dict:
         intel_cache.clear()
 @_nonfatal_mail
 def send_daily_summary_email(stats: dict, filter_stats: dict, regime: dict | None = None,
-                             prefilter_stats: dict | None = None, note: str = "") -> dict:
+                             prefilter_stats: dict | None = None, note: str = "", subject: str = "") -> dict:
     """
     שולח מייל יומי גם כשאין סטאפים.
     המטרה: לדעת שהסריקה באמת רצה, כמה מניות נבדקו, ומה נפסל בדרך.
@@ -13025,7 +13093,7 @@ def send_daily_summary_email(stats: dict, filter_stats: dict, regime: dict | Non
     msg = MIMEMultipart("alternative")
     msg["From"] = FROM_EMAIL
     msg["To"] = ", ".join(TO_EMAILS)
-    msg["Subject"] = f"✅ סורק המניות רץ — אין סטאפים היום — {now_str}"
+    msg["Subject"] = f"✅ סורק המניות רץ — {subject or 'אין סטאפים היום'} — {now_str}"
     _attach_mail_content(msg, html)
 
     return _smtp_deliver(msg, "daily_summary")
@@ -13218,7 +13286,7 @@ def prefilter_by_ema28(ticker_list: list[str]) -> tuple[list[str], list[str]]:
                 if dist < -PREFILTER_EMA_GUARD_BAND_PCT:
                     failed.append(ticker)
                     continue
-                if dist > EMA28_MAX_DIST_PCT + PREFILTER_EMA_GUARD_BAND_PCT:
+                if EMA28_UPPER_CAP_ENABLED and dist > EMA28_MAX_DIST_PCT + PREFILTER_EMA_GUARD_BAND_PCT:
                     failed.append(ticker)
                     continue
                 slope_pct = (ema_now - ema_prev) / max(abs(ema_prev), 1e-9)
@@ -13526,6 +13594,8 @@ def main() -> None:
     log(f"🎯 MIN_ALERT_SCORE דינמי: {dynamic_score} (Regime={regime_name})")
     log(f"🚀 V9.3 Pattern-Aware Entry: min_quality={ENTRY_READY_MIN_SCORE:.1f}, breakout_volume×{ENTRY_MIN_VOLUME_RATIO:.2f}, pullback/retest_volume×{ENTRY_PULLBACK_MIN_VOLUME_RATIO:.2f}+, RS>={ENTRY_MIN_RS_SCORE:.0f}")
     log(f"🧩 V9 Pattern Expansion: enabled={V9_PATTERN_ENGINE_ENABLED}, all_detected_families_before_entry=True, email_limit={TOP_ALERTS_TO_SEND}, patterns=FlatBase/Darvas/VCP/EMA-Pullback/Retest")
+    log(f"🧮 v9.7.9 breadth: TOP_ALERTS_TO_SEND={TOP_ALERTS_TO_SEND}, MAX_OPEN_POSITIONS={MAX_OPEN_POSITIONS or 'off'}, "
+        f"EMA28 upper cap={'on ' + format(EMA28_MAX_DIST_PCT * 100, '.0f') + '%' if EMA28_UPPER_CAP_ENABLED else 'off'}, PRO_RANK_ONLY={PRO_RANK_ONLY}")
     log(f"🧠 V9.1 Professional Quality: enabled={PRO_ENGINE_ENABLED}, min={PRO_MIN_SCORE:.1f}, trend>={PRO_MIN_TREND_SCORE:.0f}, multi-RS>={PRO_MIN_RS_PROFILE_SCORE:.0f}, max_stop={PRO_MAX_STOP_RISK_PCT*100:.0f}%, breakout_stop={BREAKOUT_MIN_STOP_RISK_PCT*100:.0f}-{BREAKOUT_MAX_STOP_RISK_PCT*100:.0f}%")
     log(f"🧭 V9.2 Exit Intelligence: fixed_initial_stop=True, profit_protection=+{EXIT_PROFIT_ACTIVATE_PCT:.1f}%, chandelier={EXIT_CHANDELIER_ATR_MULT:.1f}ATR, watch>={EXIT_WATCH_SCORE:.0f}, exit>={EXIT_CONFIRM_SCORE:.0f}, target=reference-only")
 
@@ -13621,11 +13691,11 @@ def main() -> None:
                     filter_stats["entry_quality"] += 1
                     continue
                 pro = alert.get("professional_quality", {}) if isinstance(alert.get("professional_quality", {}), dict) else {}
-                if PRO_ENGINE_ENABLED and not pro.get("professional_ready", False):
+                if PRO_ENGINE_ENABLED and not PRO_RANK_ONLY and not pro.get("professional_ready", False):
                     log(f"{symbol}: ❌ blocked before send — not PROFESSIONAL_READY")
                     filter_stats["professional_quality"] += 1
                     continue
-                if PRO_ENGINE_ENABLED and alert_score < float(PRO_MIN_SCORE):
+                if PRO_ENGINE_ENABLED and not PRO_RANK_ONLY and alert_score < float(PRO_MIN_SCORE):
                     log(f"{symbol}: ❌ blocked before send — professional quality {alert_score:.1f} < PRO_MIN_SCORE {float(PRO_MIN_SCORE):.1f}")
                     filter_stats["professional_quality"] += 1
                     continue
@@ -13671,6 +13741,17 @@ def main() -> None:
         if not delivery["success"]:
             stats["errors"] += 1
             stats["entry_email_failed"] = True
+        elif delivery["status"] == "max_open_positions":
+            log(f"📦 MAX_OPEN_POSITIONS={MAX_OPEN_POSITIONS} reached — no new entry alerts today ({len(all_alerts)} qualified)")
+            try:
+                send_daily_summary_email(
+                    stats, filter_stats, regime, PREFILTER_STATS,
+                    note=(f"התיק בתפוסה מלאה: {delivery.get('open_positions', MAX_OPEN_POSITIONS)}/{MAX_OPEN_POSITIONS} פוזיציות פתוחות. "
+                          f"{len(all_alerts)} סטאפים כשירים לא נשלחו היום; התראות כניסה חדשות יחזרו כשתיסגר פוזיציה."),
+                    subject=f"התיק מלא ({delivery.get('open_positions', MAX_OPEN_POSITIONS)}/{MAX_OPEN_POSITIONS}) — אין התראות כניסה חדשות")
+            except Exception as e:
+                stats["errors"] += 1
+                log(f"Daily summary email error: {type(e).__name__}: {e}")
 
     _flush_setup_evaluations()
     try:
@@ -13764,4 +13845,4 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 
-# END OF FILE - stock_scanner_unified.py v9.7.8 (2026-11-01)
+# END OF FILE - stock_scanner_unified.py v9.7.9 (2026-11-24)
